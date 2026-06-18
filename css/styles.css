@@ -233,6 +233,19 @@ td:last-child, th:last-child { text-align: right; }
 
 .hidden { display: none !important; }
 
+.load-banner, .app-error {
+  margin: 18px 22px 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 184, 77, 0.3);
+  background: rgba(255, 184, 77, 0.12);
+  color: var(--text);
+}
+.load-banner strong, .app-error h1 { display: block; margin-bottom: 6px; }
+.load-banner span, .app-error p { color: var(--muted); }
+.load-banner.error { border-color: rgba(255, 107, 122, 0.28); background: rgba(255, 107, 122, 0.12); }
+.app-error { margin: 24px; max-width: 720px; }
+
 @media (max-width: 1200px) {
   .hero, .dashboard-grid, .panel-grid, .page-layout { grid-template-columns: 1fr; }
   .mini-grid, .cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

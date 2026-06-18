@@ -126,7 +126,7 @@ function recommendations(limit = 3) {
   const recs = data?.recommendations || [];
   const generated = [
     insightCard('CPU efficiency', comparisonText(cluster.avg_cpu_efficiency, percentiles.cpu?.['75'], 'lower than', 'Your CPU efficiency is lower than')),
-    insightCard('Memory efficiency', memoryText(cluster.avg_memory_efficiency), 'Your jobs typically use only ' + pct(cluster.avg_memory_efficiency) + ' of requested memory.'),
+    insightCard('Memory efficiency', `Your jobs typically use only ${pct(cluster.avg_memory_efficiency)} of requested memory.`, 'Trim requests where the gap is widest.'),
     insightCard('Savings', 'You could reduce wasted spend by focusing on the highest-cost workloads first.', money(cluster.underutilized_cost_dkk)),
   ];
   const recommendationCards = recs.length
@@ -311,6 +311,9 @@ function methodologyPage() {
 }
 
 function renderShell(content) {
+  const loadState = data?.errors?.length
+    ? `<div class="load-banner error"><strong>Public demo mode</strong><span>Private export unavailable. Showing sample-data fallback.</span></div>`
+    : '';
   return `
     <div class="app-shell" data-theme="${state.theme}">
       <aside class="sidebar">
@@ -321,6 +324,7 @@ function renderShell(content) {
       <main class="main">
         <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Open navigation">${icon('menu')}</button></div>
         <div class="topbar"><div class="topbar-left"><div class="crumb">${icon('menu')} <span>${pageTitle(state.route)}</span></div></div><div class="topbar-right"><button class="toolbar-button" data-action="search" aria-label="Search">${icon('search')}</button><button class="toolbar-button" data-action="alerts" aria-label="Alerts">${icon('bell')}</button><button class="toolbar-button" data-action="theme" aria-label="Toggle theme">${state.theme === 'dark' ? icon('sun') : icon('moon')}</button><button class="toolbar-button" data-action="settings" aria-label="Settings">${icon('settings')}</button></div></div>
+        ${loadState}
         <div class="page">${content}</div>
       </main>
     </div>`;
@@ -340,8 +344,13 @@ function render() {
     cost: costPage(),
     methodology: methodologyPage(),
   }[state.route] || landingPage();
-  app.innerHTML = renderShell(content);
-  wireEvents();
+  try {
+    app.innerHTML = renderShell(content);
+    wireEvents();
+  } catch (error) {
+    app.innerHTML = `<div class="app-error"><h1>Dashboard failed to render</h1><p>${escapeHtml(error.message)}</p><p class="subtle">The page is showing this message instead of a blank screen.</p></div>`;
+    console.error(error);
+  }
 }
 
 function wireEvents() {
@@ -363,8 +372,17 @@ function handleRoute() {
 window.addEventListener('hashchange', handleRoute);
 
 async function init() {
-  data = await loadMjolnirData();
-  render();
+  try {
+    data = await loadMjolnirData();
+    render();
+  } catch (error) {
+    console.error(error);
+    app.innerHTML = `<div class="app-error"><h1>Dashboard data is unavailable</h1><p>${escapeHtml(error.message)}</p><p class="subtle">The site could not load JSON data, so it is showing a visible error instead of a blank page.</p></div>`;
+  }
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
 
 init();
