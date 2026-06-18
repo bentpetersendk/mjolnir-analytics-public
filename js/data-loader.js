@@ -9,18 +9,20 @@ async function loadJson(path) {
 
 async function tryLoadTree(base) {
   const index = await loadJson(`${base}index.json`);
+  const globalIndex = index.global || {};
+  const usersIndex = Array.isArray(index.users) ? index.users : [];
   const [clusterSummary, percentiles] = await Promise.all([
-    loadJson(`${base}${index.global.cluster_summary}`),
-    loadJson(`${base}${index.global.percentiles}`),
+    loadJson(`${base}${globalIndex.cluster_summary || 'global/cluster_summary.json'}`),
+    loadJson(`${base}${globalIndex.percentiles || 'global/percentiles.json'}`),
   ]);
 
-  const userTokens = index.users.map((item) => item.user_token);
+  const userTokens = usersIndex.map((item) => item?.user_token).filter(Boolean);
   const userBundles = await Promise.allSettled(
     userTokens.map((token) => loadJson(`${base}users/${token}.json`))
   );
 
   const users = userBundles
-    .map((result, i) => (result.status === 'fulfilled' ? result.value : null))
+    .map((result) => (result.status === 'fulfilled' ? result.value : null))
     .filter(Boolean);
 
   return {
@@ -34,9 +36,11 @@ async function tryLoadTree(base) {
 }
 
 function buildDerivedData(tree) {
-  const cluster = tree.clusterSummary;
-  const p = tree.percentiles.percentiles;
-  const trends = tree.users[0]?.daily_trends || tree.clusterSummary.daily_trends || [];
+  const cluster = tree.clusterSummary || {};
+  const percentilesRoot = tree.percentiles || {};
+  const p = percentilesRoot.percentiles || {};
+  const users = Array.isArray(tree.users) ? tree.users : [];
+  const trends = users[0]?.daily_trends || cluster.daily_trends || [];
   const allTime = cluster.cluster_all_time_summary || cluster.all_time_summary || {};
 
   const cpuPercentiles = p.avg_cpu_efficiency || {};
@@ -45,7 +49,7 @@ function buildDerivedData(tree) {
   const gpuPercentiles = p.gpu_hours || {};
   const underPercentiles = p.underutilized_cost_dkk || {};
 
-  const sampleUsers = tree.users.slice(0, 6).map((user, index) => ({
+  const sampleUsers = users.slice(0, 6).map((user, index) => ({
     token: user.user_token,
     label: `User ${String(index + 1).padStart(2, '0')}`,
     cpu: user.all_time_summary.avg_cpu_efficiency,
@@ -75,14 +79,14 @@ function buildDerivedData(tree) {
       underutilized: underPercentiles,
     },
     userBundles: sampleUsers,
-    recommendations: flattenRecommendations(tree.users),
+    recommendations: flattenRecommendations(users),
   };
 }
 
 function flattenRecommendations(users) {
-  return users
+  return (Array.isArray(users) ? users : [])
     .flatMap((user) =>
-      (user.recommendations || []).map((item) => ({
+      ((user && user.recommendations) || []).map((item) => ({
         token: user.user_token,
         title: item.title || item.recommendation || 'Recommendation',
         savings: item.estimated_savings_dkk ?? item.estimated_savings ?? item.estimated_dkk ?? 0,
