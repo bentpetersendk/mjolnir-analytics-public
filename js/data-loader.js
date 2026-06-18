@@ -33,7 +33,7 @@ async function tryLoadTree(base) {
   const userBundles = await Promise.all(userTokens.map((token) => loadJson(`${base}users/${token}.json`)));
 
   return {
-    source: base === REAL_BASE ? 'real-export' : 'sample-data',
+    source: base === REAL_BASE || base === PRIVATE_BASE ? 'real-export' : 'sample-data',
     sourcePath: base,
     index,
     clusterSummary,
@@ -58,6 +58,9 @@ function buildDerivedData(tree) {
   const users = normalizeList(tree.users);
   const trends = (users[0] && users[0].daily_trends) || cluster.daily_trends || [];
   const allTime = cluster.cluster_all_time_summary || cluster.all_time_summary || {};
+  const reportDates = normalizeList(cluster.daily_trends).map((row) => row && row.report_date).filter(Boolean);
+  const dateRange = reportDates.length ? { start: reportDates[0], end: reportDates[reportDates.length - 1] } : { start: null, end: null };
+  const jobMetricsRows = users.reduce((count, user) => count + normalizeList(user && user.top_inefficient_jobs).length, 0);
 
   const cpuPercentiles = normalizeSummary(p.avg_cpu_efficiency);
   const memoryPercentiles = normalizeSummary(p.avg_memory_efficiency);
@@ -99,6 +102,12 @@ function buildDerivedData(tree) {
     },
     userBundles: sampleUsers,
     recommendations: flattenRecommendations(users),
+    datasetMeta: {
+      dateRange,
+      importedRows: normalizeList(cluster.daily_trends).length || normalizeList(trends).length,
+      jobMetricsRows,
+      userBundleCount: users.length,
+    },
   };
 }
 

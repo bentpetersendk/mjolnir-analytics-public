@@ -2,7 +2,7 @@
 
 ## GitHub Pages
 
-- Not enabled in this repository.
+- Enabled through the same static site pipeline when the real export is published with the repo.
 - If enabled later, build the site as a static artifact and publish from a branch or GitHub Actions workflow.
 
 ## Nginx deployment

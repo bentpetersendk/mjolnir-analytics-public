@@ -189,7 +189,7 @@ function landingPage() {
         <div class="hero-actions"><a class="btn btn-primary" href="#/cluster">Open dashboard</a><a class="btn" href="#/methodology">Read methodology</a></div>
       </div>
       <div class="hero-panel">
-        <div class="hero-panel-head"><div class="panel-title">Overview</div><div class="subtle">${data?.source === 'real-export' ? 'Restricted export loaded locally' : 'Demo/sample data active'}</div></div>
+        <div class="hero-panel-head"><div class="panel-title">Overview</div><div class="subtle">${data?.source === 'real-export' ? 'Restricted export loaded locally' : 'Sample fallback active'}</div></div>
         <div class="mini-grid">
           ${[
             { label: 'Efficiency Score', value: pct(allTime.avg_cpu_efficiency), trend: `${fmt(allTime.jobs)} jobs`, tone: 'good' },
@@ -316,8 +316,8 @@ function methodologyPage() {
     <div class="page-layout">
       ${localNav('Methodology')}
       <div class="stack">
-        <section class="section"><div class="section-head"><h2>Methodology</h2><span class="subtle">How the sample dashboard is structured</span></div><p class="subtle" style="line-height:1.8">This prototype uses placeholder data only when the real archive is unavailable. It prefers a mirrored export directory and falls back to <code>sample-data/</code> so the UI remains usable offline. The front end is intentionally modular so the future archive swap requires no page-level code changes. Current source: ${source}.</p></section>
-        <section class="section"><div class="section-head"><h2>Design principles</h2><span class="subtle">Operational and readable</span></div><div class="cards-grid">${[statBlock('Information density', 'High', 'For control rooms'), statBlock('Color use', 'Restricted', 'Blue, teal, amber'), statBlock('Motion', 'Subtle', 'State clarity')].join('')}</div></section>
+        <section class="section"><div class="section-head"><h2>Methodology</h2><span class="subtle">How the dataset is structured</span></div><p class="subtle" style="line-height:1.8">The dashboard prefers the approved 90-day validation export and falls back to <code>sample-data/</code> only if the primary export is unavailable. The front end is intentionally modular so the archive source can change without page-level code changes. Current source: ${source}.</p></section>
+        <section class="section"><div class="section-head"><h2>Design principles</h2><span class="subtle">Operational and readable</span></div><div class="cards-grid">${[statBlock('Dataset range', meta.dateRange && meta.dateRange.start ? `${meta.dateRange.start} to ${meta.dateRange.end}` : '—', 'Approved 90-day export'), statBlock('Imported rows', fmt(meta.importedRows), 'Daily trend rows'), statBlock('Job metrics', fmt(meta.jobMetricsRows), 'Derived from job entries'), statBlock('User bundles', fmt(meta.userBundleCount), 'Approved export users')].join('')}</div></section>
         <section class="section"><div class="section-head"><h2>Loader trace</h2><span class="subtle">Runtime decision path</span></div><pre class="trace">${escapeHtml(JSON.stringify(data?.runtimeAttempts || [], null, 2))}</pre></section>
       </div>
     </div>`;
@@ -334,7 +334,7 @@ function renderShell(content) {
       <aside class="sidebar">
         <div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div>
         <nav class="nav-group">${navItems.map((item) => navLink(item)).join('')}</nav>
-        <div class="context-card"><div class="context-label">Viewing context</div><div class="context-item"><span>Environment</span><strong>Production</strong></div><div class="context-item"><span>Mode</span><strong>${data?.source === 'real-export' ? 'Restricted export loaded locally' : 'Demo/sample data active'}</strong></div><div class="context-item"><span>Schema</span><strong>${data?.schemaVersion || 'unknown'}</strong></div><div class="context-item"><span>Runtime source</span><strong>${runtimeSource}</strong></div><div class="context-item"><span>Loader attempts</span><strong>${runtimeAttempts.length}</strong></div></div>
+        <div class="context-card"><div class="context-label">Viewing context</div><div class="context-item"><span>Environment</span><strong>Production</strong></div><div class="context-item"><span>Mode</span><strong>${data?.source === 'real-export' ? 'Restricted export loaded locally' : 'Sample fallback active'}</strong></div><div class="context-item"><span>Schema</span><strong>${data?.schemaVersion || 'unknown'}</strong></div><div class="context-item"><span>Runtime source</span><strong>${runtimeSource}</strong></div><div class="context-item"><span>Loader attempts</span><strong>${runtimeAttempts.length}</strong></div></div>
       </aside>
       <main class="main">
         <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Open navigation">${icon('menu')}</button></div>
