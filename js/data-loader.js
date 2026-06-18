@@ -1,5 +1,6 @@
 const REAL_BASE = './data/efficiency_v3/site_data_90d_validation/';
 const SAMPLE_BASE = './sample-data/';
+const PRIVATE_BASE = window.__MJOLNIR_PRIVATE_DATA_BASE__ || '';
 
 async function loadJson(path) {
   const response = await fetch(path, { cache: 'no-store' });
@@ -43,6 +44,11 @@ async function tryLoadTree(base) {
 
 function normalizeSummary(summary) {
   return summary && typeof summary === 'object' ? summary : {};
+}
+
+function pickDataBase() {
+  if (PRIVATE_BASE) return PRIVATE_BASE.endsWith('/') ? PRIVATE_BASE : `${PRIVATE_BASE}/`;
+  return REAL_BASE;
 }
 
 function buildDerivedData(tree) {
@@ -114,14 +120,37 @@ function flattenRecommendations(users) {
 }
 
 export async function loadMjolnirData() {
+  const attempts = [];
+  const tryPrivate = Boolean(PRIVATE_BASE);
+  const realBase = pickDataBase();
   try {
-    return buildDerivedData(await tryLoadTree(REAL_BASE));
+    const tree = await tryLoadTree(realBase);
+    const runtimeAttempts = attempts.concat({ base: realBase, ok: true, mode: tryPrivate ? 'private' : 'real' });
+    console.info('Mjolnir data loader selected source', { runtimeSource: realBase, runtimeAttempts });
+    return {
+      ...buildDerivedData(tree),
+      runtimeSource: realBase,
+      runtimeAttempts,
+    };
   } catch (primaryError) {
+    attempts.push({ base: realBase, ok: false, mode: tryPrivate ? 'private' : 'real', error: String(primaryError) });
     try {
-      return buildDerivedData(await tryLoadTree(SAMPLE_BASE));
+      const tree = await tryLoadTree(SAMPLE_BASE);
+      const runtimeAttempts = attempts.concat({ base: SAMPLE_BASE, ok: true, mode: 'sample' });
+      console.info('Mjolnir data loader selected source', { runtimeSource: SAMPLE_BASE, runtimeAttempts });
+      return {
+        ...buildDerivedData(tree),
+        runtimeSource: SAMPLE_BASE,
+        runtimeAttempts,
+        source: 'sample-data',
+      };
     } catch (fallbackError) {
+      const runtimeAttempts = attempts.concat({ base: SAMPLE_BASE, ok: false, mode: 'sample', error: String(fallbackError) });
+      console.error('Mjolnir data loader failed', { runtimeSource: SAMPLE_BASE, runtimeAttempts, primaryError, fallbackError });
       return {
         source: 'fallback',
+        runtimeSource: SAMPLE_BASE,
+        runtimeAttempts,
         generatedAt: new Date().toISOString(),
         schemaVersion: 'fallback',
         clusterSummary: {

@@ -149,7 +149,9 @@ function recommendations(limit = 3) {
 }
 
 function recCard(level, title, savings) {
-  return `<article class="rec-card"><div class="rec-top"><span class="pill ${level.startsWith('High') ? 'warn' : 'info'}">${level}</span><strong>${savings}</strong></div><div>${title}</div><div class="subtle">Generated from the current data shape and percentile context.</div></article>`;
+  const safeTitle = title || 'Recommendation unavailable';
+  const safeSavings = savings || '—';
+  return `<article class="rec-card"><div class="rec-top"><span class="pill ${level.startsWith('High') ? 'warn' : 'info'}">${level}</span><strong>${safeSavings}</strong></div><div>${safeTitle}</div><div class="subtle">Generated from the current data shape and percentile context.</div></article>`;
 }
 
 function insightCard(label, lead, detail) {
@@ -316,11 +318,14 @@ function methodologyPage() {
       <div class="stack">
         <section class="section"><div class="section-head"><h2>Methodology</h2><span class="subtle">How the sample dashboard is structured</span></div><p class="subtle" style="line-height:1.8">This prototype uses placeholder data only when the real archive is unavailable. It prefers a mirrored export directory and falls back to <code>sample-data/</code> so the UI remains usable offline. The front end is intentionally modular so the future archive swap requires no page-level code changes. Current source: ${source}.</p></section>
         <section class="section"><div class="section-head"><h2>Design principles</h2><span class="subtle">Operational and readable</span></div><div class="cards-grid">${[statBlock('Information density', 'High', 'For control rooms'), statBlock('Color use', 'Restricted', 'Blue, teal, amber'), statBlock('Motion', 'Subtle', 'State clarity')].join('')}</div></section>
+        <section class="section"><div class="section-head"><h2>Loader trace</h2><span class="subtle">Runtime decision path</span></div><pre class="trace">${escapeHtml(JSON.stringify(data?.runtimeAttempts || [], null, 2))}</pre></section>
       </div>
     </div>`;
 }
 
 function renderShell(content) {
+  const runtimeSource = data?.runtimeSource || 'unknown';
+  const runtimeAttempts = Array.isArray(data?.runtimeAttempts) ? data.runtimeAttempts : [];
   const loadState = data?.errors?.length
     ? `<div class="load-banner error"><strong>Public demo mode</strong><span>Private export unavailable. Showing sample-data fallback.</span></div>`
     : '';
@@ -329,7 +334,7 @@ function renderShell(content) {
       <aside class="sidebar">
         <div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div>
         <nav class="nav-group">${navItems.map((item) => navLink(item)).join('')}</nav>
-        <div class="context-card"><div class="context-label">Viewing context</div><div class="context-item"><span>Environment</span><strong>Production</strong></div><div class="context-item"><span>Mode</span><strong>${data?.source === 'real-export' ? 'Restricted export loaded locally' : 'Demo/sample data active'}</strong></div><div class="context-item"><span>Schema</span><strong>${data?.schemaVersion || 'unknown'}</strong></div></div>
+        <div class="context-card"><div class="context-label">Viewing context</div><div class="context-item"><span>Environment</span><strong>Production</strong></div><div class="context-item"><span>Mode</span><strong>${data?.source === 'real-export' ? 'Restricted export loaded locally' : 'Demo/sample data active'}</strong></div><div class="context-item"><span>Schema</span><strong>${data?.schemaVersion || 'unknown'}</strong></div><div class="context-item"><span>Runtime source</span><strong>${runtimeSource}</strong></div><div class="context-item"><span>Loader attempts</span><strong>${runtimeAttempts.length}</strong></div></div>
       </aside>
       <main class="main">
         <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Open navigation">${icon('menu')}</button></div>

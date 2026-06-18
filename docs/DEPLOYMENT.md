@@ -20,3 +20,9 @@
 ## Operational note
 
 Do not publish automatically until privacy, performance, and UX reviews are accepted.
+
+## Private Deployment Mode
+
+- Internal deployments can inject `window.__MJOLNIR_PRIVATE_DATA_BASE__` before `js/app.js` loads.
+- When set, the loader uses that private base instead of the public `data/efficiency_v3/site_data_90d_validation/` path.
+- Keep the private export tree outside the public repository and point the base at a protected internal host or mount.
