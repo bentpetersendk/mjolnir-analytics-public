@@ -2,7 +2,7 @@
 
 - Source repository: `mjolnir-efficiency-dashboard`
 - Source commit used: `8626bdaa7521d6d18d3699a8acddca68d49ec91e`
-- Public repository commit: `6bc2461`
+- Public repository commit: `b3d5879`
 - Public repository: https://github.com/bentpetersendk/mjolnir-efficiency-dashboard-public
 - Pages URL: https://bentpetersendk.github.io/mjolnir-efficiency-dashboard-public/
 - Deployment status: successful
