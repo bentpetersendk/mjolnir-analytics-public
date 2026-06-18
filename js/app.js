@@ -64,6 +64,14 @@ function fmt(value, digits = 0) {
   return Number(value).toLocaleString('en-US', { maximumFractionDigits: digits });
 }
 
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function asObject(value) {
+  return value && typeof value === 'object' ? value : {};
+}
+
 function navLink(item) {
   const active = state.route === item.id ? 'aria-current="page"' : '';
   return `<a class="nav-link" href="#/${item.id}" ${active}>${icon(item.icon)}<span>${item.label}</span></a>`;
@@ -91,7 +99,8 @@ function spark(seed, width = 92, height = 24, tone = 'blue') {
   const points = [4, 14, 9, 20, 16, 11, 24, 21, 32, 15, 41, 13, 50, 17, 60, 9, 70, 15, 80, 8, 90, 13];
   const path = points.reduce((acc, value, index) => index % 2 === 0 ? `${acc}${index ? ' L ' : 'M '}${value} ${points[index + 1]}` : acc, '');
   const colors = { blue: ['#3e8cff', '#30d5d0'], green: ['#53d88a', '#2dd4bf'], amber: ['#ffb84d', '#ff6b7a'] };
-  const [a, b] = colors[tone];
+  const palette = colors[tone] || colors.blue;
+  const [a, b] = palette;
   const id = `s${seed}`.replace(/[^a-zA-Z0-9_-]/g, '');
   return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="chart"><defs><linearGradient id="${id}" x1="0" x2="1"><stop offset="0%" stop-color="${a}"/><stop offset="100%" stop-color="${b}"/></linearGradient></defs><path d="${path}" fill="none" stroke="url(#${id})" stroke-width="2.2" stroke-linecap="round"/></svg>`;
 }
@@ -121,9 +130,9 @@ function localNav(active) {
 }
 
 function recommendations(limit = 3) {
-  const cluster = data?.clusterSummary?.allTime || {};
-  const percentiles = data?.percentiles || {};
-  const recs = data?.recommendations || [];
+  const cluster = asObject(data?.clusterSummary?.allTime);
+  const percentiles = asObject(data?.percentiles);
+  const recs = asArray(data?.recommendations);
   const generated = [
     insightCard('CPU efficiency', comparisonText(cluster.avg_cpu_efficiency, percentiles.cpu?.['75'], 'lower than', 'Your CPU efficiency is lower than')),
     insightCard('Memory efficiency', `Your jobs typically use only ${pct(cluster.avg_memory_efficiency)} of requested memory.`, 'Trim requests where the gap is widest.'),
@@ -157,7 +166,8 @@ function comparisonText(value, threshold, relation, intro) {
 
 
 function userTable(users) {
-  const rows = (users.length ? users : [
+  const userList = Array.isArray(users) ? users : [];
+  const rows = (userList.length ? userList : [
     { label: 'User 01', cpu: 0.52, memory: 0.28, savings: 2140.6 },
     { label: 'User 02', cpu: 0.33, memory: 0.14, savings: 1211.5 },
   ]).map((user) => [user.label, pct(user.cpu), pct(user.memory), money(user.savings)]);
@@ -165,9 +175,9 @@ function userTable(users) {
 }
 
 function landingPage() {
-  const cluster = data?.clusterSummary || {};
-  const allTime = cluster.allTime || {};
-  const rolling90d = cluster.rolling90d || {};
+  const cluster = asObject(data?.clusterSummary);
+  const allTime = asObject(cluster.allTime);
+  const rolling90d = asObject(cluster.rolling90d);
   return `
     <section class="hero">
       <div class="hero-copy">
@@ -203,10 +213,10 @@ function landingPage() {
 }
 
 function clusterPage() {
-  const cluster = data?.clusterSummary || {};
-  const allTime = cluster.allTime || {};
-  const rolling = cluster.rolling90d || cluster.rolling30d || {};
-  const percentiles = data?.percentiles || {};
+  const cluster = asObject(data?.clusterSummary);
+  const allTime = asObject(cluster.allTime);
+  const rolling = asObject(cluster.rolling90d || cluster.rolling30d);
+  const percentiles = asObject(data?.percentiles);
   return `
     <div class="hero" style="grid-template-columns:1.1fr .9fr">
       <div class="section">
@@ -237,7 +247,7 @@ function clusterPage() {
 }
 
 function clusterTable() {
-  const rows = (data?.userBundles || []).slice(0, 6).map((user) => [
+  const rows = asArray(data?.userBundles).slice(0, 6).map((user) => [
     user.label,
     pct(user.cpu),
     pct(user.memory),
@@ -256,7 +266,7 @@ function alertsSection() {
 }
 
 function userPage() {
-  const users = data?.userBundles || [];
+  const users = asArray(data?.userBundles);
   return `
     <div class="page-layout">
       ${localNav('Users')}
@@ -269,7 +279,7 @@ function userPage() {
 }
 
 function benchmarkPage() {
-  const percentiles = data?.percentiles || {};
+  const percentiles = asObject(data?.percentiles);
   return `
     <div class="page-layout">
       ${localNav('Benchmarks')}
@@ -286,7 +296,7 @@ function comparisonBars() {
 }
 
 function costPage() {
-  const allTime = data?.clusterSummary?.allTime || {};
+  const allTime = asObject(data?.clusterSummary?.allTime);
   return `
     <div class="page-layout">
       ${localNav('Cost')}
@@ -336,20 +346,23 @@ function dot(tone) {
 
 function render() {
   document.documentElement.dataset.theme = state.theme;
-  const content = {
-    landing: landingPage(),
-    cluster: clusterPage(),
-    users: userPage(),
-    benchmarks: benchmarkPage(),
-    cost: costPage(),
-    methodology: methodologyPage(),
-  }[state.route] || landingPage();
+  const renderers = {
+    landing: landingPage,
+    cluster: clusterPage,
+    users: userPage,
+    benchmarks: benchmarkPage,
+    cost: costPage,
+    methodology: methodologyPage,
+  };
+  const rendererName = renderers[state.route] ? `${state.route}Page` : 'landingPage';
   try {
+    const pageRenderer = renderers[state.route] || renderers.landing;
+    const content = pageRenderer();
     app.innerHTML = renderShell(content);
     wireEvents();
   } catch (error) {
-    app.innerHTML = `<div class="app-error"><h1>Dashboard failed to render</h1><p>${escapeHtml(error.message)}</p><p class="subtle">The page is showing this message instead of a blank screen.</p></div>`;
-    console.error(error);
+    console.error('Renderer failed:', rendererName, error);
+    app.innerHTML = `<div class="app-error"><h1>Dashboard failed to render</h1><p>${escapeHtml(error.message)}</p><p class="subtle">Renderer: ${escapeHtml(rendererName)}</p><p class="subtle">The page is showing this message instead of a blank screen.</p></div>`;
   }
 }
 
@@ -376,7 +389,7 @@ async function init() {
     data = await loadMjolnirData();
     render();
   } catch (error) {
-    console.error(error);
+    console.error('Data loader failed:', error);
     app.innerHTML = `<div class="app-error"><h1>Dashboard data is unavailable</h1><p>${escapeHtml(error.message)}</p><p class="subtle">The site could not load JSON data, so it is showing a visible error instead of a blank page.</p></div>`;
   }
 }
