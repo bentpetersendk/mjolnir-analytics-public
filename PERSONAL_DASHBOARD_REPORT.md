@@ -39,3 +39,14 @@ Run from the repository root:
 python3 scripts/validate_data.py
 python3 scripts/validate_ui.py
 ```
+
+
+## Decision-Support Update
+
+The personal dashboard now prioritizes the user's next decisions over raw monitoring metrics:
+
+- `Priority Actions` answers what to do first.
+- `Savings Opportunity Breakdown` explains where savings come from.
+- `How do I compare?` uses percentile bands instead of exact ranks.
+- `Worst Jobs` keeps the most actionable job examples at the bottom of the decision flow.
+- Peer comparison remains pseudonymous.

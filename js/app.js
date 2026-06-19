@@ -431,42 +431,94 @@ function recoveryPage() {
 }
 
 function prototypeBanner() {
-  return '<div class="prototype-banner"><strong>Prototype Personal Dashboard - Authentication Not Yet Enabled</strong><span>Mock private JSON only. Peer comparisons remain pseudonymous.</span></div>';
+  return '<div class="prototype-banner"><strong>Prototype Personal Dashboard - Authentication Not Yet Enabled</strong><span>Decision support view. Peer comparisons remain pseudonymous.</span></div>';
 }
 
-function personalRecommendations(recommendations) {
-  const rows = asArray(recommendations);
-  if (!rows.length) return '<div class="empty-state">No personalized recommendations available.</div>';
-  return `<div class="rec-list">${rows.map((rec) => recCard(
-    rec.priority === 'high' ? 'High impact' : 'Medium impact',
-    rec.title,
-    rec.detail || rec.category || 'Personal optimization action',
-    rec.savings ? money(rec.savings) : 'Review'
-  )).join('')}</div>`;
+function percentileBand(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return { label: 'Band unavailable', detail: 'Not enough comparison data is exported yet.', tone: 'info' };
+  if (n >= 0.8) return { label: 'Top band', detail: '80th-100th percentile among exported users.', tone: 'good' };
+  if (n >= 0.6) return { label: 'Upper band', detail: '60th-80th percentile among exported users.', tone: 'info' };
+  if (n >= 0.4) return { label: 'Middle band', detail: '40th-60th percentile among exported users.', tone: 'info' };
+  if (n >= 0.2) return { label: 'Watch band', detail: '20th-40th percentile among exported users.', tone: 'warn' };
+  return { label: 'Action band', detail: 'Bottom 20th percentile among exported users.', tone: 'warn' };
+}
+
+function actionPriority(rec, index) {
+  const priority = String(rec.priority || '').toLowerCase();
+  if (priority === 'high') return `Priority ${index + 1}`;
+  if (priority === 'medium') return `Next ${index + 1}`;
+  return `Review ${index + 1}`;
+}
+
+function priorityActions(recommendations) {
+  const rows = asArray(recommendations)
+    .slice()
+    .sort((a, b) => num(b.savings) - num(a.savings));
+  if (!rows.length) return '<div class="empty-state">No priority actions are available for this bundle yet.</div>';
+  return `<div class="priority-grid">${rows.slice(0, 4).map((rec, index) => `
+    <article class="priority-card">
+      <div class="priority-top"><span class="pill ${rec.priority === 'high' ? 'warn' : 'info'}">${actionPriority(rec, index)}</span><strong>${rec.savings ? money(rec.savings) : 'Savings TBD'}</strong></div>
+      <h3>${escapeHtml(rec.title)}</h3>
+      <p>${escapeHtml(rec.detail || rec.category || 'Right-size future submissions based on this pattern.')}</p>
+      <div class="metric-explain"><strong>Why this matters</strong><span>${escapeHtml(rec.category || 'Optimization')} changes reduce wasted allocation before your next similar run.</span></div>
+    </article>`).join('')}</div>`;
+}
+
+function savingsBreakdown(recommendations, metrics) {
+  const groups = new Map();
+  asArray(recommendations).forEach((rec) => {
+    const category = rec.category || 'Other';
+    groups.set(category, (groups.get(category) || 0) + num(rec.savings));
+  });
+  const total = Math.max(num(metrics.potentialSavings), [...groups.values()].reduce((sum, value) => sum + value, 0));
+  const rows = [...groups.entries()].sort((a, b) => b[1] - a[1]);
+  if (!rows.length && !total) return '<div class="empty-state">No savings breakdown is available yet.</div>';
+  const residual = Math.max(0, total - rows.reduce((sum, [, value]) => sum + value, 0));
+  const allRows = residual > 0 ? rows.concat([['Unassigned opportunity', residual]]) : rows;
+  return `<div class="savings-summary"><div class="savings-total"><span>Total practical opportunity</span><strong>${money(total)}</strong><em>Estimated from your personal bundle and recommendations.</em></div><div class="breakdown-list">${allRows.map(([label, value]) => {
+    const share = total ? Math.max(4, (value / total) * 100) : 0;
+    return `<div class="breakdown-row"><div><strong>${escapeHtml(label)}</strong><span>${money(value)} available</span></div><div class="breakdown-track"><i style="width:${share.toFixed(1)}%"></i></div></div>`;
+  }).join('')}</div></div>`;
+}
+
+function personalContextCards(metrics, percentile) {
+  const cpuBand = percentileBand(percentile.cpu);
+  const memoryBand = percentileBand(percentile.memory);
+  const savingsBand = percentileBand(percentile.savings);
+  return `<div class="cards-grid">${[
+    statBlock('CPU efficiency', pct(metrics.cpuEfficiency), `Decision signal: ${cpuBand.label}. ${cpuBand.detail}`, cpuBand.tone),
+    statBlock('Memory efficiency', pct(metrics.memoryEfficiency), `Decision signal: ${memoryBand.label}. ${memoryBand.detail}`, memoryBand.tone),
+    statBlock('Savings opportunity', money(metrics.potentialSavings), `Prioritize actions with the largest repeatable savings. ${savingsBand.label}.`, 'warn'),
+    statBlock('Estimated spend', money(metrics.estimatedCost), 'Context only: use this to size the opportunity, not as a score.'),
+    statBlock('Job volume', fmt(metrics.jobs), 'Confidence signal: more jobs make the recommendations more reliable.'),
+    statBlock('Failure count', fmt(metrics.failedJobs), 'Reliability signal: failed jobs can hide or distort efficiency patterns.'),
+  ].join('')}</div>`;
 }
 
 function personalJobsTable(rows) {
   const tableRows = asArray(rows).map((job) => [
     escapeHtml(job.label),
-    fmt(job.inefficiencyScore, 1),
     money(job.wastedCost),
-    money(job.estimatedCost),
     pct(job.cpuEfficiency),
     pct(job.memoryEfficiency),
     escapeHtml(job.recommendation || 'Review resource request'),
   ]);
-  return tableFromRows(['Private job label', 'Score', 'Potential savings', 'Estimated cost', 'CPU', 'Memory', 'Suggested action'], tableRows);
+  return tableFromRows(['Job label', 'Savings opportunity', 'CPU use', 'Memory use', 'Decision'], tableRows);
 }
 
 function peerComparisonTable(rows) {
-  const tableRows = asArray(rows).map((peer) => [
-    escapeHtml(peer.pseudonym),
-    pct(peer.cpu),
-    pct(peer.memory),
-    money(peer.savings),
-    pct(peer.percentile),
-  ]);
-  return tableFromRows(['Pseudonymous peer', 'CPU efficiency', 'Memory efficiency', 'Savings opportunity', 'Percentile'], tableRows);
+  const tableRows = asArray(rows).map((peer) => {
+    const band = percentileBand(peer.percentile);
+    return [
+      escapeHtml(peer.pseudonym),
+      band.label,
+      pct(peer.cpu),
+      pct(peer.memory),
+      money(peer.savings),
+    ];
+  });
+  return tableFromRows(['Pseudonymous peer', 'Comparison band', 'CPU efficiency', 'Memory efficiency', 'Savings opportunity'], tableRows);
 }
 
 function personalDashboardPage() {
@@ -483,39 +535,34 @@ function personalDashboardPage() {
   }
 
   const metrics = asObject(vm.metrics);
-  const ranking = asObject(vm.ranking);
   const percentile = asObject(vm.percentile);
   const trends = asArray(vm.trends);
+  const comparisonBand = percentileBand(percentile.overall);
+  const topAction = asArray(vm.recommendations).slice().sort((a, b) => num(b.savings) - num(a.savings))[0];
   return `
     ${prototypeBanner()}
-    <div class="personal-hero section">
+    <section class="decision-hero section">
       <div>
-        <div class="context-label">Personal User Dashboard</div>
-        <h1>${escapeHtml(vm.username)}</h1>
-        <p class="subtle">Public pseudonym: <strong>${escapeHtml(vm.displayPseudonym)}</strong>${vm.publicUserId ? ` (${escapeHtml(vm.publicUserId)})` : ''}</p>
+        <div class="context-label">Personal Decision Support</div>
+        <h1>Do this next: ${escapeHtml(topAction?.title || 'review your resource requests')}</h1>
+        <p class="subtle">For <strong>${escapeHtml(vm.username)}</strong>, public pseudonym <strong>${escapeHtml(vm.displayPseudonym)}</strong>. This view favors action and savings over raw monitoring.</p>
       </div>
-      <div class="personal-rank-card">
-        <span class="subtle">Ranking among all users</span>
-        <strong>${ranking.rank ? `#${fmt(ranking.rank)}` : '-'}</strong>
-        <em>${ranking.totalUsers ? `of ${fmt(ranking.totalUsers)} users` : escapeHtml(ranking.label || 'Population unavailable')}</em>
+      <div class="decision-summary">
+        <span class="subtle">How you compare</span>
+        <strong>${comparisonBand.label}</strong>
+        <em>${comparisonBand.detail}</em>
       </div>
-    </div>
+    </section>
     <div class="stack">
-      <section class="section"><div class="section-head"><h2>Personal efficiency summary</h2><span class="subtle">Private bundle metrics</span></div><div class="cards-grid">${[
-        statBlock('CPU efficiency', pct(metrics.cpuEfficiency), `${fmt(metrics.jobs)} total jobs`, 'info'),
-        statBlock('Memory efficiency', pct(metrics.memoryEfficiency), `${fmt(metrics.completedJobs)} completed jobs`, 'good'),
-        statBlock('Estimated cost', money(metrics.estimatedCost), '90-day personal spend'),
-        statBlock('Potential savings', money(metrics.potentialSavings), 'Optimization opportunity', 'warn'),
-        statBlock('Percentile position', pct(percentile.overall), 'Overall peer position'),
-        statBlock('GPU hours', fmt(metrics.gpuHours, 1), `${fmt(metrics.failedJobs)} failed jobs`),
-      ].join('')}</div></section>
-      <div class="trend-grid">
-        ${lineChart('Your CPU and memory history', trends, [chartSeries(trends, 'avg_cpu_efficiency', 'CPU efficiency', '#3e8cff'), chartSeries(trends, 'avg_memory_efficiency', 'Memory efficiency', '#53d88a')], pct, { zeroBase: true })}
-        ${lineChart('Your cost and savings history', trends, [chartSeries(trends, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(trends, 'underutilized_cost_dkk', 'Potential savings', '#ff6b7a')], money, { zeroBase: true })}
-      </div>
-      <section class="section"><div class="section-head"><h2>Top inefficient jobs</h2><span class="subtle">Private labels for this user only</span></div>${personalJobsTable(vm.topInefficientJobs)}</section>
-      <section class="section"><div class="section-head"><h2>Personalized recommendations</h2><span class="subtle">Generated from your bundle</span></div>${personalRecommendations(vm.recommendations)}</section>
-      <section class="section"><div class="section-head"><h2>Anonymous peer comparison</h2><span class="subtle">Peers stay pseudonymous</span></div>${peerComparisonTable(vm.peerComparisons)}</section>
+      <section class="section"><div class="section-head"><h2>Priority Actions</h2><span class="subtle">What should I do?</span></div>${priorityActions(vm.recommendations)}</section>
+      <section class="section"><div class="section-head"><h2>Savings Opportunity Breakdown</h2><span class="subtle">How much can I save?</span></div>${savingsBreakdown(vm.recommendations, metrics)}</section>
+      <section class="section"><div class="section-head"><h2>How do I compare?</h2><span class="subtle">Percentile bands, not rank numbers</span></div>${personalContextCards(metrics, percentile)}<div class="metric-explain wide"><strong>How to read these bands</strong><span>Percentile bands summarize position among exported users without exposing exact ranks. Higher savings opportunity means more room to improve, not a badge of failure.</span></div></section>
+      <section class="section"><div class="section-head"><h2>Trend evidence</h2><span class="subtle">Why these actions are being recommended</span></div><div class="trend-grid">
+        ${lineChart('Efficiency trend evidence', trends, [chartSeries(trends, 'avg_cpu_efficiency', 'CPU efficiency', '#3e8cff'), chartSeries(trends, 'avg_memory_efficiency', 'Memory efficiency', '#53d88a')], pct, { zeroBase: true })}
+        ${lineChart('Cost opportunity trend', trends, [chartSeries(trends, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(trends, 'underutilized_cost_dkk', 'Savings opportunity', '#ff6b7a')], money, { zeroBase: true })}
+      </div></section>
+      <section class="section"><div class="section-head"><h2>Keep perspective: anonymous peers</h2><span class="subtle">Peer comparison stays pseudonymous</span></div>${peerComparisonTable(vm.peerComparisons)}</section>
+      <section class="section"><div class="section-head"><h2>Worst Jobs</h2><span class="subtle">What are my worst jobs?</span></div><p class="subtle" style="line-height:1.7">These jobs are shown because they combine cost with low CPU or memory use. Treat them as templates to fix before submitting similar work again.</p>${personalJobsTable(vm.topInefficientJobs)}</section>
     </div>`;
 }
 
