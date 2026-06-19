@@ -17,6 +17,7 @@ function normalizeGlobal(index) {
   return {
     cluster_summary: globalIndex && globalIndex.cluster_summary ? globalIndex.cluster_summary : 'global/cluster_summary.json',
     percentiles: globalIndex && globalIndex.percentiles ? globalIndex.percentiles : 'global/percentiles.json',
+    projects: globalIndex && globalIndex.projects ? globalIndex.projects : 'global/projects.json',
   };
 }
 
@@ -24,9 +25,10 @@ async function tryLoadTree(base) {
   const index = await loadJson(`${base}index.json`);
   const globalIndex = normalizeGlobal(index);
   const usersIndex = normalizeList(index.users);
-  const [clusterSummary, percentiles] = await Promise.all([
+  const [clusterSummary, percentiles, projectsResult] = await Promise.all([
     loadJson(`${base}${globalIndex.cluster_summary}`),
     loadJson(`${base}${globalIndex.percentiles}`),
+    loadJson(`${base}${globalIndex.projects}`).catch(() => null),
   ]);
 
   const userTokens = usersIndex.map((item) => item && item.user_token).filter(Boolean);
@@ -41,6 +43,7 @@ async function tryLoadTree(base) {
     index,
     clusterSummary,
     percentiles,
+    projects: projectsResult,
     users: userBundles,
     userTokens,
     indexUserCount: usersIndex.length,
@@ -62,6 +65,8 @@ function buildDerivedData(tree) {
   const percentilesRoot = normalizeSummary(tree.percentiles);
   const p = normalizeSummary(percentilesRoot.percentiles);
   const users = normalizeList(tree.users);
+  const projectsRoot = normalizeSummary(tree.projects);
+  const projects = normalizeList(projectsRoot.projects);
   const trends = (users[0] && users[0].daily_trends) || cluster.daily_trends || [];
   const allTime = cluster.cluster_all_time_summary || cluster.all_time_summary || {};
   const reportDates = normalizeList(cluster.daily_trends).map((row) => row && row.report_date).filter(Boolean);
@@ -75,6 +80,7 @@ function buildDerivedData(tree) {
   const underPercentiles = normalizeSummary(p.underutilized_cost_dkk);
 
   const userBundles = users.map((user, index) => normalizeUserBundle(user, index));
+  const projectBundles = projects.map((project, index) => normalizeProjectBundle(project, index));
   const userLookup = userBundles.reduce((lookup, user) => {
     if (user.routeId) lookup[user.routeId] = user;
     if (user.token && user.token !== user.routeId) lookup[user.token] = user;
@@ -85,6 +91,11 @@ function buildDerivedData(tree) {
     memory: rankedUsers(userBundles, 'memory', 'desc'),
     savings: rankedUsers(userBundles, 'savings', 'desc'),
   };
+  const projectRankings = {
+    cost: rankedProjects(projectBundles, 'cost', 'desc'),
+    savings: rankedProjects(projectBundles, 'savings', 'desc'),
+    cpu: rankedProjects(projectBundles, 'cpu', 'desc'),
+  };
   const diagnostics = {
     selectedRuntimeSource: tree.source,
     indexUsersCount: tree.indexUserCount || normalizeList(tree.index && tree.index.users).length,
@@ -93,6 +104,7 @@ function buildDerivedData(tree) {
     firstFiveUserLabelsOrTokens: userBundles.slice(0, 5).map((user) => user.label || user.tokenPreview || 'User bundle'),
     clusterDailyTrendLength: normalizeList(cluster.daily_trends).length,
     percentilesKeys: Object.keys(p).sort(),
+    projectCount: projectBundles.length,
   };
 
   return {
@@ -116,6 +128,8 @@ function buildDerivedData(tree) {
     userBundles,
     userLookup,
     rankings,
+    projectBundles,
+    projectRankings,
     recommendations: flattenRecommendations(users),
     diagnostics,
     datasetMeta: {
@@ -123,6 +137,7 @@ function buildDerivedData(tree) {
       importedRows: normalizeList(cluster.daily_trends).length || normalizeList(trends).length,
       jobMetricsRows,
       userBundleCount: users.length,
+      projectCount: projectBundles.length,
     },
   };
 }
@@ -133,6 +148,35 @@ function rankedUsers(users, field, direction = 'desc') {
     .slice()
     .sort((a, b) => direction === 'desc' ? Number(b[field]) - Number(a[field]) : Number(a[field]) - Number(b[field]))
     .slice(0, 25);
+}
+
+function rankedProjects(projects, field, direction = 'desc') {
+  return normalizeList(projects)
+    .filter((project) => Number.isFinite(Number(project && project[field])))
+    .slice()
+    .sort((a, b) => direction === 'desc' ? Number(b[field]) - Number(a[field]) : Number(a[field]) - Number(b[field]))
+    .slice(0, 25);
+}
+
+function normalizeProjectBundle(project, index) {
+  const summary = normalizeSummary(project && project.all_time_summary);
+  const id = String((project && project.project_id) || `project-${index + 1}`);
+  const label = (project && (project.project_pseudonym || project.display_label || project.label)) || `Project ${String(index + 1).padStart(3, '0')}`;
+  return {
+    id,
+    label,
+    allTime: summary,
+    rollingSummaries: normalizeSummary(project && project.rolling_summaries),
+    dailyTrends: normalizeList(project && project.daily_trends),
+    cost: project && project.cost !== undefined ? project.cost : summary.estimated_cost_dkk,
+    cpu: project && project.cpu_efficiency !== undefined ? project.cpu_efficiency : summary.avg_cpu_efficiency,
+    memory: project && project.memory_efficiency !== undefined ? project.memory_efficiency : summary.avg_memory_efficiency,
+    gpu: project && project.gpu_hours !== undefined ? project.gpu_hours : summary.gpu_hours || 0,
+    savings: project && project.potential_savings !== undefined ? project.potential_savings : summary.underutilized_cost_dkk || 0,
+    jobs: summary.jobs,
+    completedJobs: summary.completed_jobs,
+    failedJobs: summary.failed_jobs,
+  };
 }
 
 function normalizeUserBundle(user, index) {
@@ -223,6 +267,8 @@ export async function loadMjolnirData() {
         percentiles: { cpu: {}, memory: {}, cost: {}, gpu: {}, underutilized: {} },
         userBundles: [],
         recommendations: [],
+        projectBundles: [],
+        projectRankings: { cost: [], savings: [], cpu: [] },
         errors: [String(primaryError), String(fallbackError)],
       };
     }

@@ -5,6 +5,7 @@ const navItems = [
   { id: 'landing', label: 'Landing', icon: 'home' },
   { id: 'cluster', label: 'Cluster', icon: 'cluster' },
   { id: 'users', label: 'Users', icon: 'users' },
+  { id: 'projects', label: 'Projects', icon: 'cluster' },
   { id: 'benchmarks', label: 'Benchmarks', icon: 'chart' },
   { id: 'cost', label: 'Cost', icon: 'wallet' },
   { id: 'methodology', label: 'Methodology', icon: 'book' },
@@ -278,6 +279,53 @@ function userTable(users) {
   return rankingTable('Top 25 users by CPU efficiency', users, 'CPU efficiency', (user) => pct(user.cpu));
 }
 
+function projectLink(project) {
+  const label = escapeHtml(project && project.label ? project.label : 'Project bundle');
+  return `<span class="table-link">${label}</span>`;
+}
+
+function projectRankingTable(title, projects, metricLabel, metricFormatter) {
+  const rows = asArray(projects).slice(0, 25).map((project, index) => [
+    `#${index + 1}`,
+    projectLink(project),
+    metricFormatter(project),
+    pct(project.cpu),
+    pct(project.memory),
+    money(project.savings),
+    fmt(project.gpu, 1),
+    fmt(project.jobs),
+  ]);
+  const body = rows.length ? tableFromRows(['Rank', 'Project pseudonym', metricLabel, 'CPU efficiency', 'Memory efficiency', 'Potential savings', 'GPU hours', 'Jobs'], rows) : '<p class="subtle">No anonymized project summaries are available in this export.</p>';
+  return `<section class="section"><div class="section-head"><h2>${title}</h2><span class="subtle">Top ${Math.min(asArray(projects).length, 25)}</span></div>${body}</section>`;
+}
+
+function aggregateProjectDailyTrends(projects) {
+  const days = new Map();
+  asArray(projects).forEach((project) => {
+    asArray(project.dailyTrends).forEach((row) => {
+      const date = row && row.report_date;
+      if (!date) return;
+      const current = days.get(date) || { report_date: date, jobs: 0, failed_jobs: 0, completed_jobs: 0, estimated_cost_dkk: 0, underutilized_cost_dkk: 0, gpu_hours: 0, cpuWeighted: 0, memoryWeighted: 0, weight: 0 };
+      const jobs = Number(row.jobs) || 0;
+      current.jobs += jobs;
+      current.failed_jobs += Number(row.failed_jobs) || 0;
+      current.completed_jobs += Number(row.completed_jobs) || 0;
+      current.estimated_cost_dkk += Number(row.estimated_cost_dkk) || 0;
+      current.underutilized_cost_dkk += Number(row.underutilized_cost_dkk) || 0;
+      current.gpu_hours += Number(row.gpu_hours) || 0;
+      if (Number.isFinite(Number(row.avg_cpu_efficiency))) current.cpuWeighted += Number(row.avg_cpu_efficiency) * Math.max(jobs, 1);
+      if (Number.isFinite(Number(row.avg_memory_efficiency))) current.memoryWeighted += Number(row.avg_memory_efficiency) * Math.max(jobs, 1);
+      current.weight += Math.max(jobs, 1);
+      days.set(date, current);
+    });
+  });
+  return [...days.values()].sort((a, b) => String(a.report_date).localeCompare(String(b.report_date))).map((row) => ({
+    ...row,
+    avg_cpu_efficiency: row.weight ? row.cpuWeighted / row.weight : null,
+    avg_memory_efficiency: row.weight ? row.memoryWeighted / row.weight : null,
+  }));
+}
+
 function rollingSummaryCards(user) {
   const summaries = asObject(user?.rollingSummaries);
   return ['7d', '30d', '90d'].map((window) => {
@@ -491,6 +539,45 @@ function userDetailPage() {
 }
 
 
+function projectsPage() {
+  const projects = asArray(data?.projectBundles);
+  const rankings = asObject(data?.projectRankings);
+  const topCost = asArray(rankings.cost).length ? rankings.cost : projects.slice().sort((a, b) => Number(b.cost || 0) - Number(a.cost || 0)).slice(0, 25);
+  const topSavings = asArray(rankings.savings).length ? rankings.savings : projects.slice().sort((a, b) => Number(b.savings || 0) - Number(a.savings || 0)).slice(0, 25);
+  const topCpu = asArray(rankings.cpu).length ? rankings.cpu : projects.slice().sort((a, b) => Number(b.cpu || 0) - Number(a.cpu || 0)).slice(0, 25);
+  const projectTrends = aggregateProjectDailyTrends(projects);
+  const totals = projects.reduce((acc, project) => {
+    acc.jobs += Number(project.jobs) || 0;
+    acc.cost += Number(project.cost) || 0;
+    acc.savings += Number(project.savings) || 0;
+    acc.gpu += Number(project.gpu) || 0;
+    return acc;
+  }, { jobs: 0, cost: 0, savings: 0, gpu: 0 });
+  return `
+    <div class="page-layout">
+      ${localNav('Projects')}
+      <div class="stack">
+        <section class="section"><div class="section-head"><h2>Projects</h2><span class="subtle">Anonymized account summaries from global/projects.json</span></div><div class="cards-grid">${[
+          statBlock('Project count', fmt(projects.length), 'Stable public pseudonyms'),
+          statBlock('Estimated cost', money(totals.cost), 'All exported projects'),
+          statBlock('Potential savings', money(totals.savings), 'Underutilized cost'),
+          statBlock('GPU hours', fmt(totals.gpu, 1), 'Project aggregate'),
+          statBlock('Jobs', fmt(totals.jobs), 'Daily account summaries'),
+          statBlock('Top project cost', topCost[0] ? money(topCost[0].cost) : '—', topCost[0] ? topCost[0].label : 'No project export'),
+        ].join('')}</div></section>
+        <section class="section"><div class="section-head"><h2>Project daily trends</h2><span class="subtle">Aggregated from anonymized project rows</span></div>${trendChart('Cost, savings, and jobs across projects', projectTrends, [
+          { key: 'estimated_cost_dkk', label: 'Estimated cost', color: '#ffb84d' },
+          { key: 'underutilized_cost_dkk', label: 'Potential savings', color: '#ff6b7a' },
+          { key: 'jobs', label: 'Jobs', color: '#9cd0ff' },
+        ])}</section>
+        ${projectRankingTable('Top 25 projects by estimated cost', topCost, 'Estimated cost', (project) => money(project.cost))}
+        ${projectRankingTable('Top 25 projects by potential savings', topSavings, 'Potential savings', (project) => money(project.savings))}
+        ${projectRankingTable('Top 25 projects by CPU efficiency', topCpu, 'CPU efficiency', (project) => pct(project.cpu))}
+      </div>
+    </div>`;
+}
+
+
 function benchmarkPage() {
   const percentiles = asObject(data?.percentiles);
   return `
@@ -550,6 +637,7 @@ function methodologyPage() {
           statBlock('Imported rows', fmt(meta.importedRows), 'Daily trend rows'),
           statBlock('Job metrics', fmt(meta.jobMetricsRows), 'Derived inefficient-job rows currently exported'),
           statBlock('User bundles', fmt(meta.userBundleCount), 'Approved export users'),
+          statBlock('Projects', fmt(meta.projectCount), 'Anonymized account summaries'),
         ].join('')}</div></section>
         ${diagnosticsPanel()}
         <section class="section"><div class="section-head"><h2>Data flow</h2><span class="subtle">Runtime path</span></div><p class="subtle" style="line-height:1.8">SQLite validation tables become privacy-reviewed JSON, the data loader normalizes the export into cluster, percentile, recommendation, and user bundle collections, then page renderers consume only those normalized properties.</p></section>
@@ -593,6 +681,7 @@ function render() {
     cluster: clusterPage,
     users: userPage,
     userDetail: userDetailPage,
+    projects: projectsPage,
     benchmarks: benchmarkPage,
     cost: costPage,
     methodology: methodologyPage,
