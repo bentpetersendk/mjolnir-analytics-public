@@ -138,8 +138,8 @@ Touch target audit improved from 13-14 small targets on many routes to 1 detecte
 /opt/shared_software/shared_envmodules/conda/nodejs-25.2.1/bin/node --check js/data-loader.js
 python3 scripts/validate_ui.py
 python3 scripts/validate_data.py
-/opt/shared_software/shared_envmodules/conda/nodejs-25.2.1/bin/node /tmp/mjolnir_mobile_audit.js before
-/opt/shared_software/shared_envmodules/conda/nodejs-25.2.1/bin/node /tmp/mjolnir_mobile_audit.js after2
+/opt/shared_software/shared_envmodules/conda/nodejs-25.2.1/bin/node /projects/mjolnir_admin/scratch/mjolnir-mobile-ux-audit/mjolnir_mobile_audit.js before
+/opt/shared_software/shared_envmodules/conda/nodejs-25.2.1/bin/node /projects/mjolnir_admin/scratch/mjolnir-mobile-ux-audit/mjolnir_mobile_audit.js after2
 ```
 
 ## Remaining Limitations
