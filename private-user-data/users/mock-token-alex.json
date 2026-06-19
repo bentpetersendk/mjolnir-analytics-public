@@ -1,0 +1,52 @@
+{
+  "schema_version": "personal-prototype-v1",
+  "generated_at": "2026-06-19T00:00:00Z",
+  "username": "demo_user",
+  "public_user_id": "usr_p7k4m2q9r1",
+  "display_pseudonym": "Silver Falcon",
+  "all_time_summary": {
+    "avg_cpu_efficiency": 0.46,
+    "avg_memory_efficiency": 0.31,
+    "completed_jobs": 68,
+    "estimated_cost_dkk": 8420.5,
+    "failed_jobs": 5,
+    "gpu_hours": 36.8,
+    "jobs": 73,
+    "underutilized_cost_dkk": 3185.2
+  },
+  "ranking": {
+    "rank": 18,
+    "total_users": 142,
+    "label": "Top quartile savings opportunity"
+  },
+  "percentile_position": {
+    "overall": 0.72,
+    "avg_cpu_efficiency": 0.58,
+    "avg_memory_efficiency": 0.43,
+    "underutilized_cost_dkk": 0.81
+  },
+  "daily_trends": [
+    { "report_date": "2026-03-21", "avg_cpu_efficiency": 0.38, "avg_memory_efficiency": 0.24, "estimated_cost_dkk": 76.3, "underutilized_cost_dkk": 36.2 },
+    { "report_date": "2026-04-04", "avg_cpu_efficiency": 0.41, "avg_memory_efficiency": 0.27, "estimated_cost_dkk": 88.1, "underutilized_cost_dkk": 40.8 },
+    { "report_date": "2026-04-18", "avg_cpu_efficiency": 0.44, "avg_memory_efficiency": 0.29, "estimated_cost_dkk": 92.4, "underutilized_cost_dkk": 39.4 },
+    { "report_date": "2026-05-02", "avg_cpu_efficiency": 0.49, "avg_memory_efficiency": 0.32, "estimated_cost_dkk": 96.2, "underutilized_cost_dkk": 34.6 },
+    { "report_date": "2026-05-16", "avg_cpu_efficiency": 0.47, "avg_memory_efficiency": 0.34, "estimated_cost_dkk": 101.7, "underutilized_cost_dkk": 33.1 },
+    { "report_date": "2026-05-30", "avg_cpu_efficiency": 0.52, "avg_memory_efficiency": 0.36, "estimated_cost_dkk": 106.5, "underutilized_cost_dkk": 30.5 },
+    { "report_date": "2026-06-13", "avg_cpu_efficiency": 0.55, "avg_memory_efficiency": 0.38, "estimated_cost_dkk": 110.2, "underutilized_cost_dkk": 27.9 }
+  ],
+  "top_inefficient_jobs": [
+    { "job_label": "Job A", "estimated_cost_dkk": 812.4, "underutilized_cost_dkk": 426.2, "measured_cpu_efficiency": 0.18, "memory_efficiency": 0.22, "elapsed_hours": 18.4, "gpu_count": 0, "recommendation": "Reduce CPU request before resubmitting similar jobs" },
+    { "job_label": "Job B", "estimated_cost_dkk": 540.8, "underutilized_cost_dkk": 288.6, "measured_cpu_efficiency": 0.31, "memory_efficiency": 0.19, "elapsed_hours": 9.7, "gpu_count": 1, "recommendation": "Right-size memory request and verify GPU need" },
+    { "job_label": "Job C", "estimated_cost_dkk": 438.5, "underutilized_cost_dkk": 201.4, "measured_cpu_efficiency": 0.27, "memory_efficiency": 0.41, "elapsed_hours": 11.2, "gpu_count": 0, "recommendation": "Profile thread scaling for this workflow" }
+  ],
+  "recommendations": [
+    { "title": "Lower default CPU requests for short jobs", "category": "CPU", "priority": "high", "estimated_savings_dkk": 1240, "detail": "Your short-running jobs show low measured CPU use compared with allocated cores." },
+    { "title": "Create a smaller-memory submission template", "category": "Memory", "priority": "high", "estimated_savings_dkk": 980, "detail": "Memory efficiency is below your peer median on repeated workloads." },
+    { "title": "Review GPU queue submissions", "category": "GPU", "priority": "medium", "estimated_savings_dkk": 420, "detail": "A small number of GPU jobs drive a large share of your savings opportunity." }
+  ],
+  "peer_comparisons": [
+    { "display_pseudonym": "Blue Comet", "avg_cpu_efficiency": 0.61, "avg_memory_efficiency": 0.44, "underutilized_cost_dkk": 1720.4, "percentile_position": 0.79 },
+    { "display_pseudonym": "Green Vector", "avg_cpu_efficiency": 0.53, "avg_memory_efficiency": 0.37, "underutilized_cost_dkk": 2418.9, "percentile_position": 0.69 },
+    { "display_pseudonym": "Amber Matrix", "avg_cpu_efficiency": 0.42, "avg_memory_efficiency": 0.28, "underutilized_cost_dkk": 3350.1, "percentile_position": 0.51 }
+  ]
+}
