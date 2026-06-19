@@ -165,7 +165,8 @@ function flattenRecommendations(users) {
       normalizeList(user && user.recommendations).forEach((item) => {
         acc.push({
           token: user && user.user_token,
-          title: item.title || item.recommendation || 'Recommendation',
+          title: item.title || item.recommendation || item.suggestion || 'Exported recommendation',
+          suggestion: item.suggestion || '',
           savings: item.estimated_savings_dkk ?? item.estimated_savings ?? item.estimated_dkk ?? 0,
           category: item.category || item.type || 'Optimization',
           priority: item.priority || item.severity || 'medium',

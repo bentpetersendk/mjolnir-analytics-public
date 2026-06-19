@@ -83,32 +83,130 @@ function pageTitle(route) {
   return navItems.find((item) => item.id === route)?.label || 'Landing';
 }
 
-function lineChart() {
-  const points = [[4, 78], [12, 72], [20, 76], [28, 68], [36, 73], [44, 63], [52, 66], [60, 50], [68, 46], [76, 58], [84, 57], [92, 48], [100, 42]];
-  const path = points.map(([x, y], i) => `${i ? 'L' : 'M'} ${x} ${y}`).join(' ');
-  const avg = points.map(([x, y], i) => `${i ? 'L' : 'M'} ${x} ${y + (i % 2 ? 8 : 6)}`).join(' ');
-  return `
-    <svg class="chart" viewBox="0 0 104 88" preserveAspectRatio="none">
-      <defs><linearGradient id="g1" x1="0" x2="1"><stop offset="0%" stop-color="#3e8cff"/><stop offset="100%" stop-color="#30d5d0"/></linearGradient></defs>
-      ${[18, 36, 54, 72].map((y) => `<line x1="0" y1="${y}" x2="104" y2="${y}" stroke="rgba(147,166,194,.16)" />`).join('')}
-      <path d="${avg}" fill="none" stroke="rgba(95,180,255,.58)" stroke-dasharray="3 3" stroke-width="1.5"/>
-      <path d="${path}" fill="none" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round"/>
-      ${points.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.6" fill="#ecf3ff" stroke="#3e8cff" stroke-width="1.5"/>`).join('')}
-    </svg>`;
+function numberValue(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
-function spark(seed, width = 92, height = 24, tone = 'blue') {
-  const points = [4, 14, 9, 20, 16, 11, 24, 21, 32, 15, 41, 13, 50, 17, 60, 9, 70, 15, 80, 8, 90, 13];
-  const path = points.reduce((acc, value, index) => index % 2 === 0 ? `${acc}${index ? ' L ' : 'M '}${value} ${points[index + 1]}` : acc, '');
-  const colors = { blue: ['#3e8cff', '#30d5d0'], green: ['#53d88a', '#2dd4bf'], amber: ['#ffb84d', '#ff6b7a'] };
-  const palette = colors[tone] || colors.blue;
-  const [a, b] = palette;
-  const id = `s${seed}`.replace(/[^a-zA-Z0-9_-]/g, '');
-  return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="chart"><defs><linearGradient id="${id}" x1="0" x2="1"><stop offset="0%" stop-color="${a}"/><stop offset="100%" stop-color="${b}"/></linearGradient></defs><path d="${path}" fill="none" stroke="url(#${id})" stroke-width="2.2" stroke-linecap="round"/></svg>`;
+function seriesValues(rows, key) {
+  return asArray(rows).map((row) => numberValue(row && row[key]));
 }
+
+function chartPath(rows, key, width = 104, height = 78) {
+  const values = seriesValues(rows, key);
+  const numeric = values.filter((value) => value !== null);
+  if (!numeric.length) return '';
+  const min = Math.min(...numeric);
+  const max = Math.max(...numeric);
+  const span = max === min ? 1 : max - min;
+  return values.map((value, index) => {
+    if (value === null) return '';
+    const x = rows.length <= 1 ? width / 2 : (index / (rows.length - 1)) * width;
+    const y = height - ((value - min) / span) * (height - 8) + 4;
+    return `${index ? 'L' : 'M'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+  }).filter(Boolean).join(' ');
+}
+
+function sparkline(rows, key, tone = 'blue') {
+  const colors = { blue: '#3e8cff', green: '#53d88a', amber: '#ffb84d', red: '#ff6b7a', cyan: '#30d5d0' };
+  const path = chartPath(rows, key, 92, 24);
+  if (!path) return '<div class="subtle">No trend exported</div>';
+  return `<svg viewBox="0 0 92 28" preserveAspectRatio="none" class="chart"><path d="${path}" fill="none" stroke="${colors[tone] || colors.blue}" stroke-width="2.2" stroke-linecap="round"/></svg>`;
+}
+
+function trendChart(title, rows, series, note = '') {
+  const cleanRows = asArray(rows);
+  if (!cleanRows.length) return `<div class="empty-state">No daily trend rows are exported for ${escapeHtml(title)}.</div>`;
+  const palette = ['#3e8cff', '#53d88a', '#ffb84d', '#ff6b7a', '#30d5d0', '#9cd0ff'];
+  const lines = series.map((item, index) => {
+    const path = chartPath(cleanRows, item.key, 104, 78);
+    if (!path) return '';
+    return `<path d="${path}" fill="none" stroke="${item.color || palette[index % palette.length]}" stroke-width="2.3" stroke-linecap="round"/>`;
+  }).join('');
+  const first = cleanRows[0]?.report_date || 'start';
+  const last = cleanRows[cleanRows.length - 1]?.report_date || 'end';
+  const legend = series.map((item, index) => `<span class="chart-legend-item"><i style="background:${item.color || palette[index % palette.length]}"></i>${escapeHtml(item.label)}</span>`).join('');
+  return `<article class="chart-card"><div class="section-head"><h3>${escapeHtml(title)}</h3><span class="subtle">${escapeHtml(first)} to ${escapeHtml(last)}</span></div><svg class="chart trend-chart" viewBox="0 0 104 88" preserveAspectRatio="none">${[18,36,54,72].map((y) => `<line x1="0" y1="${y}" x2="104" y2="${y}" stroke="rgba(147,166,194,.16)"/>`).join('')}${lines}</svg><div class="chart-legend">${legend}</div>${note ? `<p class="subtle chart-note">${escapeHtml(note)}</p>` : ''}</article>`;
+}
+
+function clusterTrendCharts(rows = data?.clusterSummary?.dailyTrends) {
+  const trends = asArray(rows);
+  return `<div class="chart-grid">
+    ${trendChart('CPU and memory efficiency over time', trends, [
+      { key: 'avg_cpu_efficiency', label: 'CPU efficiency', color: '#3e8cff' },
+      { key: 'avg_memory_efficiency', label: 'Memory efficiency', color: '#53d88a' },
+    ])}
+    ${trendChart('Estimated cost and underutilized cost', trends, [
+      { key: 'estimated_cost_dkk', label: 'Estimated cost', color: '#ffb84d' },
+      { key: 'underutilized_cost_dkk', label: 'Underutilized cost', color: '#ff6b7a' },
+    ])}
+    ${trendChart('GPU hours over time', trends, [
+      { key: 'gpu_hours', label: 'GPU hours', color: '#30d5d0' },
+    ])}
+    ${trendChart('Jobs and failed jobs per day', trends, [
+      { key: 'jobs', label: 'Jobs', color: '#9cd0ff' },
+      { key: 'failed_jobs', label: 'Failed jobs', color: '#ff6b7a' },
+    ])}
+  </div>`;
+}
+
+function percentileBars(percentiles) {
+  const metrics = [
+    { key: 'cpu', label: 'CPU efficiency', format: pct },
+    { key: 'memory', label: 'Memory efficiency', format: pct },
+    { key: 'cost', label: 'Estimated cost', format: money },
+    { key: 'underutilized', label: 'Underutilized cost', format: money },
+    { key: 'gpu', label: 'GPU hours', format: (value) => fmt(value, 1) },
+  ];
+  return `<div class="percentile-bars">${metrics.map((metric) => {
+    const values = asObject(percentiles && percentiles[metric.key]);
+    const checkpoints = ['5', '25', '50', '75', '95'];
+    const numeric = checkpoints.map((key) => numberValue(values[key])).filter((value) => value !== null);
+    if (!numeric.length) return `<article class="chart-card"><h3>${metric.label}</h3><p class="subtle">No percentile data exported.</p></article>`;
+    const max = Math.max(...numeric, 1);
+    return `<article class="chart-card"><div class="section-head"><h3>${metric.label}</h3><span class="subtle">p5 to p95</span></div><div class="bar-list">${checkpoints.map((key) => {
+      const value = numberValue(values[key]);
+      const height = value === null ? 0 : Math.max(4, (value / max) * 100);
+      return `<div class="percentile-bar"><div class="bar-track"><div class="bar-fill" style="height:${height.toFixed(1)}%"></div></div><strong>p${key}</strong><span>${metric.format(value)}</span></div>`;
+    }).join('')}</div></article>`;
+  }).join('')}</div>`;
+}
+
+function aggregateUserDailyTrends(users) {
+  const days = new Map();
+  asArray(users).forEach((user) => {
+    asArray(user.dailyTrends).forEach((row) => {
+      const date = row && row.report_date;
+      if (!date) return;
+      const current = days.get(date) || { report_date: date, jobs: 0, failed_jobs: 0, completed_jobs: 0, estimated_cost_dkk: 0, underutilized_cost_dkk: 0, gpu_hours: 0, cpuWeighted: 0, memoryWeighted: 0, weight: 0 };
+      const jobs = Number(row.jobs) || 0;
+      current.jobs += jobs;
+      current.failed_jobs += Number(row.failed_jobs) || 0;
+      current.completed_jobs += Number(row.completed_jobs) || 0;
+      current.estimated_cost_dkk += Number(row.estimated_cost_dkk) || 0;
+      current.underutilized_cost_dkk += Number(row.underutilized_cost_dkk) || 0;
+      current.gpu_hours += Number(row.gpu_hours) || 0;
+      if (Number.isFinite(Number(row.avg_cpu_efficiency))) current.cpuWeighted += Number(row.avg_cpu_efficiency) * Math.max(jobs, 1);
+      if (Number.isFinite(Number(row.avg_memory_efficiency))) current.memoryWeighted += Number(row.avg_memory_efficiency) * Math.max(jobs, 1);
+      current.weight += Math.max(jobs, 1);
+      days.set(date, current);
+    });
+  });
+  return [...days.values()].sort((a, b) => String(a.report_date).localeCompare(String(b.report_date))).map((row) => ({
+    ...row,
+    avg_cpu_efficiency: row.weight ? row.cpuWeighted / row.weight : null,
+    avg_memory_efficiency: row.weight ? row.memoryWeighted / row.weight : null,
+  }));
+}
+
+function costAvailabilityNotice() {
+  return `<div class="empty-state strong">Cost composition is not exported yet.</div>`;
+}
+
 
 function metricCard(kpi) {
-  return `<article class="metric-card"><div class="metric-label">${kpi.label}</div><div class="metric-value">${kpi.value}</div><div class="metric-trend">${kpi.trend}</div>${spark(`${kpi.label}-${kpi.value}`, 92, 24, kpi.tone || 'blue')}</article>`;
+  const trend = kpi.series && kpi.seriesKey ? sparkline(kpi.series, kpi.seriesKey, kpi.tone || 'blue') : '';
+  return `<article class="metric-card"><div class="metric-label">${kpi.label}</div><div class="metric-value">${kpi.value}</div><div class="metric-trend">${kpi.trend}</div>${trend}</article>`;
 }
 
 function statBlock(label, value, trend) {
@@ -132,33 +230,21 @@ function localNav(active) {
 }
 
 function recommendations(limit = 3) {
-  const cluster = asObject(data?.clusterSummary?.allTime);
-  const percentiles = asObject(data?.percentiles);
-  const recs = asArray(data?.recommendations);
-  const generated = [
-    insightCard('CPU efficiency', comparisonText(cluster.avg_cpu_efficiency, percentiles.cpu?.['75'], 'lower than', 'Your CPU efficiency is lower than')),
-    insightCard('Memory efficiency', `Your jobs typically use only ${pct(cluster.avg_memory_efficiency)} of requested memory.`, 'Trim requests where the gap is widest.'),
-    insightCard('Savings', 'You could reduce wasted spend by focusing on the highest-cost workloads first.', money(cluster.underutilized_cost_dkk)),
-  ];
-  const recommendationCards = recs.length
-    ? recs.slice(0, limit).map((item) => recCard(item.priority === 'high' ? 'High impact' : 'Medium impact', item.title, money(item.savings)))
-    : [
-        recCard('High impact', 'Reduce requested memory', '0 DKK'),
-        recCard('High impact', 'Reduce requested CPUs', '0 DKK'),
-        recCard('Medium impact', 'Review GPU utilization', '0 DKK'),
-      ];
-  return [...generated, ...recommendationCards].slice(0, limit);
+  const recs = asArray(data?.recommendations).filter((item) => item && (item.title || item.suggestion));
+  if (!recs.length) return ['<article class="rec-card"><div class="rec-top"><span class="pill info">No exported recommendations</span></div><div class="subtle">The current JSON export did not include recommendation rows for this view.</div></article>'];
+  return recs.slice(0, limit).map((item) => recCard(item.priority === 'high' ? 'High impact' : 'Medium impact', item.title || item.suggestion, item.suggestion || item.category || 'Exported recommendation'));
 }
 
-function recCard(level, title, savings) {
+function recCard(level, title, detail) {
   const safeTitle = title || 'Recommendation unavailable';
-  const safeSavings = savings || '—';
-  return `<article class="rec-card"><div class="rec-top"><span class="pill ${level.startsWith('High') ? 'warn' : 'info'}">${level}</span><strong>${safeSavings}</strong></div><div>${safeTitle}</div><div class="subtle">Generated from the current data shape and percentile context.</div></article>`;
+  const safeDetail = detail || 'Exported recommendation';
+  return `<article class="rec-card"><div class="rec-top"><span class="pill ${level.startsWith('High') ? 'warn' : 'info'}">${level}</span></div><div>${escapeHtml(safeTitle)}</div><div class="subtle">${escapeHtml(safeDetail)}</div></article>`;
 }
 
 function insightCard(label, lead, detail) {
   return `<article class="rec-card"><div class="rec-top"><span class="pill info">Insight</span><strong>${label}</strong></div><div>${lead}</div><div class="subtle">${detail}</div></article>`;
 }
+
 
 function comparisonText(value, threshold, relation, intro) {
   if (value === null || value === undefined || threshold === null || threshold === undefined) return 'Data unavailable for this comparison.';
@@ -247,93 +333,104 @@ function diagnosticsPanel() {
 function landingPage() {
   const cluster = asObject(data?.clusterSummary);
   const allTime = asObject(cluster.allTime);
-  const rolling90d = asObject(cluster.rolling90d);
+  const trends = asArray(cluster.dailyTrends);
   return `
     <section class="hero">
       <div class="hero-copy">
         <div class="eyebrow">${dot('green')} Built for efficiency engineering and cluster operations</div>
         <h1>Improve cluster efficiency. Lower spend. Increase performance.</h1>
-        <p>Mjolnir Efficiency Dashboard gives platform teams a focused workspace for cluster efficiency, user behavior, benchmark drift, and cost optimization. The interface is designed for fast scanning, real monitoring workflows, and production review.</p>
+        <p>Mjolnir Efficiency Dashboard gives platform teams a focused workspace for cluster efficiency, user behavior, benchmark drift, and cost optimization. The interface is driven by the approved 90-day export loaded at runtime.</p>
         <div class="hero-actions"><a class="btn btn-primary" href="#/cluster">Open dashboard</a><a class="btn" href="#/methodology">Read methodology</a></div>
       </div>
       <div class="hero-panel">
-        <div class="hero-panel-head"><div class="panel-title">Overview</div><div class="subtle">${data?.source === 'real-export' ? 'Restricted export loaded locally' : 'Sample fallback active'}</div></div>
+        <div class="hero-panel-head"><div class="panel-title">Overview</div><div class="subtle">${data?.source === 'real-export' ? 'Real 90-day export' : 'Fallback dataset active'}</div></div>
         <div class="mini-grid">
           ${[
-            { label: 'Efficiency Score', value: pct(allTime.avg_cpu_efficiency), trend: `${fmt(allTime.jobs)} jobs`, tone: 'good' },
-            { label: 'Potential Savings', value: money(allTime.underutilized_cost_dkk), trend: `${fmt(allTime.failed_jobs)} failed jobs`, tone: 'info' },
-            { label: 'Memory Efficiency', value: pct(allTime.avg_memory_efficiency), trend: `${fmt(allTime.jobs_with_measured_memory)} measured`, tone: 'warn' },
-            { label: 'GPU Hours', value: fmt(allTime.gpu_hours, 1), trend: 'Measured usage', tone: 'good' },
+            { label: 'CPU efficiency', value: pct(allTime.avg_cpu_efficiency), trend: `${fmt(allTime.jobs)} jobs`, tone: 'blue', series: trends, seriesKey: 'avg_cpu_efficiency' },
+            { label: 'Potential savings', value: money(allTime.underutilized_cost_dkk), trend: `${fmt(allTime.failed_jobs)} failed jobs`, tone: 'amber', series: trends, seriesKey: 'underutilized_cost_dkk' },
+            { label: 'Memory efficiency', value: pct(allTime.avg_memory_efficiency), trend: `${fmt(allTime.jobs_with_measured_memory)} measured`, tone: 'green', series: trends, seriesKey: 'avg_memory_efficiency' },
+            { label: 'GPU hours', value: fmt(allTime.gpu_hours, 1), trend: 'Measured usage', tone: 'cyan', series: trends, seriesKey: 'gpu_hours' },
           ].map(metricCard).join('')}
         </div>
         <div class="panel-grid">
-          <div class="section" style="margin:0"><div class="section-head"><h2>Efficiency trend</h2><span class="subtle">Daily</span></div>${lineChart()}</div>
-          <div class="section" style="margin:0"><div class="section-head"><h2>Top recommendations</h2><span class="pill info">${fmt((data?.recommendations || []).length)}</span></div><div class="rec-list">${recommendations(3).join('')}</div></div>
+          <div class="section" style="margin:0"><div class="section-head"><h2>Efficiency trend</h2><span class="subtle">From cluster daily trends</span></div>${trendChart('CPU and memory efficiency', trends, [
+            { key: 'avg_cpu_efficiency', label: 'CPU efficiency', color: '#3e8cff' },
+            { key: 'avg_memory_efficiency', label: 'Memory efficiency', color: '#53d88a' },
+          ])}</div>
+          <div class="section" style="margin:0"><div class="section-head"><h2>Exported recommendations</h2><span class="pill info">${fmt((data?.recommendations || []).length)}</span></div><div class="rec-list">${recommendations(3).join('')}</div></div>
         </div>
       </div>
     </section>
     <section class="dashboard-grid">
       <div class="stack">
-        <section class="section"><div class="section-head"><h2>Am I using Mjolnir efficiently?</h2></div><p class="subtle">Compare CPU and memory efficiency against the population, then act on the largest gap first.</p></section>
-        <section class="section"><div class="section-head"><h2>How do I compare to others?</h2></div><p class="subtle">Use percentile context to see whether you sit above or below the majority of users.</p></section>
-        <section class="section"><div class="section-head"><h2>What should I change?</h2></div><p class="subtle">Follow the recommendation cards for the most direct path to lower waste and cost.</p></section>
+        <section class="section"><div class="section-head"><h2>How efficiently is Mjolnir being used?</h2></div><p class="subtle">Cluster trend charts show CPU efficiency, memory efficiency, cost, GPU hours, job volume, and failures from exported daily summaries.</p></section>
+        <section class="section"><div class="section-head"><h2>Where is money being wasted?</h2></div><p class="subtle">Cost and underutilized-cost trends highlight the days and users with the largest savings opportunity.</p></section>
+        <section class="section"><div class="section-head"><h2>What should users change?</h2></div><p class="subtle">Recommendation cards now display exported recommendations only, with no generated text mixed into production views.</p></section>
       </div>
-      <div class="stack"><section class="section"><div class="section-head"><h2>Operational fit</h2></div><div class="cards-grid"><article class="stat-card"><div class="label">Export window</div><div class="value">90 days</div><div class="subtle">Mirrored source</div></article><article class="stat-card"><div class="label">Archive-ready</div><div class="value">Yes</div><div class="subtle">Path stable</div></article><article class="stat-card"><div class="label">Fallback</div><div class="value">Sample data</div><div class="subtle">Offline mode</div></article></div></section></div>
+      <div class="stack"><section class="section"><div class="section-head"><h2>Operational fit</h2></div><div class="cards-grid"><article class="stat-card"><div class="label">Export window</div><div class="value">90 days</div><div class="subtle">Approved source</div></article><article class="stat-card"><div class="label">Loaded bundles</div><div class="value">${fmt(data?.diagnostics?.loadedUserBundleCount)}</div><div class="subtle">Pseudonymous users</div></article><article class="stat-card"><div class="label">Fallback readiness</div><div class="value">Yes</div><div class="subtle">Static hosting compatible</div></article></div></section></div>
     </section>`;
 }
+
 
 function clusterPage() {
   const cluster = asObject(data?.clusterSummary);
   const allTime = asObject(cluster.allTime);
   const rolling = asObject(cluster.rolling90d || cluster.rolling30d);
   const percentiles = asObject(data?.percentiles);
+  const trends = asArray(cluster.dailyTrends);
   return `
-    <div class="hero" style="grid-template-columns:1.1fr .9fr">
-      <div class="section">
-        <div class="section-head"><h2>Cluster Dashboard</h2><span class="subtle">Operational view focused on utilization, efficiency, and cost action</span></div>
+    <div class="stack">
+      <section class="section">
+        <div class="section-head"><h2>Cluster Dashboard</h2><span class="subtle">Operational view from exported daily summaries</span></div>
         <div class="cards-grid">${[
-          statBlock('Jobs', fmt(allTime.jobs), 'All time volume'),
+          statBlock('Jobs', fmt(allTime.jobs), `${fmt(allTime.completed_jobs)} completed, ${fmt(allTime.failed_jobs)} failed`),
           statBlock('CPU efficiency', actionSentence('CPU efficiency', allTime.avg_cpu_efficiency, data?.percentiles?.cpu?.['75'])),
           statBlock('Memory efficiency', actionSentence('Memory efficiency', allTime.avg_memory_efficiency, data?.percentiles?.memory?.['75'])),
+          statBlock('Estimated cost', money(allTime.estimated_cost_dkk), 'All exported rows'),
+          statBlock('Potential savings', money(allTime.underutilized_cost_dkk), 'Underutilized cost'),
+          statBlock('GPU hours', fmt(allTime.gpu_hours, 1), 'Measured usage'),
         ].join('')}</div>
-        <div style="margin-top:16px">${lineChart()}</div>
-      </div>
-      <div class="section">
-        <div class="section-head"><h2>Percentile distributions</h2><span class="subtle">How this dataset compares with the cluster population</span></div>
+      </section>
+      <section class="section"><div class="section-head"><h2>Cluster trends</h2><span class="subtle">${fmt(trends.length)} daily rows</span></div>${clusterTrendCharts(trends)}</section>
+      <section class="section"><div class="section-head"><h2>Percentile distributions</h2><span class="subtle">Exported percentiles</span></div>
         <div class="percentiles">
           ${percentileCard('CPU p50', pct(percentiles.cpu?.['50']), 'Median efficiency', 'info')}
           ${percentileCard('Memory p50', pct(percentiles.memory?.['50']), 'Median memory', 'info')}
           ${percentileCard('Cost p75', money(percentiles.cost?.['75']), 'Upper quartile', 'warn')}
           ${percentileCard('GPU p95', fmt(percentiles.gpu?.['95'], 1), 'Heavy usage', 'good')}
           ${percentileCard('Underutilized p95', money(percentiles.underutilized?.['95']), 'Savings ceiling', 'good')}
-          ${percentileCard('7d CPU', pct(rolling.avg_cpu_efficiency), 'Rolling summary', 'info')}
+          ${percentileCard('90d CPU', pct(rolling.avg_cpu_efficiency), 'Rolling summary', 'info')}
         </div>
+      </section>
+      <div class="dashboard-grid">
+        <div class="table-card"><div class="section-head"><h2>Cluster efficiency overview</h2><span class="subtle">${fmt((data?.userBundles?.length || 0))} users in export</span></div>${clusterTable()}</div>
+        <div class="stack">${clusterObservations()}</div>
       </div>
-    </div>
-    <div class="dashboard-grid">
-      <div class="table-card"><div class="section-head"><h2>Cluster efficiency overview</h2><span class="subtle">${fmt((data?.index?.user_count) || (data?.userBundles?.length || 0))} users in export</span></div>${clusterTable()}</div>
-      <div class="stack">${alertsSection()}</div>
     </div>`;
 }
 
+
 function clusterTable() {
-  const rows = asArray(data?.userBundles).slice(0, 6).map((user) => [
-    user.label,
+  const rows = asArray(data?.userBundles).slice(0, 10).map((user) => [
+    userLink(user),
     pct(user.cpu),
     pct(user.memory),
     money(user.savings),
     fmt(user.jobs),
   ]);
-  return `
-    <div class="table-toolbar"><input class="search" type="search" placeholder="Search clusters..." /><button class="btn">Filter</button><button class="btn">Export</button></div>
-    ${tableFromRows(['User', 'CPU efficiency', 'Memory efficiency', 'Potential savings', 'Jobs'], rows)}
-  `;
+  return tableFromRows(['Pseudonymous user', 'CPU efficiency', 'Memory efficiency', 'Potential savings', 'Jobs'], rows);
 }
 
-function alertsSection() {
-  return `
-    <section class="section"><div class="section-head"><h2>Alerts</h2><span class="subtle">12 total</span></div><div class="alerts-list"><div class="alert-item"><div class="alert-top"><strong>High waste detected in cluster</strong><span class="subtle">5m ago</span></div><div class="subtle">payments-prod</div></div><div class="alert-item"><div class="alert-top"><strong>Efficiency score below threshold</strong><span class="subtle">15m ago</span></div><div class="subtle">inventory-prod</div></div><div class="alert-item"><div class="alert-top"><strong>Benchmark data updated</strong><span class="subtle">2h ago</span></div><div class="subtle">4 benchmarks updated</div></div></div></section>`;
+function clusterObservations() {
+  const allTime = asObject(data?.clusterSummary?.allTime);
+  const observations = [
+    { title: 'Failure rate', value: allTime.jobs ? pct((Number(allTime.failed_jobs) || 0) / Number(allTime.jobs), 2) : '—', detail: `${fmt(allTime.failed_jobs)} failed of ${fmt(allTime.jobs)} jobs` },
+    { title: 'Measured CPU coverage', value: allTime.jobs ? pct((Number(allTime.jobs_with_measured_cpu) || 0) / Number(allTime.jobs), 1) : '—', detail: `${fmt(allTime.jobs_with_measured_cpu)} jobs with measured CPU` },
+    { title: 'Measured memory coverage', value: allTime.jobs ? pct((Number(allTime.jobs_with_measured_memory) || 0) / Number(allTime.jobs), 1) : '—', detail: `${fmt(allTime.jobs_with_measured_memory)} jobs with measured memory` },
+  ];
+  return `<section class="section"><div class="section-head"><h2>Cluster observations</h2><span class="subtle">Computed from exported summaries</span></div><div class="alerts-list">${observations.map((item) => `<div class="alert-item"><div class="alert-top"><strong>${item.title}</strong><span>${item.value}</span></div><div class="subtle">${item.detail}</div></div>`).join('')}</div></section>`;
 }
+
 
 function userPage() {
   const users = asArray(data?.userBundles);
@@ -341,6 +438,7 @@ function userPage() {
   const topCpu = asArray(rankings.cpu).length ? rankings.cpu : users.slice().sort((a, b) => Number(b.cpu || 0) - Number(a.cpu || 0)).slice(0, 25);
   const topMemory = asArray(rankings.memory).length ? rankings.memory : users.slice().sort((a, b) => Number(b.memory || 0) - Number(a.memory || 0)).slice(0, 25);
   const topSavings = asArray(rankings.savings).length ? rankings.savings : users.slice().sort((a, b) => Number(b.savings || 0) - Number(a.savings || 0)).slice(0, 25);
+  const userTrends = aggregateUserDailyTrends(users);
   return `
     <div class="page-layout">
       ${localNav('Users')}
@@ -350,6 +448,11 @@ function userPage() {
           statBlock('Failed bundle loads', fmt(data?.diagnostics?.failedUserBundleCount), 'Loader keeps rendering with successful bundles'),
           statBlock('Top CPU efficiency', topCpu[0] ? pct(topCpu[0].cpu) : '—', topCpu[0] ? topCpu[0].label : 'No bundle loaded'),
         ].join('')}</div></section>
+        <section class="section"><div class="section-head"><h2>All-user daily trends</h2><span class="subtle">Aggregated from loaded user daily trends</span></div>${trendChart('Jobs, failures, and savings across users', userTrends, [
+          { key: 'jobs', label: 'Jobs', color: '#9cd0ff' },
+          { key: 'failed_jobs', label: 'Failed jobs', color: '#ff6b7a' },
+          { key: 'underutilized_cost_dkk', label: 'Underutilized cost', color: '#ffb84d' },
+        ])}</section>
         ${rankingTable('Top 25 users by CPU efficiency', topCpu, 'CPU efficiency', (user) => pct(user.cpu))}
         ${rankingTable('Top 25 users by memory efficiency', topMemory, 'Memory efficiency', (user) => pct(user.memory))}
         ${rankingTable('Top 25 users by potential savings', topSavings, 'Potential savings', (user) => money(user.savings))}
@@ -394,29 +497,45 @@ function benchmarkPage() {
     <div class="page-layout">
       ${localNav('Benchmarks')}
       <div class="stack">
-        <section class="section"><div class="section-head"><h2>Benchmark Dashboard</h2><span class="subtle">Performance and regression tracking</span></div><div class="cards-grid">${[statBlock('CPU p95', pct(percentiles.cpu?.['95']), 'Sample benchmark'), statBlock('Memory p95', pct(percentiles.memory?.['95']), 'Sample benchmark'), statBlock('Regression score', '94', 'Placeholder')].join('')}</div></section>
-        <section class="section"><div class="section-head"><h2>Benchmark comparisons</h2><span class="subtle">By release</span></div>${comparisonBars()}</section>
-        <section class="section"><div class="section-head"><h2>Percentile ranking</h2><span class="subtle">Grouped by workload</span></div><div class="percentiles">${percentileCard('CPU p50', pct(percentiles.cpu?.['50']), 'Baseline', 'info')}${percentileCard('CPU p95', pct(percentiles.cpu?.['95']), 'Top tier', 'good')}${percentileCard('Memory p95', pct(percentiles.memory?.['95']), 'Top tier', 'good')}${percentileCard('Cost p50', money(percentiles.cost?.['50']), 'Baseline', 'info')}</div></section>
+        <section class="section"><div class="section-head"><h2>Benchmark Dashboard</h2><span class="subtle">Percentiles exported from validation data</span></div><div class="cards-grid">${[
+          statBlock('CPU p95', pct(percentiles.cpu?.['95']), 'Exported percentile'),
+          statBlock('Memory p95', pct(percentiles.memory?.['95']), 'Exported percentile'),
+          statBlock('Cost p95', money(percentiles.cost?.['95']), 'Exported percentile'),
+          statBlock('GPU p95', fmt(percentiles.gpu?.['95'], 1), 'Exported percentile'),
+          statBlock('Underutilized p95', money(percentiles.underutilized?.['95']), 'Exported percentile'),
+          statBlock('CPU p50', pct(percentiles.cpu?.['50']), 'Median efficiency'),
+        ].join('')}</div></section>
+        <section class="section"><div class="section-head"><h2>Percentile bars</h2><span class="subtle">p5, p25, p50, p75, p95</span></div>${percentileBars(percentiles)}</section>
       </div>
     </div>`;
 }
 
-function comparisonBars() {
-  return `<div class="bars" style="height: 240px;">${[62, 78, 68, 96, 82, 90, 74].map((h) => `<div class="bar" style="height:${h}%"></div>`).join('')}</div><p class="subtle" style="margin-top:12px">These bars summarize the spread between lower-performing and higher-performing workloads so users can focus on the widest gaps first.</p>`;
-}
 
 function costPage() {
   const allTime = asObject(data?.clusterSummary?.allTime);
+  const trends = asArray(data?.clusterSummary?.dailyTrends);
   return `
     <div class="page-layout">
       ${localNav('Cost')}
       <div class="stack">
-        <section class="section"><div class="section-head"><h2>Cost Dashboard</h2><span class="subtle">Spend, savings, and waste</span></div><div class="cards-grid">${[statBlock('Estimated cost', money(allTime.estimated_cost_dkk), 'All time'), statBlock('Potential savings', money(allTime.underutilized_cost_dkk), 'All time'), statBlock('GPU hours', fmt(allTime.gpu_hours, 1), 'All time')].join('')}</div></section>
-        <section class="section"><div class="section-head"><h2>Spend composition</h2><span class="subtle">Placeholder series</span></div><div class="bars" style="height: 200px;">${[42, 58, 76, 62, 88, 54, 74].map((h) => `<div class="bar" style="height:${h}%"></div>`).join('')}</div></section>
-        <section class="section"><div class="section-head"><h2>Recommendations</h2><span class="subtle">Impact-ranked</span></div><div class="rec-list">${recommendations(3).join('')}</div></section>
+        <section class="section"><div class="section-head"><h2>Cost Dashboard</h2><span class="subtle">Spend, savings, and waste from exported summaries</span></div><div class="cards-grid">${[
+          statBlock('Estimated cost', money(allTime.estimated_cost_dkk), 'All exported rows'),
+          statBlock('Potential savings', money(allTime.underutilized_cost_dkk), 'Underutilized cost'),
+          statBlock('GPU hours', fmt(allTime.gpu_hours, 1), 'All exported rows'),
+          statBlock('Allocated CPU hours', fmt(allTime.cpu_hours_allocated, 1), `${fmt(allTime.measured_cpu_hours, 1)} measured`),
+          statBlock('Requested memory GB-hours', fmt(allTime.requested_mem_gb_hours, 1), 'Requested resources'),
+          statBlock('Failed jobs', fmt(allTime.failed_jobs), 'Cost review candidates'),
+        ].join('')}</div></section>
+        <section class="section"><div class="section-head"><h2>Cost and waste trends</h2><span class="subtle">Daily exported values</span></div>${trendChart('Estimated cost vs. underutilized cost', trends, [
+          { key: 'estimated_cost_dkk', label: 'Estimated cost', color: '#ffb84d' },
+          { key: 'underutilized_cost_dkk', label: 'Underutilized cost', color: '#ff6b7a' },
+        ])}</section>
+        <section class="section"><div class="section-head"><h2>Cost composition</h2><span class="subtle">Awaiting export support</span></div>${costAvailabilityNotice()}</section>
+        <section class="section"><div class="section-head"><h2>Exported recommendations</h2><span class="subtle">Impact-ranked when available</span></div><div class="rec-list">${recommendations(6).join('')}</div></section>
       </div>
     </div>`;
 }
+
 
 function methodologyPage() {
   const source = data?.source || 'fallback';
@@ -425,7 +544,7 @@ function methodologyPage() {
     <div class="page-layout">
       ${localNav('Methodology')}
       <div class="stack">
-        <section class="section"><div class="section-head"><h2>Methodology</h2><span class="subtle">How the dataset is structured</span></div><p class="subtle" style="line-height:1.8">The dashboard prefers the approved 90-day validation export and falls back to sample data only if the primary export is unavailable. The front end is intentionally modular so the archive source can change without page-level code changes. Current source: ${escapeHtml(source)}.</p></section>
+        <section class="section"><div class="section-head"><h2>Methodology</h2><span class="subtle">How the dataset is structured</span></div><p class="subtle" style="line-height:1.8">The dashboard prefers the approved 90-day validation export and falls back to the bundled fallback dataset only if the primary export is unavailable. The front end is intentionally modular so the archive source can change without page-level code changes. Current source: ${escapeHtml(source)}.</p></section>
         <section class="section"><div class="section-head"><h2>Design principles</h2><span class="subtle">Operational and readable</span></div><div class="cards-grid">${[
           statBlock('Dataset range', meta.dateRange && meta.dateRange.start ? `${meta.dateRange.start} to ${meta.dateRange.end}` : '—', 'Approved 90-day export'),
           statBlock('Imported rows', fmt(meta.importedRows), 'Daily trend rows'),
@@ -443,7 +562,7 @@ function renderShell(content) {
   const runtimeSource = data?.diagnostics?.selectedRuntimeSource || data?.source || 'unknown';
   const runtimeAttempts = Array.isArray(data?.runtimeAttempts) ? data.runtimeAttempts : [];
   const loadState = data?.errors?.length
-    ? `<div class="load-banner error"><strong>Public demo mode</strong><span>Primary export unavailable. Showing sample-data fallback.</span></div>`
+    ? `<div class="load-banner error"><strong>Fallback data mode</strong><span>Primary export unavailable. Showing the fallback dataset.</span></div>`
     : data?.source === 'real-export'
       ? `<div class="load-banner real"><strong>REAL MJOLNIR DATA</strong><span>90-day validation dataset</span></div>`
       : '';
@@ -452,7 +571,7 @@ function renderShell(content) {
       <aside class="sidebar">
         <div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div>
         <nav class="nav-group">${navItems.map((item) => navLink(item)).join('')}</nav>
-        <div class="context-card"><div class="context-label">Viewing context</div><div class="context-item"><span>Environment</span><strong>Production</strong></div><div class="context-item"><span>Mode</span><strong>${data?.source === 'real-export' ? 'Real 90-day export' : 'Sample fallback active'}</strong></div><div class="context-item"><span>Schema</span><strong>${data?.schemaVersion || 'unknown'}</strong></div><div class="context-item"><span>Runtime source</span><strong>${runtimeSource}</strong></div><div class="context-item"><span>Loaded bundles</span><strong>${fmt(data?.diagnostics?.loadedUserBundleCount)}</strong></div><div class="context-item"><span>Loader attempts</span><strong>${runtimeAttempts.length}</strong></div></div>
+        <div class="context-card"><div class="context-label">Viewing context</div><div class="context-item"><span>Environment</span><strong>Production</strong></div><div class="context-item"><span>Mode</span><strong>${data?.source === 'real-export' ? 'Real 90-day export' : 'Fallback dataset active'}</strong></div><div class="context-item"><span>Schema</span><strong>${data?.schemaVersion || 'unknown'}</strong></div><div class="context-item"><span>Runtime source</span><strong>${runtimeSource}</strong></div><div class="context-item"><span>Loaded bundles</span><strong>${fmt(data?.diagnostics?.loadedUserBundleCount)}</strong></div><div class="context-item"><span>Loader attempts</span><strong>${runtimeAttempts.length}</strong></div></div>
       </aside>
       <main class="main">
         <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Open navigation">${icon('menu')}</button></div>
