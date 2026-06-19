@@ -30,7 +30,10 @@ async function tryLoadTree(base) {
   ]);
 
   const userTokens = usersIndex.map((item) => item && item.user_token).filter(Boolean);
-  const userBundles = await Promise.all(userTokens.map((token) => loadJson(`${base}users/${token}.json`)));
+  const userResults = await Promise.allSettled(userTokens.map((token) => loadJson(`${base}users/${token}.json`)));
+  const userBundles = userResults
+    .filter((result) => result.status === 'fulfilled' && result.value)
+    .map((result) => result.value);
 
   return {
     source: base === REAL_BASE || base === PRIVATE_BASE ? 'real-export' : 'sample-data',
@@ -38,7 +41,10 @@ async function tryLoadTree(base) {
     index,
     clusterSummary,
     percentiles,
-    users: userBundles.filter(Boolean),
+    users: userBundles,
+    userTokens,
+    indexUserCount: usersIndex.length,
+    failedUserBundleCount: userResults.filter((result) => result.status === 'rejected').length,
   };
 }
 
@@ -68,19 +74,26 @@ function buildDerivedData(tree) {
   const gpuPercentiles = normalizeSummary(p.gpu_hours);
   const underPercentiles = normalizeSummary(p.underutilized_cost_dkk);
 
-  const sampleUsers = users.slice(0, 6).map((user, index) => {
-    const summary = normalizeSummary(user.all_time_summary);
-    return {
-      token: user.user_token,
-      label: `User ${String(index + 1).padStart(2, '0')}`,
-      cpu: summary.avg_cpu_efficiency,
-      memory: summary.avg_memory_efficiency,
-      gpu: summary.gpu_hours || 0,
-      savings: summary.underutilized_cost_dkk || 0,
-      jobs: summary.jobs,
-      recommendations: normalizeList(user.recommendations),
-    };
-  });
+  const userBundles = users.map((user, index) => normalizeUserBundle(user, index));
+  const userLookup = userBundles.reduce((lookup, user) => {
+    if (user.routeId) lookup[user.routeId] = user;
+    if (user.token && user.token !== user.routeId) lookup[user.token] = user;
+    return lookup;
+  }, {});
+  const rankings = {
+    cpu: rankedUsers(userBundles, 'cpu', 'desc'),
+    memory: rankedUsers(userBundles, 'memory', 'desc'),
+    savings: rankedUsers(userBundles, 'savings', 'desc'),
+  };
+  const diagnostics = {
+    selectedRuntimeSource: tree.source,
+    indexUsersCount: tree.indexUserCount || normalizeList(tree.index && tree.index.users).length,
+    loadedUserBundleCount: userBundles.length,
+    failedUserBundleCount: tree.failedUserBundleCount || 0,
+    firstFiveUserLabelsOrTokens: userBundles.slice(0, 5).map((user) => user.label || user.tokenPreview || 'User bundle'),
+    clusterDailyTrendLength: normalizeList(cluster.daily_trends).length,
+    percentilesKeys: Object.keys(p).sort(),
+  };
 
   return {
     source: tree.source,
@@ -100,14 +113,49 @@ function buildDerivedData(tree) {
       gpu: gpuPercentiles,
       underutilized: underPercentiles,
     },
-    userBundles: sampleUsers,
+    userBundles,
+    userLookup,
+    rankings,
     recommendations: flattenRecommendations(users),
+    diagnostics,
     datasetMeta: {
       dateRange,
       importedRows: normalizeList(cluster.daily_trends).length || normalizeList(trends).length,
       jobMetricsRows,
       userBundleCount: users.length,
     },
+  };
+}
+
+function rankedUsers(users, field, direction = 'desc') {
+  return normalizeList(users)
+    .filter((user) => Number.isFinite(Number(user && user[field])))
+    .slice()
+    .sort((a, b) => direction === 'desc' ? Number(b[field]) - Number(a[field]) : Number(a[field]) - Number(b[field]))
+    .slice(0, 25);
+}
+
+function normalizeUserBundle(user, index) {
+  const summary = normalizeSummary(user && user.all_time_summary);
+  const token = String((user && user.user_token) || '');
+  const label = (user && (user.display_pseudonym || user.public_user_id || user.pseudonym)) || `User-${String(index + 1).padStart(4, '0')}`;
+  return {
+    token,
+    routeId: token || `user-${index + 1}`,
+    tokenPreview: token ? `${token.slice(0, 12)}...` : '',
+    label,
+    allTime: summary,
+    rollingSummaries: normalizeSummary(user && user.rolling_summaries),
+    dailyTrends: normalizeList(user && user.daily_trends),
+    topInefficientJobs: normalizeList(user && user.top_inefficient_jobs),
+    recommendations: normalizeList(user && user.recommendations),
+    cpu: summary.avg_cpu_efficiency,
+    memory: summary.avg_memory_efficiency,
+    gpu: summary.gpu_hours || 0,
+    savings: summary.underutilized_cost_dkk || 0,
+    jobs: summary.jobs,
+    completedJobs: summary.completed_jobs,
+    failedJobs: summary.failed_jobs,
   };
 }
 
@@ -135,9 +183,10 @@ export async function loadMjolnirData() {
   try {
     const tree = await tryLoadTree(realBase);
     const runtimeAttempts = attempts.concat({ base: realBase, ok: true, mode: tryPrivate ? 'private' : 'real' });
-    console.info('Mjolnir data loader selected source', { runtimeSource: realBase, runtimeAttempts });
+    const loaded = buildDerivedData(tree);
+    console.info('Mjolnir data loader diagnostics', loaded.diagnostics);
     return {
-      ...buildDerivedData(tree),
+      ...loaded,
       runtimeSource: realBase,
       runtimeAttempts,
     };
@@ -146,9 +195,10 @@ export async function loadMjolnirData() {
     try {
       const tree = await tryLoadTree(SAMPLE_BASE);
       const runtimeAttempts = attempts.concat({ base: SAMPLE_BASE, ok: true, mode: 'sample' });
-      console.info('Mjolnir data loader selected source', { runtimeSource: SAMPLE_BASE, runtimeAttempts });
+      const loaded = buildDerivedData(tree);
+      console.info('Mjolnir data loader diagnostics', loaded.diagnostics);
       return {
-        ...buildDerivedData(tree),
+        ...loaded,
         runtimeSource: SAMPLE_BASE,
         runtimeAttempts,
         source: 'sample-data',

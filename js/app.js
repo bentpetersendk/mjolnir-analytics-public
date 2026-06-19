@@ -73,11 +73,13 @@ function asObject(value) {
 }
 
 function navLink(item) {
-  const active = state.route === item.id ? 'aria-current="page"' : '';
+  const activeRoute = state.route === item.id || (item.id === 'users' && state.route.startsWith('user/'));
+  const active = activeRoute ? 'aria-current="page"' : '';
   return `<a class="nav-link" href="#/${item.id}" ${active}>${icon(item.icon)}<span>${item.label}</span></a>`;
 }
 
 function pageTitle(route) {
+  if (route.startsWith('user/')) return 'User Detail';
   return navItems.find((item) => item.id === route)?.label || 'Landing';
 }
 
@@ -167,14 +169,80 @@ function comparisonText(value, threshold, relation, intro) {
 }
 
 
-function userTable(users) {
-  const userList = Array.isArray(users) ? users : [];
-  const rows = (userList.length ? userList : [
-    { label: 'User 01', cpu: 0.52, memory: 0.28, savings: 2140.6 },
-    { label: 'User 02', cpu: 0.33, memory: 0.14, savings: 1211.5 },
-  ]).map((user) => [user.label, pct(user.cpu), pct(user.memory), money(user.savings)]);
-  return tableFromRows(['User', 'CPU efficiency', 'Memory efficiency', 'Potential savings'], rows);
+function userLink(user) {
+  const routeId = user && user.routeId ? encodeURIComponent(user.routeId) : '';
+  const label = escapeHtml(user && user.label ? user.label : 'User bundle');
+  return routeId ? `<a class="table-link" href="#/user/${routeId}">${label}</a>` : label;
 }
+
+function rankingTable(title, users, metricLabel, metricFormatter) {
+  const rows = asArray(users).slice(0, 25).map((user, index) => [
+    `#${index + 1}`,
+    userLink(user),
+    metricFormatter(user),
+    pct(user.memory),
+    money(user.savings),
+    fmt(user.jobs),
+  ]);
+  const body = rows.length ? tableFromRows(['Rank', 'Pseudonymous user', metricLabel, 'Memory efficiency', 'Potential savings', 'Jobs'], rows) : '<p class="subtle">No user bundles are available for this ranking.</p>';
+  return `<section class="section"><div class="section-head"><h2>${title}</h2><span class="subtle">Top ${Math.min(asArray(users).length, 25)}</span></div>${body}</section>`;
+}
+
+function userTable(users) {
+  return rankingTable('Top 25 users by CPU efficiency', users, 'CPU efficiency', (user) => pct(user.cpu));
+}
+
+function rollingSummaryCards(user) {
+  const summaries = asObject(user?.rollingSummaries);
+  return ['7d', '30d', '90d'].map((window) => {
+    const summary = asObject(summaries[window]);
+    return statBlock(`Rolling ${window}`, `${pct(summary.avg_cpu_efficiency)} CPU`, `${pct(summary.avg_memory_efficiency)} memory, ${money(summary.underutilized_cost_dkk)} savings`);
+  }).join('');
+}
+
+function dailyTrendTable(trends) {
+  const rows = asArray(trends).slice(-14).reverse().map((row) => [
+    escapeHtml(row.report_date || '—'),
+    pct(row.avg_cpu_efficiency),
+    pct(row.avg_memory_efficiency),
+    fmt(row.jobs),
+    money(row.underutilized_cost_dkk),
+  ]);
+  return rows.length ? tableFromRows(['Date', 'CPU efficiency', 'Memory efficiency', 'Jobs', 'Savings opportunity'], rows) : '<p class="subtle">No daily trend rows are available for this user bundle.</p>';
+}
+
+function inefficientJobsTable(jobs) {
+  const rows = asArray(jobs).slice(0, 10).map((job) => [
+    money(job.underutilized_cost_dkk),
+    pct(job.measured_cpu_efficiency),
+    pct(job.memory_efficiency),
+    fmt(job.elapsed_hours, 1),
+    fmt(job.gpu_count),
+    money(job.estimated_cost_dkk),
+  ]);
+  return rows.length ? tableFromRows(['Wasted cost', 'CPU efficiency', 'Memory efficiency', 'Elapsed hours', 'GPUs', 'Estimated cost'], rows) : '<p class="subtle">No inefficient job rows are available for this user bundle.</p>';
+}
+
+function userRecommendations(user) {
+  const recs = asArray(user?.recommendations);
+  if (!recs.length) return '<p class="subtle">No generated recommendations are attached to this user bundle.</p>';
+  return `<div class="rec-list">${recs.map((item) => recCard(item.severity === 'high' ? 'High impact' : 'Medium impact', item.title || item.suggestion || 'Recommendation', item.suggestion || 'Review this workload pattern')).join('')}</div>`;
+}
+
+function diagnosticsPanel() {
+  const diagnostics = asObject(data?.diagnostics);
+  const rows = [
+    ['Selected runtime source', diagnostics.selectedRuntimeSource || data?.source || 'unknown'],
+    ['Index users count', fmt(diagnostics.indexUsersCount)],
+    ['Loaded user bundle count', fmt(diagnostics.loadedUserBundleCount)],
+    ['Failed user bundle count', fmt(diagnostics.failedUserBundleCount)],
+    ['First 5 pseudonymous labels/tokens', asArray(diagnostics.firstFiveUserLabelsOrTokens).map(escapeHtml).join(', ') || '—'],
+    ['Cluster daily trend length', fmt(diagnostics.clusterDailyTrendLength)],
+    ['Percentiles keys', asArray(diagnostics.percentilesKeys).map(escapeHtml).join(', ') || '—'],
+  ];
+  return `<section class="section diagnostics-panel"><div class="section-head"><h2>Runtime diagnostics</h2><span class="subtle">No private identifiers or raw paths</span></div>${tableFromRows(['Check', 'Value'], rows)}</section>`;
+}
+
 
 function landingPage() {
   const cluster = asObject(data?.clusterSummary);
@@ -269,16 +337,56 @@ function alertsSection() {
 
 function userPage() {
   const users = asArray(data?.userBundles);
+  const rankings = asObject(data?.rankings);
+  const topCpu = asArray(rankings.cpu).length ? rankings.cpu : users.slice().sort((a, b) => Number(b.cpu || 0) - Number(a.cpu || 0)).slice(0, 25);
+  const topMemory = asArray(rankings.memory).length ? rankings.memory : users.slice().sort((a, b) => Number(b.memory || 0) - Number(a.memory || 0)).slice(0, 25);
+  const topSavings = asArray(rankings.savings).length ? rankings.savings : users.slice().sort((a, b) => Number(b.savings || 0) - Number(a.savings || 0)).slice(0, 25);
   return `
     <div class="page-layout">
       ${localNav('Users')}
       <div class="stack">
-        <section class="section"><div class="section-head"><h2>User Dashboard</h2><span class="subtle">Requests, activity, and role mix</span></div><div class="cards-grid">${[statBlock('Sample users', fmt(users.length), 'Anonymized bundles'), statBlock('Top CPU user', users[0] ? pct(users[0].cpu) : '—', 'From bundle data'), statBlock('Top savings', users[0] ? money(users[0].savings) : '—', 'Sample recommendation')].join('')}</div></section>
-        <section class="section"><div class="section-head"><h2>Activity timeline</h2><span class="subtle">Last 24 hours</span></div><div class="bars" style="height: 220px;">${Array.from({ length: 12 }, (_, i) => `<div class="bar" style="height:${60 + ((i * 11) % 120)}px"></div>`).join('')}</div></section>
-        <section class="section"><div class="section-head"><h2>Recent actions</h2><span class="subtle">Derived from user bundles</span></div>${userTable(users)}</section>
+        <section class="section"><div class="section-head"><h2>Users</h2><span class="subtle">Pseudonymous bundle rankings from the loaded export</span></div><div class="cards-grid">${[
+          statBlock('Total user bundle count', fmt(users.length), `${fmt(data?.diagnostics?.indexUsersCount)} users listed in index`),
+          statBlock('Failed bundle loads', fmt(data?.diagnostics?.failedUserBundleCount), 'Loader keeps rendering with successful bundles'),
+          statBlock('Top CPU efficiency', topCpu[0] ? pct(topCpu[0].cpu) : '—', topCpu[0] ? topCpu[0].label : 'No bundle loaded'),
+        ].join('')}</div></section>
+        ${rankingTable('Top 25 users by CPU efficiency', topCpu, 'CPU efficiency', (user) => pct(user.cpu))}
+        ${rankingTable('Top 25 users by memory efficiency', topMemory, 'Memory efficiency', (user) => pct(user.memory))}
+        ${rankingTable('Top 25 users by potential savings', topSavings, 'Potential savings', (user) => money(user.savings))}
       </div>
     </div>`;
 }
+
+function userDetailPage() {
+  const routeId = decodeURIComponent(state.route.replace(/^user\//, ''));
+  const users = asArray(data?.userBundles);
+  const user = asObject(data?.userLookup)[routeId] || users.find((item) => item.routeId === routeId || item.token === routeId);
+  if (!user) {
+    console.error('User detail renderer could not find user bundle', { renderer: 'userDetailPage', routeId });
+    return `<section class="section"><div class="section-head"><h2>User bundle not found</h2><a class="btn" href="#/users">Back to users</a></div><p class="subtle">The requested pseudonymous user bundle was not loaded by the data layer.</p></section>`;
+  }
+  const allTime = asObject(user.allTime);
+  return `
+    <div class="page-layout">
+      ${localNav('Users')}
+      <div class="stack">
+        <section class="section user-detail-head"><div><div class="subtle">Pseudonymous user bundle</div><h2>${escapeHtml(user.label)}</h2><p class="subtle">Public route token: ${escapeHtml(user.tokenPreview || user.routeId)}</p></div><a class="btn" href="#/users">Back to rankings</a></section>
+        <section class="section"><div class="section-head"><h2>All-time summary</h2><span class="subtle">Loaded from the actual user bundle</span></div><div class="cards-grid">${[
+          statBlock('Jobs', fmt(allTime.jobs), `${fmt(allTime.completed_jobs)} completed, ${fmt(allTime.failed_jobs)} failed`),
+          statBlock('CPU efficiency', pct(allTime.avg_cpu_efficiency), `${fmt(allTime.jobs_with_measured_cpu)} measured CPU rows`),
+          statBlock('Memory efficiency', pct(allTime.avg_memory_efficiency), `${fmt(allTime.jobs_with_measured_memory)} measured memory rows`),
+          statBlock('Potential savings', money(allTime.underutilized_cost_dkk), `${money(allTime.estimated_cost_dkk)} estimated cost`),
+          statBlock('GPU hours', fmt(allTime.gpu_hours, 1), 'Measured usage'),
+          statBlock('Allocated CPU hours', fmt(allTime.cpu_hours_allocated, 1), `${fmt(allTime.measured_cpu_hours, 1)} measured`),
+        ].join('')}</div></section>
+        <section class="section"><div class="section-head"><h2>Rolling summaries</h2><span class="subtle">7, 30, and 90 day windows</span></div><div class="cards-grid">${rollingSummaryCards(user)}</div></section>
+        <section class="section"><div class="section-head"><h2>Daily trends</h2><span class="subtle">Most recent rows in this bundle</span></div>${dailyTrendTable(user.dailyTrends)}</section>
+        <section class="section"><div class="section-head"><h2>Top inefficient jobs</h2><span class="subtle">No job names or raw identifiers displayed</span></div>${inefficientJobsTable(user.topInefficientJobs)}</section>
+        <section class="section"><div class="section-head"><h2>Recommendations</h2><span class="subtle">Generated from bundle metrics</span></div>${userRecommendations(user)}</section>
+      </div>
+    </div>`;
+}
+
 
 function benchmarkPage() {
   const percentiles = asObject(data?.percentiles);
@@ -312,29 +420,39 @@ function costPage() {
 
 function methodologyPage() {
   const source = data?.source || 'fallback';
+  const meta = asObject(data?.datasetMeta);
   return `
     <div class="page-layout">
       ${localNav('Methodology')}
       <div class="stack">
-        <section class="section"><div class="section-head"><h2>Methodology</h2><span class="subtle">How the dataset is structured</span></div><p class="subtle" style="line-height:1.8">The dashboard prefers the approved 90-day validation export and falls back to <code>sample-data/</code> only if the primary export is unavailable. The front end is intentionally modular so the archive source can change without page-level code changes. Current source: ${source}.</p></section>
-        <section class="section"><div class="section-head"><h2>Design principles</h2><span class="subtle">Operational and readable</span></div><div class="cards-grid">${[statBlock('Dataset range', meta.dateRange && meta.dateRange.start ? `${meta.dateRange.start} to ${meta.dateRange.end}` : '—', 'Approved 90-day export'), statBlock('Imported rows', fmt(meta.importedRows), 'Daily trend rows'), statBlock('Job metrics', fmt(meta.jobMetricsRows), 'Derived from job entries'), statBlock('User bundles', fmt(meta.userBundleCount), 'Approved export users')].join('')}</div></section>
-        <section class="section"><div class="section-head"><h2>Loader trace</h2><span class="subtle">Runtime decision path</span></div><pre class="trace">${escapeHtml(JSON.stringify(data?.runtimeAttempts || [], null, 2))}</pre></section>
+        <section class="section"><div class="section-head"><h2>Methodology</h2><span class="subtle">How the dataset is structured</span></div><p class="subtle" style="line-height:1.8">The dashboard prefers the approved 90-day validation export and falls back to sample data only if the primary export is unavailable. The front end is intentionally modular so the archive source can change without page-level code changes. Current source: ${escapeHtml(source)}.</p></section>
+        <section class="section"><div class="section-head"><h2>Design principles</h2><span class="subtle">Operational and readable</span></div><div class="cards-grid">${[
+          statBlock('Dataset range', meta.dateRange && meta.dateRange.start ? `${meta.dateRange.start} to ${meta.dateRange.end}` : '—', 'Approved 90-day export'),
+          statBlock('Imported rows', fmt(meta.importedRows), 'Daily trend rows'),
+          statBlock('Job metrics', fmt(meta.jobMetricsRows), 'Derived inefficient-job rows currently exported'),
+          statBlock('User bundles', fmt(meta.userBundleCount), 'Approved export users'),
+        ].join('')}</div></section>
+        ${diagnosticsPanel()}
+        <section class="section"><div class="section-head"><h2>Data flow</h2><span class="subtle">Runtime path</span></div><p class="subtle" style="line-height:1.8">SQLite validation tables become privacy-reviewed JSON, the data loader normalizes the export into cluster, percentile, recommendation, and user bundle collections, then page renderers consume only those normalized properties.</p></section>
       </div>
     </div>`;
 }
 
+
 function renderShell(content) {
-  const runtimeSource = data?.runtimeSource || 'unknown';
+  const runtimeSource = data?.diagnostics?.selectedRuntimeSource || data?.source || 'unknown';
   const runtimeAttempts = Array.isArray(data?.runtimeAttempts) ? data.runtimeAttempts : [];
   const loadState = data?.errors?.length
-    ? `<div class="load-banner error"><strong>Public demo mode</strong><span>Private export unavailable. Showing sample-data fallback.</span></div>`
-    : '';
+    ? `<div class="load-banner error"><strong>Public demo mode</strong><span>Primary export unavailable. Showing sample-data fallback.</span></div>`
+    : data?.source === 'real-export'
+      ? `<div class="load-banner real"><strong>REAL MJOLNIR DATA</strong><span>90-day validation dataset</span></div>`
+      : '';
   return `
     <div class="app-shell" data-theme="${state.theme}">
       <aside class="sidebar">
         <div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div>
         <nav class="nav-group">${navItems.map((item) => navLink(item)).join('')}</nav>
-        <div class="context-card"><div class="context-label">Viewing context</div><div class="context-item"><span>Environment</span><strong>Production</strong></div><div class="context-item"><span>Mode</span><strong>${data?.source === 'real-export' ? 'Restricted export loaded locally' : 'Sample fallback active'}</strong></div><div class="context-item"><span>Schema</span><strong>${data?.schemaVersion || 'unknown'}</strong></div><div class="context-item"><span>Runtime source</span><strong>${runtimeSource}</strong></div><div class="context-item"><span>Loader attempts</span><strong>${runtimeAttempts.length}</strong></div></div>
+        <div class="context-card"><div class="context-label">Viewing context</div><div class="context-item"><span>Environment</span><strong>Production</strong></div><div class="context-item"><span>Mode</span><strong>${data?.source === 'real-export' ? 'Real 90-day export' : 'Sample fallback active'}</strong></div><div class="context-item"><span>Schema</span><strong>${data?.schemaVersion || 'unknown'}</strong></div><div class="context-item"><span>Runtime source</span><strong>${runtimeSource}</strong></div><div class="context-item"><span>Loaded bundles</span><strong>${fmt(data?.diagnostics?.loadedUserBundleCount)}</strong></div><div class="context-item"><span>Loader attempts</span><strong>${runtimeAttempts.length}</strong></div></div>
       </aside>
       <main class="main">
         <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Open navigation">${icon('menu')}</button></div>
@@ -355,13 +473,15 @@ function render() {
     landing: landingPage,
     cluster: clusterPage,
     users: userPage,
+    userDetail: userDetailPage,
     benchmarks: benchmarkPage,
     cost: costPage,
     methodology: methodologyPage,
   };
-  const rendererName = renderers[state.route] ? `${state.route}Page` : 'landingPage';
+  const routeKey = state.route.startsWith('user/') ? 'userDetail' : state.route;
+  const rendererName = renderers[routeKey] ? `${routeKey}Page` : 'landingPage';
   try {
-    const pageRenderer = renderers[state.route] || renderers.landing;
+    const pageRenderer = renderers[routeKey] || renderers.landing;
     const content = pageRenderer();
     app.innerHTML = renderShell(content);
     wireEvents();
