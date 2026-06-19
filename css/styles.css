@@ -612,3 +612,446 @@ td:last-child, th:last-child { text-align: right; }
   .load-banner, .prototype-banner, .personal-hero, .decision-hero { align-items: start; flex-direction: column; }
   .percentile-scale { grid-template-columns: repeat(5, minmax(48px, 1fr)); overflow-x: auto; }
 }
+
+/* Mobile-first UX redesign layer */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+.mobile-route-nav,
+.mobile-card-list {
+  display: none;
+}
+
+.personal-pulse {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.pulse-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 8px;
+}
+
+.pulse-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pulse-card strong {
+  font-size: clamp(1.25rem, 2vw, 1.8rem);
+  line-height: 1.1;
+}
+
+.pulse-card em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pulse-card.good { border-color: rgba(83, 216, 138, 0.3); }
+.pulse-card.warn { border-color: rgba(255, 184, 77, 0.34); }
+.pulse-card.info { border-color: rgba(62, 140, 255, 0.34); }
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1200px) {
+  .mobile-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(14px);
+  }
+
+  .mobile-topbar .brand {
+    padding: 0;
+    min-width: 0;
+  }
+
+  .mobile-topbar .brand-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .mobile-topbar .brand-name {
+    font-size: 16px;
+  }
+
+  .mobile-topbar .brand-sub {
+    max-width: 190px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-route-nav {
+    position: sticky;
+    top: 55px;
+    z-index: 28;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 8px 12px 10px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(14px);
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-route-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-nav-link {
+    min-height: 44px;
+    min-width: max-content;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 13px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--muted);
+    background: var(--surface);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .mobile-nav-link svg {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+  }
+
+  .mobile-nav-link[aria-current="page"] {
+    color: var(--text);
+    border-color: rgba(95, 180, 255, 0.34);
+    background: linear-gradient(180deg, rgba(62, 140, 255, 0.22), rgba(45, 212, 191, 0.1));
+  }
+
+  .local-nav {
+    display: none;
+  }
+
+  .topbar {
+    display: none;
+  }
+
+  .page {
+    padding: 14px 12px 20px;
+  }
+
+  .load-banner {
+    margin: 12px;
+    align-items: flex-start;
+  }
+
+  .hero,
+  .dashboard-grid,
+  .panel-grid,
+  .page-layout,
+  .trend-grid,
+  .insight-grid,
+  .priority-grid,
+  .savings-summary,
+  .personal-pulse {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-copy,
+  .hero-panel,
+  .section,
+  .table-card,
+  .chart-card,
+  .metric-card,
+  .stat-card,
+  .rec-card,
+  .percentile-card,
+  .pulse-card {
+    border-radius: 14px;
+  }
+
+  .section,
+  .table-card,
+  .chart-card {
+    padding: 16px;
+  }
+
+  .section-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .section-head h2,
+  .chart-head h3 {
+    font-size: 1.12rem;
+    line-height: 1.25;
+  }
+
+  .chart-card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chart-card::after {
+    content: "Swipe chart";
+    display: inline-flex;
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .chart-card .chart {
+    min-width: 560px;
+  }
+
+  .trend-chart {
+    height: 220px;
+  }
+
+  .decision-hero,
+  .personal-hero,
+  .prototype-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .decision-summary,
+  .personal-rank-card {
+    max-width: none;
+    width: 100%;
+  }
+
+  .personal-pulse {
+    margin-top: -4px;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 12px 10px 18px;
+  }
+
+  .hero-copy {
+    padding: 18px;
+  }
+
+  .hero h1,
+  .decision-hero h1,
+  .personal-hero h1 {
+    font-size: clamp(1.75rem, 9vw, 2.55rem);
+    letter-spacing: -0.02em;
+    line-height: 1.02;
+  }
+
+  .hero p,
+  .subtle,
+  .priority-card p {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .hero-actions,
+  .table-toolbar,
+  .recovery-row {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn,
+  .toolbar-button,
+  .search,
+  .nav-link,
+  .local-nav a {
+    min-height: 44px;
+  }
+
+  .btn {
+    justify-content: center;
+  }
+
+  .mini-grid,
+  .cards-grid,
+  .percentiles {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-card,
+  .stat-card,
+  .priority-card,
+  .rec-card,
+  .alert-item,
+  .pulse-card {
+    padding: 16px;
+  }
+
+  .metric-value,
+  .stat-card .value,
+  .savings-total strong,
+  .decision-summary strong,
+  .personal-rank-card strong {
+    font-size: clamp(1.55rem, 8vw, 2.2rem);
+  }
+
+  .table-responsive {
+    display: none;
+  }
+
+  .mobile-card-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .mobile-row-card {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface-3);
+    overflow: hidden;
+  }
+
+  .mobile-row-card summary {
+    min-height: 56px;
+    padding: 14px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .mobile-row-card summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mobile-row-card summary::after {
+    content: "+";
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .mobile-row-card[open] summary::after {
+    content: "-";
+  }
+
+  .mobile-row-card summary span,
+  .mobile-row-card summary strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-row-card summary strong {
+    color: var(--green);
+    text-align: right;
+    font-size: 13px;
+  }
+
+  .mobile-row-card dl {
+    margin: 0;
+    padding: 0 14px 14px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .mobile-row-card dl div {
+    display: grid;
+    grid-template-columns: minmax(92px, 0.42fr) minmax(0, 1fr);
+    gap: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+
+  .mobile-row-card dt {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .mobile-row-card dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    text-align: right;
+    font-size: 13px;
+  }
+
+  .breakdown-row,
+  .mobile-row-card dl div {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-row-card dd {
+    text-align: left;
+  }
+
+  .percentile-scale {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    min-height: 210px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .percentile-step {
+    min-width: 74px;
+  }
+
+  .lineage {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .lineage span,
+  .lineage b,
+  .lineage strong {
+    min-width: 126px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .app-shell,
+  .main {
+    max-width: 100vw;
+    overflow-x: clip;
+  }
+
+  .mobile-route-nav,
+  .lineage,
+  .percentile-scale,
+  .chart-card {
+    max-width: 100%;
+    contain: layout paint;
+  }
+}

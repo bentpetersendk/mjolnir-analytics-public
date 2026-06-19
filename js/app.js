@@ -71,6 +71,11 @@ function navLink(item) {
   return `<a class="nav-link" href="#/${item.id}" ${active}>${icon(item.icon)}<span>${item.label}</span></a>`;
 }
 
+function mobileNavLink(item) {
+  const active = state.route === item.id ? 'aria-current="page"' : '';
+  return `<a class="mobile-nav-link" href="#/${item.id}" ${active}>${icon(item.icon)}<span>${item.label}</span></a>`;
+}
+
 function rollingAverage(rows, key, windowSize) {
   return asArray(rows).map((row, index, all) => {
     const slice = all.slice(Math.max(0, index - windowSize + 1), index + 1);
@@ -146,10 +151,18 @@ function percentileCard(label, value, status, tone) {
 }
 
 function tableFromRows(headers, rows) {
-  const body = rows.length
-    ? rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')
+  const safeRows = asArray(rows);
+  const body = safeRows.length
+    ? safeRows.map((row) => `<tr>${row.map((cell, index) => `<td data-label="${escapeHtml(headers[index] || '')}">${cell}</td>`).join('')}</tr>`).join('')
     : `<tr><td colspan="${headers.length}">No data available.</td></tr>`;
-  return `<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`;
+  const mobileCards = safeRows.length
+    ? safeRows.map((row, rowIndex) => {
+      const title = row[0] || `Item ${rowIndex + 1}`;
+      const summary = row[1] || '';
+      return `<details class="mobile-row-card"><summary><span>${title}</span><strong>${summary}</strong></summary><dl>${row.map((cell, index) => `<div><dt>${escapeHtml(headers[index] || '')}</dt><dd>${cell}</dd></div>`).join('')}</dl></details>`;
+    }).join('')
+    : '<div class="empty-state">No data available.</div>';
+  return `<div class="table-responsive"><table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div><div class="mobile-card-list">${mobileCards}</div>`;
 }
 
 function localNav(active) {
@@ -507,6 +520,40 @@ function personalJobsTable(rows) {
   return tableFromRows(['Job label', 'Savings opportunity', 'CPU use', 'Memory use', 'Decision'], tableRows);
 }
 
+
+function firstFinite(values) {
+  return values.map(Number).find(Number.isFinite);
+}
+
+function improvementSignal(trends) {
+  const rows = asArray(trends);
+  if (rows.length < 2) return { label: 'Trend pending', value: 'No baseline', tone: 'info', detail: 'More daily points are needed before the dashboard can judge improvement.' };
+  const first = rows.slice(0, Math.min(14, rows.length));
+  const last = rows.slice(-Math.min(14, rows.length));
+  const firstCpu = firstFinite(first.map((row) => row && row.avg_cpu_efficiency));
+  const lastCpu = firstFinite(last.map((row) => row && row.avg_cpu_efficiency).reverse());
+  if (!Number.isFinite(firstCpu) || !Number.isFinite(lastCpu)) return { label: 'Trend pending', value: 'No baseline', tone: 'info', detail: 'CPU trend data is not available for this bundle.' };
+  const delta = lastCpu - firstCpu;
+  return {
+    label: delta >= 0 ? 'Improving' : 'Drifting',
+    value: `${delta >= 0 ? '+' : ''}${pct(delta, 1)}`,
+    tone: delta >= 0 ? 'good' : 'warn',
+    detail: 'CPU efficiency change from early to recent daily points.',
+  };
+}
+
+function personalPulse(metrics, percentile, trends, topAction) {
+  const overallBand = percentileBand(percentile.overall);
+  const savings = num(metrics.potentialSavings);
+  const trend = improvementSignal(trends);
+  return `<div class="personal-pulse" aria-label="Personal dashboard summary">
+    <article class="pulse-card ${overallBand.tone}"><span>How am I doing?</span><strong>${overallBand.label}</strong><em>${overallBand.detail}</em></article>
+    <article class="pulse-card warn"><span>What should I fix next?</span><strong>${escapeHtml(topAction?.title || 'Review requests')}</strong><em>${topAction?.detail ? escapeHtml(topAction.detail) : 'Start with the highest repeatable savings pattern.'}</em></article>
+    <article class="pulse-card good"><span>How much can I save?</span><strong>${money(savings)}</strong><em>${money(annualized(savings))} annualized run-rate if the pattern repeats.</em></article>
+    <article class="pulse-card ${trend.tone}"><span>Am I improving?</span><strong>${trend.value}</strong><em>${trend.label}. ${trend.detail}</em></article>
+  </div>`;
+}
+
 function peerComparisonTable(rows) {
   const tableRows = asArray(rows).map((peer) => {
     const band = percentileBand(peer.percentile);
@@ -553,6 +600,7 @@ function personalDashboardPage() {
         <em>${comparisonBand.detail}</em>
       </div>
     </section>
+    ${personalPulse(metrics, percentile, trends, topAction)}
     <div class="stack">
       <section class="section"><div class="section-head"><h2>Priority Actions</h2><span class="subtle">What should I do?</span></div>${priorityActions(vm.recommendations)}</section>
       <section class="section"><div class="section-head"><h2>Savings Opportunity Breakdown</h2><span class="subtle">How much can I save?</span></div>${savingsBreakdown(vm.recommendations, metrics)}</section>
@@ -607,7 +655,8 @@ function renderShell(content) {
         <div class="context-card"><div class="context-label">Viewing context</div><div class="context-item"><span>Environment</span><strong>Production review</strong></div><div class="context-item"><span>Mode</span><strong>${sourceText}</strong></div><div class="context-item"><span>Schema</span><strong>${data?.schemaVersion || 'unknown'}</strong></div><div class="context-item"><span>Users</span><strong>${fmt(data?.datasetMeta?.userCount || 0)}</strong></div></div>
       </aside>
       <main class="main">
-        <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Open navigation">${icon('menu')}</button></div>
+        <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Show routes">${icon('menu')}</button></div>
+        <nav class="mobile-route-nav" aria-label="Mobile route navigation">${navItems.map((item) => mobileNavLink(item)).join('')}</nav>
         <div class="topbar"><div class="topbar-left"><div class="crumb">${icon('menu')} <span>${pageTitle(state.route)}</span></div></div><div class="topbar-right"><a class="btn" href="#/recovery">Who am I?</a><button class="toolbar-button" data-action="theme" aria-label="Toggle theme">${state.theme === 'dark' ? icon('sun') : icon('moon')}</button></div></div>
         ${data?.source === 'real-export' ? '<div class="load-banner real"><strong>REAL MJOLNIR DATA</strong><span>90-day validation dataset</span></div>' : ''}
         <div class="page">${content}</div>
@@ -643,7 +692,7 @@ function wireEvents() {
     render();
   });
   document.querySelector('[data-action="menu"]')?.addEventListener('click', () => {
-    document.querySelector('.sidebar')?.classList.toggle('hidden');
+    document.querySelector('.mobile-route-nav')?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
   });
   document.querySelector('[data-recovery-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
