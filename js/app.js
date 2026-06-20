@@ -11,6 +11,9 @@ const navItems = [
   { id: 'recommendations', label: 'Recommendations', icon: 'spark' },
   { id: 'inefficient-jobs', label: 'Inefficient Jobs', icon: 'alert' },
   { id: 'projects', label: 'Projects', icon: 'folder' },
+  { id: 'pis', label: 'PIs', icon: 'users' },
+  { id: 'groups', label: 'Groups', icon: 'cluster' },
+  { id: 'sections', label: 'Sections', icon: 'book' },
   { id: 'users', label: 'Peer Compare', icon: 'users' },
   { id: 'cost', label: 'Cost', icon: 'wallet' },
   { id: 'recovery', label: 'Reveal My Dashboard', icon: 'key' },
@@ -63,17 +66,21 @@ function annualized(value) { return num(value) * (365 / 90); }
 function escapeHtml(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
 function isPersonalRoute(route) { return /^u\/[A-Za-z0-9_-]+$/.test(route || ''); }
 function personalRouteToken(route) { return isPersonalRoute(route) ? route.split('/')[1] : null; }
-function pageTitle(route) { if (isPersonalRoute(route)) return 'Personal Dashboard'; return navItems.find((item) => item.id === route)?.label || 'Overview'; }
+function isHierarchyDetailRoute(route) { return /^(project|pi|group|section)\/[A-Za-z0-9_-]+$/.test(route || ''); }
+function detailRouteParts(route) { const parts = String(route || '').split('/'); return { type: parts[0], id: parts[1] }; }
+function pageTitle(route) {
+  if (isPersonalRoute(route)) return 'Personal Dashboard';
+  if (isHierarchyDetailRoute(route)) {
+    const part = detailRouteParts(route).type;
+    return part === 'pi' ? 'PI Detail' : `${part.charAt(0).toUpperCase()}${part.slice(1)} Detail`;
+  }
+  return navItems.find((item) => item.id === route)?.label || 'Overview';
+}
 function trendDirection(current, previous, lowerIsBetter = false) { const delta = num(current) - num(previous); const good = lowerIsBetter ? delta < 0 : delta > 0; if (Math.abs(delta) < 0.0001) return { text: 'Flat', tone: 'info' }; return { text: `${good ? 'Improving' : 'Needs attention'} (${delta > 0 ? '+' : ''}${pct(delta, 1)})`, tone: good ? 'good' : 'warn' }; }
 
 function navLink(item) {
   const active = state.route === item.id ? 'aria-current="page"' : '';
   return `<a class="nav-link" href="#/${item.id}" ${active}>${icon(item.icon)}<span>${item.label}</span></a>`;
-}
-
-function mobileNavLink(item) {
-  const active = state.route === item.id ? 'aria-current="page"' : '';
-  return `<a class="mobile-nav-link" href="#/${item.id}" ${active}>${icon(item.icon)}<span>${item.label}</span></a>`;
 }
 
 function rollingAverage(rows, key, windowSize) {
@@ -151,18 +158,10 @@ function percentileCard(label, value, status, tone) {
 }
 
 function tableFromRows(headers, rows) {
-  const safeRows = asArray(rows);
-  const body = safeRows.length
-    ? safeRows.map((row) => `<tr>${row.map((cell, index) => `<td data-label="${escapeHtml(headers[index] || '')}">${cell}</td>`).join('')}</tr>`).join('')
+  const body = rows.length
+    ? rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')
     : `<tr><td colspan="${headers.length}">No data available.</td></tr>`;
-  const mobileCards = safeRows.length
-    ? safeRows.map((row, rowIndex) => {
-      const title = row[0] || `Item ${rowIndex + 1}`;
-      const summary = row[1] || '';
-      return `<details class="mobile-row-card"><summary><span>${title}</span><strong>${summary}</strong></summary><dl>${row.map((cell, index) => `<div><dt>${escapeHtml(headers[index] || '')}</dt><dd>${cell}</dd></div>`).join('')}</dl></details>`;
-    }).join('')
-    : '<div class="empty-state">No data available.</div>';
-  return `<div class="table-responsive"><table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div><div class="mobile-card-list">${mobileCards}</div>`;
+  return `<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
 function localNav(active) {
@@ -374,23 +373,102 @@ function inefficientJobsPage() {
     </div>`;
 }
 
+function metricSummaryCards(entity) {
+  return `<div class="cards-grid">${[
+    statBlock('Jobs', fmt(entity.jobs), `${fmt(entity.completedJobs)} completed / ${fmt(entity.failedJobs)} failed`),
+    statBlock('CPU efficiency', pct(entity.cpu), 'Average measured CPU efficiency', entity.cpu && entity.cpu >= 0.5 ? 'good' : 'warn'),
+    statBlock('Memory efficiency', pct(entity.memory), 'Average measured memory efficiency', entity.memory && entity.memory >= 0.5 ? 'good' : 'warn'),
+    statBlock('Cost opportunity', money(entity.savings), `${money(entity.cost)} estimated cost`, 'warn'),
+    statBlock('GPU hours', fmt(entity.gpu, 1), 'Allocated GPU time'),
+  ].join('')}</div>`;
+}
+
+function hierarchyRows(items, detailPrefix) {
+  return asArray(items).map((item, index) => [
+    fmt(index + 1),
+    `<a href="#/${detailPrefix}/${escapeHtml(item.id)}"><strong>${escapeHtml(item.label)}</strong></a>`,
+    fmt(item.jobs),
+    pct(item.cpu),
+    pct(item.memory),
+    money(item.savings),
+    fmt(item.gpu, 1),
+  ]);
+}
+
 function projectsPage() {
-  const projects = asArray(data?.projects);
-  const meta = asObject(data?.datasetMeta);
-  const rows = projects.map((project) => [escapeHtml(project.label), fmt(project.jobs), pct(project.cpu), pct(project.memory), money(project.cost), money(project.savings), fmt(project.gpu, 1)]);
-  const unavailable = !meta.accountExportAvailable
-    ? `<section class="section"><div class="section-head"><h2>Project export not available</h2><span class="pill warn">Future export</span></div><p class="subtle" style="line-height:1.8">The SQLite database contains ${fmt(meta.rowCounts?.daily_account_summary)} daily project summary rows, but this public JSON export does not currently include anonymized project summaries. The page is ready to render them when a public-safe project export is added.</p></section>`
-    : '';
+  const projects = asArray(data?.projects).slice().sort((a, b) => num(b.savings) - num(a.savings));
+  const coverage = asObject(data?.hierarchyCoverage);
   return `
     <div class="page-layout">
       ${localNav('Projects')}
       <div class="stack">
-        <section class="section"><div class="section-head"><h2>Project efficiency summaries</h2><span class="subtle">Anonymized labels only</span></div><p class="subtle">When exported, projects are shown with generated labels rather than real project or account names.</p></section>
-        ${unavailable}
-        <section class="table-card">${tableFromRows(['Project label', 'Jobs', 'CPU', 'Memory', 'Cost', 'Savings opportunity', 'GPU hours'], rows)}</section>
+        <section class="section"><div class="section-head"><h2>Research Project portfolio</h2><span class="subtle">Derived from project directory extraction, not Slurm account</span></div><div class="cards-grid">${[
+          statBlock('Projects', fmt(projects.length), 'Public-safe project IDs'),
+          statBlock('Assigned rows', fmt(coverage.assigned_project_rows), 'Valid /maps/projects extraction', 'good'),
+          statBlock('Home directory rows', fmt(coverage.home_directory_rows), 'Kept in unassigned bucket'),
+        ].join('')}</div></section>
+        <section class="table-card"><div class="section-head"><h2>Project ranking</h2><span class="subtle">Cost opportunity first</span></div>${tableFromRows(['Rank', 'Project', 'Jobs', 'CPU', 'Memory', 'Cost opportunity', 'GPU hours'], hierarchyRows(projects, 'project'))}</section>
+        <section class="section"><div class="section-head"><h2>Portfolio trends</h2><span class="subtle">Cluster-level context until project export is available</span></div>${lineChart('Project portfolio cost opportunity', asArray(data?.clusterSummary?.dailyTrends), [chartSeries(asArray(data?.clusterSummary?.dailyTrends), 'underutilized_cost_dkk', 'Opportunity', '#ff6b7a'), chartSeries(asArray(data?.clusterSummary?.dailyTrends), 'estimated_cost_dkk', 'Estimated cost', '#3e8cff')], money, { zeroBase: true })}</section>
       </div>
     </div>`;
 }
+
+function hierarchyIndexPage(kind, title, items, detailPrefix, countLabel) {
+  const sorted = asArray(items).slice().sort((a, b) => num(b.savings) - num(a.savings));
+  return `
+    <div class="page-layout">
+      ${localNav(title)}
+      <div class="stack">
+        <section class="section"><div class="section-head"><h2>${title}</h2><span class="subtle">Hierarchy rollup view</span></div><div class="cards-grid">${[
+          statBlock(countLabel, fmt(sorted.length), 'Loaded from project hierarchy export'),
+          statBlock('Jobs', fmt(sorted.reduce((sum, item) => sum + num(item.jobs), 0)), 'Aggregated workload'),
+          statBlock('Cost opportunity', money(sorted.reduce((sum, item) => sum + num(item.savings), 0)), 'Underutilized cost'),
+        ].join('')}</div></section>
+        <section class="table-card"><div class="section-head"><h2>${kind} ranking</h2><span class="subtle">Cost opportunity first</span></div>${tableFromRows(['Rank', kind, 'Jobs', 'CPU', 'Memory', 'Cost opportunity', 'GPU hours'], hierarchyRows(sorted, detailPrefix))}</section>
+      </div>
+    </div>`;
+}
+
+function pisPage() { return hierarchyIndexPage('PI', 'PIs', data?.pis, 'pi', 'PIs'); }
+function groupsPage() { return hierarchyIndexPage('Group', 'Groups', data?.groups, 'group', 'Groups'); }
+function sectionsPage() { return hierarchyIndexPage('Section', 'Sections', data?.sections, 'section', 'Sections'); }
+
+function findHierarchyEntity(type, id) {
+  const source = type === 'project' ? data?.projects : type === 'pi' ? data?.pis : type === 'group' ? data?.groups : data?.sections;
+  return asArray(source).find((item) => item.id === id);
+}
+
+function linkList(items, prefix, idKey, labelKey) {
+  const rows = asArray(items).slice(0, 8).map((item, index) => [
+    fmt(index + 1),
+    `<a href="#/${prefix}/${escapeHtml(item[idKey] || item.id)}">${escapeHtml(item[labelKey] || item.label || 'Item')}</a>`,
+    money(item.underutilized_cost_dkk ?? item.savings),
+    money(item.estimated_cost_dkk ?? item.cost),
+  ]);
+  return tableFromRows(['Rank', 'Name', 'Cost opportunity', 'Estimated cost'], rows);
+}
+
+function hierarchyDetailPage(type, id) {
+  const entity = findHierarchyEntity(type, id);
+  if (!entity) return `<section class="section"><div class="section-head"><h2>Hierarchy item not found</h2><span class="pill warn">Missing export</span></div><div class="empty-state">No ${escapeHtml(type)} record was found for ${escapeHtml(id)}.</div></section>`;
+  const title = type === 'pi' ? 'PI portfolio' : `${type.charAt(0).toUpperCase()}${type.slice(1)} rollup`;
+  const related = type === 'project'
+    ? `<section class="section"><div class="section-head"><h2>Hierarchy</h2><span class="subtle">Registry cache enrichment</span></div><div class="cards-grid">${[
+        statBlock('PI', escapeHtml(entity.hierarchy.pi_label || '-'), 'Public PI ID only'),
+        statBlock('Group', escapeHtml(entity.hierarchy.group_label || '-'), 'Research group rollup'),
+        statBlock('Section', escapeHtml(entity.hierarchy.section_label || '-'), 'Section rollup'),
+      ].join('')}</div></section>`
+    : `<section class="section"><div class="section-head"><h2>Top projects</h2><span class="subtle">Portfolio contributors</span></div>${linkList(entity.topProjects, 'project', 'project_id', 'project_label')}</section>`;
+  return `
+    <div class="stack">
+      <section class="section"><div class="section-head"><h2>${escapeHtml(entity.label)}</h2><span class="subtle">${title}</span></div>${metricSummaryCards(entity)}</section>
+      ${lineChart(`${escapeHtml(entity.label)} efficiency trend`, entity.dailyTrends, [chartSeries(entity.dailyTrends, 'avg_cpu_efficiency', 'CPU', '#3e8cff'), chartSeries(entity.dailyTrends, 'avg_memory_efficiency', 'Memory', '#53d88a')], pct, { zeroBase: true })}
+      ${lineChart(`${escapeHtml(entity.label)} cost trend`, entity.dailyTrends, [chartSeries(entity.dailyTrends, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(entity.dailyTrends, 'underutilized_cost_dkk', 'Opportunity', '#ff6b7a')], money, { zeroBase: true })}
+      ${related}
+      <section class="section"><div class="section-head"><h2>Recommendations</h2><span class="subtle">Generated from aggregate efficiency signals</span></div><div class="rec-list">${asArray(entity.recommendations).length ? entity.recommendations.map((rec) => recCard(rec.priority || rec.severity || 'Review', rec.title, rec.detail || rec.category || '', rec.savings ? money(rec.savings) : 'Impact TBD')).join('') : '<div class="empty-state">No hierarchy-level recommendations are available yet.</div>'}</div></section>
+    </div>`;
+}
+
 
 function userPage() {
   const users = asArray(data?.users).slice(0, 25);
@@ -520,40 +598,6 @@ function personalJobsTable(rows) {
   return tableFromRows(['Job label', 'Savings opportunity', 'CPU use', 'Memory use', 'Decision'], tableRows);
 }
 
-
-function firstFinite(values) {
-  return values.map(Number).find(Number.isFinite);
-}
-
-function improvementSignal(trends) {
-  const rows = asArray(trends);
-  if (rows.length < 2) return { label: 'Trend pending', value: 'No baseline', tone: 'info', detail: 'More daily points are needed before the dashboard can judge improvement.' };
-  const first = rows.slice(0, Math.min(14, rows.length));
-  const last = rows.slice(-Math.min(14, rows.length));
-  const firstCpu = firstFinite(first.map((row) => row && row.avg_cpu_efficiency));
-  const lastCpu = firstFinite(last.map((row) => row && row.avg_cpu_efficiency).reverse());
-  if (!Number.isFinite(firstCpu) || !Number.isFinite(lastCpu)) return { label: 'Trend pending', value: 'No baseline', tone: 'info', detail: 'CPU trend data is not available for this bundle.' };
-  const delta = lastCpu - firstCpu;
-  return {
-    label: delta >= 0 ? 'Improving' : 'Drifting',
-    value: `${delta >= 0 ? '+' : ''}${pct(delta, 1)}`,
-    tone: delta >= 0 ? 'good' : 'warn',
-    detail: 'CPU efficiency change from early to recent daily points.',
-  };
-}
-
-function personalPulse(metrics, percentile, trends, topAction) {
-  const overallBand = percentileBand(percentile.overall);
-  const savings = num(metrics.potentialSavings);
-  const trend = improvementSignal(trends);
-  return `<div class="personal-pulse" aria-label="Personal dashboard summary">
-    <article class="pulse-card ${overallBand.tone}"><span>How am I doing?</span><strong>${overallBand.label}</strong><em>${overallBand.detail}</em></article>
-    <article class="pulse-card warn"><span>What should I fix next?</span><strong>${escapeHtml(topAction?.title || 'Review requests')}</strong><em>${topAction?.detail ? escapeHtml(topAction.detail) : 'Start with the highest repeatable savings pattern.'}</em></article>
-    <article class="pulse-card good"><span>How much can I save?</span><strong>${money(savings)}</strong><em>${money(annualized(savings))} annualized run-rate if the pattern repeats.</em></article>
-    <article class="pulse-card ${trend.tone}"><span>Am I improving?</span><strong>${trend.value}</strong><em>${trend.label}. ${trend.detail}</em></article>
-  </div>`;
-}
-
 function peerComparisonTable(rows) {
   const tableRows = asArray(rows).map((peer) => {
     const band = percentileBand(peer.percentile);
@@ -600,7 +644,6 @@ function personalDashboardPage() {
         <em>${comparisonBand.detail}</em>
       </div>
     </section>
-    ${personalPulse(metrics, percentile, trends, topAction)}
     <div class="stack">
       <section class="section"><div class="section-head"><h2>Priority Actions</h2><span class="subtle">What should I do?</span></div>${priorityActions(vm.recommendations)}</section>
       <section class="section"><div class="section-head"><h2>Savings Opportunity Breakdown</h2><span class="subtle">How much can I save?</span></div>${savingsBreakdown(vm.recommendations, metrics)}</section>
@@ -655,8 +698,7 @@ function renderShell(content) {
         <div class="context-card"><div class="context-label">Viewing context</div><div class="context-item"><span>Environment</span><strong>Production review</strong></div><div class="context-item"><span>Mode</span><strong>${sourceText}</strong></div><div class="context-item"><span>Schema</span><strong>${data?.schemaVersion || 'unknown'}</strong></div><div class="context-item"><span>Users</span><strong>${fmt(data?.datasetMeta?.userCount || 0)}</strong></div></div>
       </aside>
       <main class="main">
-        <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Show routes">${icon('menu')}</button></div>
-        <nav class="mobile-route-nav" aria-label="Mobile route navigation">${navItems.map((item) => mobileNavLink(item)).join('')}</nav>
+        <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Efficiency Dashboard</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Open navigation">${icon('menu')}</button></div>
         <div class="topbar"><div class="topbar-left"><div class="crumb">${icon('menu')} <span>${pageTitle(state.route)}</span></div></div><div class="topbar-right"><a class="btn" href="#/recovery">Who am I?</a><button class="toolbar-button" data-action="theme" aria-label="Toggle theme">${state.theme === 'dark' ? icon('sun') : icon('moon')}</button></div></div>
         ${data?.source === 'real-export' ? '<div class="load-banner real"><strong>REAL MJOLNIR DATA</strong><span>90-day validation dataset</span></div>' : ''}
         <div class="page">${content}</div>
@@ -675,12 +717,19 @@ function render() {
     recommendations: recommendationsPage,
     'inefficient-jobs': inefficientJobsPage,
     projects: projectsPage,
+    pis: pisPage,
+    groups: groupsPage,
+    sections: sectionsPage,
     users: userPage,
     cost: costPage,
     recovery: recoveryPage,
     methodology: methodologyPage,
   };
-  const content = isPersonalRoute(state.route) ? personalDashboardPage() : (renderers[state.route] || renderers.landing)();
+  const content = isPersonalRoute(state.route)
+    ? personalDashboardPage()
+    : isHierarchyDetailRoute(state.route)
+      ? hierarchyDetailPage(detailRouteParts(state.route).type, detailRouteParts(state.route).id)
+      : (renderers[state.route] || renderers.landing)();
   app.innerHTML = renderShell(content);
   wireEvents();
 }
@@ -692,7 +741,7 @@ function wireEvents() {
     render();
   });
   document.querySelector('[data-action="menu"]')?.addEventListener('click', () => {
-    document.querySelector('.mobile-route-nav')?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    document.querySelector('.sidebar')?.classList.toggle('hidden');
   });
   document.querySelector('[data-recovery-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();

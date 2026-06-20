@@ -1,6 +1,6 @@
-# Public Demo Personal Data
+# Private User Data Prototype
 
-This directory contains sanitized demo JSON used by the public GitHub Pages build to exercise the personal dashboard route.
+This directory contains mock personal dashboard JSON only. It is not a production export, is not part of the public deployment, and exists to exercise `#/u/{personal_route_token}` during Phase 6.
 
 Demo route:
 

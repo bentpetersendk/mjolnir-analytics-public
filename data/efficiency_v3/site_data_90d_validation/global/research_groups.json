@@ -1,19 +1,7 @@
 {
-  "coverage": {
-    "ambiguous_project_rows": 0,
-    "assigned_project_rows": 1198480,
-    "home_directory_rows": 20222,
-    "job_metrics_rows": 1218881,
-    "missing_source_rows": 0,
-    "other_path_rows": 179
-  },
   "generated_at": "2026-06-20T08:33:41.003896+00:00",
-  "notes": [
-    "Project hierarchy is derived from admin-only source data and registry cache enrichment.",
-    "Sensitive source fields and private identifiers are excluded from this export."
-  ],
-  "project_count": 35,
-  "projects": [
+  "group_count": 35,
+  "groups": [
     {
       "all_time_summary": {
         "avg_cpu_efficiency": 0.245858,
@@ -30,8 +18,6 @@
         "requested_mem_gb_hours": 81540509.015,
         "underutilized_cost_dkk": 1319242.04
       },
-      "cost": 1326443.11,
-      "cpu_efficiency": 0.245858,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.05520084246926652,
@@ -1474,43 +1460,10 @@
           "underutilized_cost_dkk": 2191.54
         }
       ],
-      "gpu_hours": 21.6858,
-      "hierarchy": {
-        "group_id": "grp_5a83a5e2283b7682",
-        "group_label": "Research Group A032",
-        "pi_id": "pi_865d9eeaa21cf04a",
-        "pi_label": "PI A032",
-        "section_id": "sec_23283aa312b20b7f",
-        "section_label": "Section A032"
-      },
-      "memory_efficiency": 0.128848,
-      "potential_savings": 1319242.04,
-      "project_id": "prj_743ea46775e5eb15",
-      "project_label": "Project A032",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.245858,
-            "jobs_with_measured_cpu": 17895
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.128848,
-            "jobs_with_measured_memory": 17155
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_5a83a5e2283b7682",
+      "group_label": "Research Group A032",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.274455,
@@ -1557,7 +1510,29 @@
           "requested_mem_gb_hours": 81540509.015,
           "underutilized_cost_dkk": 1319242.04
         }
-      }
+      },
+      "section_id": "sec_23283aa312b20b7f",
+      "section_label": "Section A032",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 1326443.11,
+          "jobs": 19184,
+          "pi_id": "pi_865d9eeaa21cf04a",
+          "pi_label": "PI A032",
+          "project_count": 90,
+          "underutilized_cost_dkk": 1319242.04
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 1326443.11,
+          "gpu_hours": 21.6858,
+          "jobs": 19184,
+          "project_id": "prj_743ea46775e5eb15",
+          "project_label": "Project A032",
+          "underutilized_cost_dkk": 1319242.04
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -1575,8 +1550,6 @@
         "requested_mem_gb_hours": 24039371.6267,
         "underutilized_cost_dkk": 366686.58
       },
-      "cost": 390644.55,
-      "cpu_efficiency": 0.31952,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.209713896916375,
@@ -2923,20 +2896,10 @@
           "underutilized_cost_dkk": 13.58
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_1d656e04e2972118",
-        "group_label": "Research Group A028",
-        "pi_id": "pi_36e8977b581b6da9",
-        "pi_label": "PI A028",
-        "section_id": "sec_9f8089087ad532dc",
-        "section_label": "Section A028"
-      },
-      "memory_efficiency": 0.523296,
-      "potential_savings": 366686.58,
-      "project_id": "prj_f45e4784d85d1a96",
-      "project_label": "Project A028",
-      "recommendations": [],
+      "group_id": "grp_1d656e04e2972118",
+      "group_label": "Research Group A028",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.268899,
@@ -2983,7 +2946,29 @@
           "requested_mem_gb_hours": 24039371.6267,
           "underutilized_cost_dkk": 366686.58
         }
-      }
+      },
+      "section_id": "sec_9f8089087ad532dc",
+      "section_label": "Section A028",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 390644.55,
+          "jobs": 21118,
+          "pi_id": "pi_36e8977b581b6da9",
+          "pi_label": "PI A028",
+          "project_count": 84,
+          "underutilized_cost_dkk": 366686.58
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 390644.55,
+          "gpu_hours": 0.0,
+          "jobs": 21118,
+          "project_id": "prj_f45e4784d85d1a96",
+          "project_label": "Project A028",
+          "underutilized_cost_dkk": 366686.58
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -3001,8 +2986,6 @@
         "requested_mem_gb_hours": 10086636.6271,
         "underutilized_cost_dkk": 211448.13
       },
-      "cost": 224911.31,
-      "cpu_efficiency": 0.233351,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.08430602046001318,
@@ -4349,43 +4332,10 @@
           "underutilized_cost_dkk": 0.0
         }
       ],
-      "gpu_hours": 4365.9092,
-      "hierarchy": {
-        "group_id": "grp_054fa8be6d5162df",
-        "group_label": "Research Group A004",
-        "pi_id": "pi_82e37e95f995d124",
-        "pi_label": "PI A004",
-        "section_id": "sec_18ef16671bfc09de",
-        "section_label": "Section A004"
-      },
-      "memory_efficiency": 0.226708,
-      "potential_savings": 211448.13,
-      "project_id": "prj_e08c991d809783cf",
-      "project_label": "Project A004",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.233351,
-            "jobs_with_measured_cpu": 2024
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.226708,
-            "jobs_with_measured_memory": 1966
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_054fa8be6d5162df",
+      "group_label": "Research Group A004",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.219534,
@@ -4432,7 +4382,29 @@
           "requested_mem_gb_hours": 10086636.6271,
           "underutilized_cost_dkk": 211448.13
         }
-      }
+      },
+      "section_id": "sec_18ef16671bfc09de",
+      "section_label": "Section A004",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 224911.31,
+          "jobs": 2248,
+          "pi_id": "pi_82e37e95f995d124",
+          "pi_label": "PI A004",
+          "project_count": 84,
+          "underutilized_cost_dkk": 211448.13
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 224911.31,
+          "gpu_hours": 4365.9092,
+          "jobs": 2248,
+          "project_id": "prj_e08c991d809783cf",
+          "project_label": "Project A004",
+          "underutilized_cost_dkk": 211448.13
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -4450,8 +4422,6 @@
         "requested_mem_gb_hours": 13555473.5852,
         "underutilized_cost_dkk": 174926.01
       },
-      "cost": 227616.83,
-      "cpu_efficiency": 0.273063,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.38386067651429073,
@@ -5654,20 +5624,10 @@
           "underutilized_cost_dkk": 651.23
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_aa10a862a34be401",
-        "group_label": "Research Group A003",
-        "pi_id": "pi_61fc111894bb92d4",
-        "pi_label": "PI A003",
-        "section_id": "sec_9cdaaf3d5be8af41",
-        "section_label": "Section A003"
-      },
-      "memory_efficiency": 0.334405,
-      "potential_savings": 174926.01,
-      "project_id": "prj_4190b42790d4a7d3",
-      "project_label": "Project A003",
-      "recommendations": [],
+      "group_id": "grp_aa10a862a34be401",
+      "group_label": "Research Group A003",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.184735,
@@ -5714,7 +5674,29 @@
           "requested_mem_gb_hours": 13555473.5852,
           "underutilized_cost_dkk": 174926.01
         }
-      }
+      },
+      "section_id": "sec_9cdaaf3d5be8af41",
+      "section_label": "Section A003",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 227616.83,
+          "jobs": 80088,
+          "pi_id": "pi_61fc111894bb92d4",
+          "pi_label": "PI A003",
+          "project_count": 75,
+          "underutilized_cost_dkk": 174926.01
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 227616.83,
+          "gpu_hours": 0.0,
+          "jobs": 80088,
+          "project_id": "prj_4190b42790d4a7d3",
+          "project_label": "Project A003",
+          "underutilized_cost_dkk": 174926.01
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -5732,8 +5714,6 @@
         "requested_mem_gb_hours": 12379053.3158,
         "underutilized_cost_dkk": 167838.74
       },
-      "cost": 203293.23,
-      "cpu_efficiency": 0.196761,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.15250564179626402,
@@ -7032,43 +7012,10 @@
           "underutilized_cost_dkk": 2643.53
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_7507c081dc14037b",
-        "group_label": "Research Group A021",
-        "pi_id": "pi_5962c1aef978edf8",
-        "pi_label": "PI A021",
-        "section_id": "sec_dca3915fbf7e0d07",
-        "section_label": "Section A021"
-      },
-      "memory_efficiency": 0.183296,
-      "potential_savings": 167838.74,
-      "project_id": "prj_38d5be6997e72931",
-      "project_label": "Project A021",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.196761,
-            "jobs_with_measured_cpu": 665
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.183296,
-            "jobs_with_measured_memory": 584
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_7507c081dc14037b",
+      "group_label": "Research Group A021",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.1866,
@@ -7115,7 +7062,29 @@
           "requested_mem_gb_hours": 12379053.3158,
           "underutilized_cost_dkk": 167838.74
         }
-      }
+      },
+      "section_id": "sec_dca3915fbf7e0d07",
+      "section_label": "Section A021",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 203293.23,
+          "jobs": 699,
+          "pi_id": "pi_5962c1aef978edf8",
+          "pi_label": "PI A021",
+          "project_count": 81,
+          "underutilized_cost_dkk": 167838.74
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 203293.23,
+          "gpu_hours": 0.0,
+          "jobs": 699,
+          "project_id": "prj_38d5be6997e72931",
+          "project_label": "Project A021",
+          "underutilized_cost_dkk": 167838.74
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -7133,8 +7102,6 @@
         "requested_mem_gb_hours": 17098722.3843,
         "underutilized_cost_dkk": 161802.23
       },
-      "cost": 278533.68,
-      "cpu_efficiency": 0.0979,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.06399389387306605,
@@ -8561,43 +8528,10 @@
           "underutilized_cost_dkk": 340.96
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_8551aff1c2d59dba",
-        "group_label": "Research Group A027",
-        "pi_id": "pi_cc447bb5122cf9fe",
-        "pi_label": "PI A027",
-        "section_id": "sec_447a53bd83f6a2a3",
-        "section_label": "Section A027"
-      },
-      "memory_efficiency": 0.065571,
-      "potential_savings": 161802.23,
-      "project_id": "prj_41d4d3bf2fb7be14",
-      "project_label": "Project A027",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.0979,
-            "jobs_with_measured_cpu": 228366
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.065571,
-            "jobs_with_measured_memory": 151926
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_8551aff1c2d59dba",
+      "group_label": "Research Group A027",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.354667,
@@ -8644,7 +8578,29 @@
           "requested_mem_gb_hours": 17098722.3843,
           "underutilized_cost_dkk": 161802.23
         }
-      }
+      },
+      "section_id": "sec_447a53bd83f6a2a3",
+      "section_label": "Section A027",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 278533.68,
+          "jobs": 234516,
+          "pi_id": "pi_cc447bb5122cf9fe",
+          "pi_label": "PI A027",
+          "project_count": 89,
+          "underutilized_cost_dkk": 161802.23
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 278533.68,
+          "gpu_hours": 0.0,
+          "jobs": 234516,
+          "project_id": "prj_41d4d3bf2fb7be14",
+          "project_label": "Project A027",
+          "underutilized_cost_dkk": 161802.23
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -8662,8 +8618,6 @@
         "requested_mem_gb_hours": 1184644.1819,
         "underutilized_cost_dkk": 128634.92
       },
-      "cost": 130331.11,
-      "cpu_efficiency": 0.07061,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.0,
@@ -9594,43 +9548,10 @@
           "underutilized_cost_dkk": 873.6
         }
       ],
-      "gpu_hours": 4.3722,
-      "hierarchy": {
-        "group_id": "grp_60e6ffca58278e59",
-        "group_label": "Research Group A005",
-        "pi_id": "pi_58577c24c5a6a878",
-        "pi_label": "PI A005",
-        "section_id": "sec_0e45e41842aebe16",
-        "section_label": "Section A005"
-      },
-      "memory_efficiency": 0.097914,
-      "potential_savings": 128634.92,
-      "project_id": "prj_130a021c0b1d623d",
-      "project_label": "Project A005",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.07061,
-            "jobs_with_measured_cpu": 1507
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.097914,
-            "jobs_with_measured_memory": 1418
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_60e6ffca58278e59",
+      "group_label": "Research Group A005",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.151361,
@@ -9677,7 +9598,29 @@
           "requested_mem_gb_hours": 1184644.1819,
           "underutilized_cost_dkk": 128634.92
         }
-      }
+      },
+      "section_id": "sec_0e45e41842aebe16",
+      "section_label": "Section A005",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 130331.11,
+          "jobs": 1674,
+          "pi_id": "pi_58577c24c5a6a878",
+          "pi_label": "PI A005",
+          "project_count": 58,
+          "underutilized_cost_dkk": 128634.92
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 130331.11,
+          "gpu_hours": 4.3722,
+          "jobs": 1674,
+          "project_id": "prj_130a021c0b1d623d",
+          "project_label": "Project A005",
+          "underutilized_cost_dkk": 128634.92
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -9695,8 +9638,6 @@
         "requested_mem_gb_hours": 9863303.0789,
         "underutilized_cost_dkk": 111343.48
       },
-      "cost": 334842.79,
-      "cpu_efficiency": 0.075587,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.0,
@@ -11075,43 +11016,10 @@
           "underutilized_cost_dkk": 0.21
         }
       ],
-      "gpu_hours": 12881.8925,
-      "hierarchy": {
-        "group_id": "grp_8e08953f814b190a",
-        "group_label": "Research Group A001",
-        "pi_id": "pi_0ccd04082df612b0",
-        "pi_label": "PI A001",
-        "section_id": "sec_710e87670e1401fd",
-        "section_label": "Section A001"
-      },
-      "memory_efficiency": 0.005492,
-      "potential_savings": 111343.48,
-      "project_id": "prj_c888010aacd7de01",
-      "project_label": "Project A001",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.075587,
-            "jobs_with_measured_cpu": 125602
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.005492,
-            "jobs_with_measured_memory": 124719
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_8e08953f814b190a",
+      "group_label": "Research Group A001",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.069441,
@@ -11158,7 +11066,29 @@
           "requested_mem_gb_hours": 9863303.0789,
           "underutilized_cost_dkk": 111343.48
         }
-      }
+      },
+      "section_id": "sec_710e87670e1401fd",
+      "section_label": "Section A001",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 334842.79,
+          "jobs": 126222,
+          "pi_id": "pi_0ccd04082df612b0",
+          "pi_label": "PI A001",
+          "project_count": 86,
+          "underutilized_cost_dkk": 111343.48
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 334842.79,
+          "gpu_hours": 12881.8925,
+          "jobs": 126222,
+          "project_id": "prj_c888010aacd7de01",
+          "project_label": "Project A001",
+          "underutilized_cost_dkk": 111343.48
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -11176,8 +11106,6 @@
         "requested_mem_gb_hours": 9763148.8631,
         "underutilized_cost_dkk": 92140.86
       },
-      "cost": 163870.01,
-      "cpu_efficiency": 0.493086,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.0,
@@ -12572,20 +12500,10 @@
           "underutilized_cost_dkk": 104.87
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_ae7da9c77a2e67a2",
-        "group_label": "Research Group A025",
-        "pi_id": "pi_00cf40691133ef7d",
-        "pi_label": "PI A025",
-        "section_id": "sec_b4742da5cf6a2ba5",
-        "section_label": "Section A025"
-      },
-      "memory_efficiency": 0.504169,
-      "potential_savings": 92140.86,
-      "project_id": "prj_c56c83167131024c",
-      "project_label": "Project A025",
-      "recommendations": [],
+      "group_id": "grp_ae7da9c77a2e67a2",
+      "group_label": "Research Group A025",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.492271,
@@ -12632,7 +12550,29 @@
           "requested_mem_gb_hours": 9763148.8631,
           "underutilized_cost_dkk": 92140.86
         }
-      }
+      },
+      "section_id": "sec_b4742da5cf6a2ba5",
+      "section_label": "Section A025",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 163870.01,
+          "jobs": 72483,
+          "pi_id": "pi_00cf40691133ef7d",
+          "pi_label": "PI A025",
+          "project_count": 87,
+          "underutilized_cost_dkk": 92140.86
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 163870.01,
+          "gpu_hours": 0.0,
+          "jobs": 72483,
+          "project_id": "prj_c56c83167131024c",
+          "project_label": "Project A025",
+          "underutilized_cost_dkk": 92140.86
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -12650,8 +12590,6 @@
         "requested_mem_gb_hours": 5038706.9428,
         "underutilized_cost_dkk": 64814.68
       },
-      "cost": 82190.79,
-      "cpu_efficiency": 0.338232,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.9113719537903702,
@@ -13726,32 +13664,10 @@
           "underutilized_cost_dkk": 140.29
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_d76334fed6850500",
-        "group_label": "Research Group A035",
-        "pi_id": "pi_37e2ee995c75ed43",
-        "pi_label": "PI A035",
-        "section_id": "sec_e0ce635c0de61fd0",
-        "section_label": "Section A035"
-      },
-      "memory_efficiency": 0.179372,
-      "potential_savings": 64814.68,
-      "project_id": "prj_f82e260d2f899d02",
-      "project_label": "Project A035",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.179372,
-            "jobs_with_measured_memory": 221
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_d76334fed6850500",
+      "group_label": "Research Group A035",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.382295,
@@ -13798,7 +13714,29 @@
           "requested_mem_gb_hours": 5038706.9428,
           "underutilized_cost_dkk": 64814.68
         }
-      }
+      },
+      "section_id": "sec_e0ce635c0de61fd0",
+      "section_label": "Section A035",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 82190.79,
+          "jobs": 233,
+          "pi_id": "pi_37e2ee995c75ed43",
+          "pi_label": "PI A035",
+          "project_count": 67,
+          "underutilized_cost_dkk": 64814.68
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 82190.79,
+          "gpu_hours": 0.0,
+          "jobs": 233,
+          "project_id": "prj_f82e260d2f899d02",
+          "project_label": "Project A035",
+          "underutilized_cost_dkk": 64814.68
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -13816,8 +13754,6 @@
         "requested_mem_gb_hours": 3623977.2833,
         "underutilized_cost_dkk": 49099.03
       },
-      "cost": 87143.76,
-      "cpu_efficiency": 0.080235,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.5007357322743066,
@@ -15212,43 +15148,10 @@
           "underutilized_cost_dkk": 1343.05
         }
       ],
-      "gpu_hours": 2.1464,
-      "hierarchy": {
-        "group_id": "grp_883443e84f9a0006",
-        "group_label": "Research Group A013",
-        "pi_id": "pi_db29bcaea2c6ee7d",
-        "pi_label": "PI A013",
-        "section_id": "sec_c676b8387835db60",
-        "section_label": "Section A013"
-      },
-      "memory_efficiency": 0.011133,
-      "potential_savings": 49099.03,
-      "project_id": "prj_406b7ad8a78cbeeb",
-      "project_label": "Project A013",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.080235,
-            "jobs_with_measured_cpu": 360074
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.011133,
-            "jobs_with_measured_memory": 320684
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_883443e84f9a0006",
+      "group_label": "Research Group A013",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.019044,
@@ -15295,7 +15198,29 @@
           "requested_mem_gb_hours": 3623977.2833,
           "underutilized_cost_dkk": 49099.03
         }
-      }
+      },
+      "section_id": "sec_c676b8387835db60",
+      "section_label": "Section A013",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 87143.76,
+          "jobs": 469406,
+          "pi_id": "pi_db29bcaea2c6ee7d",
+          "pi_label": "PI A013",
+          "project_count": 87,
+          "underutilized_cost_dkk": 49099.03
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 87143.76,
+          "gpu_hours": 2.1464,
+          "jobs": 469406,
+          "project_id": "prj_406b7ad8a78cbeeb",
+          "project_label": "Project A013",
+          "underutilized_cost_dkk": 49099.03
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -15313,8 +15238,6 @@
         "requested_mem_gb_hours": 2459682.8266,
         "underutilized_cost_dkk": 35538.08
       },
-      "cost": 41522.71,
-      "cpu_efficiency": 0.550682,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.021430107004430786,
@@ -16741,32 +16664,10 @@
           "underutilized_cost_dkk": 191.52
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_6bd943e04ecb267e",
-        "group_label": "Research Group A034",
-        "pi_id": "pi_8c01f4e8b9376e80",
-        "pi_label": "PI A034",
-        "section_id": "sec_abb124959ee140d2",
-        "section_label": "Section A034"
-      },
-      "memory_efficiency": 0.123706,
-      "potential_savings": 35538.08,
-      "project_id": "prj_183cf45b96da3fc3",
-      "project_label": "Project A034",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.123706,
-            "jobs_with_measured_memory": 14421
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_6bd943e04ecb267e",
+      "group_label": "Research Group A034",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.654575,
@@ -16813,7 +16714,29 @@
           "requested_mem_gb_hours": 2459682.8266,
           "underutilized_cost_dkk": 35538.08
         }
-      }
+      },
+      "section_id": "sec_abb124959ee140d2",
+      "section_label": "Section A034",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 41522.71,
+          "jobs": 15503,
+          "pi_id": "pi_8c01f4e8b9376e80",
+          "pi_label": "PI A034",
+          "project_count": 89,
+          "underutilized_cost_dkk": 35538.08
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 41522.71,
+          "gpu_hours": 0.0,
+          "jobs": 15503,
+          "project_id": "prj_183cf45b96da3fc3",
+          "project_label": "Project A034",
+          "underutilized_cost_dkk": 35538.08
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -16831,8 +16754,6 @@
         "requested_mem_gb_hours": 1564772.1117,
         "underutilized_cost_dkk": 24674.3
       },
-      "cost": 26162.51,
-      "cpu_efficiency": 0.365889,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.0074988527567052925,
@@ -17875,32 +17796,10 @@
           "underutilized_cost_dkk": 5.06
         }
       ],
-      "gpu_hours": 54.6172,
-      "hierarchy": {
-        "group_id": "grp_c6c4a2cea8321753",
-        "group_label": "Research Group A018",
-        "pi_id": "pi_14e68bada213c283",
-        "pi_label": "PI A018",
-        "section_id": "sec_be566c4f06dc3ab0",
-        "section_label": "Section A018"
-      },
-      "memory_efficiency": 0.118509,
-      "potential_savings": 24674.3,
-      "project_id": "prj_3f79ff863cf1b7f6",
-      "project_label": "Project A018",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.118509,
-            "jobs_with_measured_memory": 1397
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_c6c4a2cea8321753",
+      "group_label": "Research Group A018",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.29871,
@@ -17947,7 +17846,29 @@
           "requested_mem_gb_hours": 1564772.1117,
           "underutilized_cost_dkk": 24674.3
         }
-      }
+      },
+      "section_id": "sec_be566c4f06dc3ab0",
+      "section_label": "Section A018",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 26162.51,
+          "jobs": 1580,
+          "pi_id": "pi_14e68bada213c283",
+          "pi_label": "PI A018",
+          "project_count": 65,
+          "underutilized_cost_dkk": 24674.3
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 26162.51,
+          "gpu_hours": 54.6172,
+          "jobs": 1580,
+          "project_id": "prj_3f79ff863cf1b7f6",
+          "project_label": "Project A018",
+          "underutilized_cost_dkk": 24674.3
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -17965,8 +17886,6 @@
         "requested_mem_gb_hours": 541400.5795,
         "underutilized_cost_dkk": 22322.16
       },
-      "cost": 30754.52,
-      "cpu_efficiency": 0.143117,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.06100925706114717,
@@ -19297,43 +19216,10 @@
           "underutilized_cost_dkk": 118.29
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_b1043c5031db3b4f",
-        "group_label": "Research Group A019",
-        "pi_id": "pi_3df7b7930b5de495",
-        "pi_label": "PI A019",
-        "section_id": "sec_3e25cedf630e5ffe",
-        "section_label": "Section A019"
-      },
-      "memory_efficiency": 0.051657,
-      "potential_savings": 22322.16,
-      "project_id": "prj_e9abab50be114c18",
-      "project_label": "Project A019",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.143117,
-            "jobs_with_measured_cpu": 9166
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.051657,
-            "jobs_with_measured_memory": 9690
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_b1043c5031db3b4f",
+      "group_label": "Research Group A019",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.051565,
@@ -19380,7 +19266,29 @@
           "requested_mem_gb_hours": 541400.5795,
           "underutilized_cost_dkk": 22322.16
         }
-      }
+      },
+      "section_id": "sec_3e25cedf630e5ffe",
+      "section_label": "Section A019",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 30754.52,
+          "jobs": 10426,
+          "pi_id": "pi_3df7b7930b5de495",
+          "pi_label": "PI A019",
+          "project_count": 83,
+          "underutilized_cost_dkk": 22322.16
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 30754.52,
+          "gpu_hours": 0.0,
+          "jobs": 10426,
+          "project_id": "prj_e9abab50be114c18",
+          "project_label": "Project A019",
+          "underutilized_cost_dkk": 22322.16
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -19398,8 +19306,6 @@
         "requested_mem_gb_hours": 1435430.7956,
         "underutilized_cost_dkk": 18947.93
       },
-      "cost": 24157.27,
-      "cpu_efficiency": 0.23254,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.05227337514253136,
@@ -20330,43 +20236,10 @@
           "underutilized_cost_dkk": 598.82
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_67975ea1d4d0f1ed",
-        "group_label": "Research Group A015",
-        "pi_id": "pi_8e68b4d7efbaa07f",
-        "pi_label": "PI A015",
-        "section_id": "sec_70ec853a99e0b509",
-        "section_label": "Section A015"
-      },
-      "memory_efficiency": 0.165589,
-      "potential_savings": 18947.93,
-      "project_id": "prj_4c5abfc2ab5779da",
-      "project_label": "Project A015",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.23254,
-            "jobs_with_measured_cpu": 5311
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.165589,
-            "jobs_with_measured_memory": 4631
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_67975ea1d4d0f1ed",
+      "group_label": "Research Group A015",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.168442,
@@ -20413,7 +20286,29 @@
           "requested_mem_gb_hours": 1435430.7956,
           "underutilized_cost_dkk": 18947.93
         }
-      }
+      },
+      "section_id": "sec_70ec853a99e0b509",
+      "section_label": "Section A015",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 24157.27,
+          "jobs": 5597,
+          "pi_id": "pi_8e68b4d7efbaa07f",
+          "pi_label": "PI A015",
+          "project_count": 58,
+          "underutilized_cost_dkk": 18947.93
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 24157.27,
+          "gpu_hours": 0.0,
+          "jobs": 5597,
+          "project_id": "prj_4c5abfc2ab5779da",
+          "project_label": "Project A015",
+          "underutilized_cost_dkk": 18947.93
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -20431,8 +20326,6 @@
         "requested_mem_gb_hours": 1236809.7185,
         "underutilized_cost_dkk": 18895.87
       },
-      "cost": 25010.77,
-      "cpu_efficiency": 0.275966,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.4850546365739821,
@@ -21523,32 +21416,10 @@
           "underutilized_cost_dkk": 0.19
         }
       ],
-      "gpu_hours": 377.8528,
-      "hierarchy": {
-        "group_id": "grp_27da5053681803ac",
-        "group_label": "Research Group A010",
-        "pi_id": "pi_7e36c788f696a7ae",
-        "pi_label": "PI A010",
-        "section_id": "sec_eaf95ebc63906430",
-        "section_label": "Section A010"
-      },
-      "memory_efficiency": 0.16172,
-      "potential_savings": 18895.87,
-      "project_id": "prj_a2cadc09d3d19b00",
-      "project_label": "Project A010",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.16172,
-            "jobs_with_measured_memory": 693
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_27da5053681803ac",
+      "group_label": "Research Group A010",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.376094,
@@ -21595,7 +21466,29 @@
           "requested_mem_gb_hours": 1236809.7185,
           "underutilized_cost_dkk": 18895.87
         }
-      }
+      },
+      "section_id": "sec_eaf95ebc63906430",
+      "section_label": "Section A010",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 25010.77,
+          "jobs": 769,
+          "pi_id": "pi_7e36c788f696a7ae",
+          "pi_label": "PI A010",
+          "project_count": 68,
+          "underutilized_cost_dkk": 18895.87
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 25010.77,
+          "gpu_hours": 377.8528,
+          "jobs": 769,
+          "project_id": "prj_a2cadc09d3d19b00",
+          "project_label": "Project A010",
+          "underutilized_cost_dkk": 18895.87
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -21613,8 +21506,6 @@
         "requested_mem_gb_hours": 1170047.6706,
         "underutilized_cost_dkk": 17726.4
       },
-      "cost": 19088.4,
-      "cpu_efficiency": 0.00341,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.0003273949702311363,
@@ -21825,43 +21716,10 @@
           "underutilized_cost_dkk": 336.07
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_f5b7bbeb987dd3d3",
-        "group_label": "Research Group A016",
-        "pi_id": "pi_9017d0cfc1dd22af",
-        "pi_label": "PI A016",
-        "section_id": "sec_f501077388aec1ad",
-        "section_label": "Section A016"
-      },
-      "memory_efficiency": 0.009412,
-      "potential_savings": 17726.4,
-      "project_id": "prj_d8e38eb0db6aa4de",
-      "project_label": "Project A016",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.00341,
-            "jobs_with_measured_cpu": 32472
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.009412,
-            "jobs_with_measured_memory": 32062
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_f5b7bbeb987dd3d3",
+      "group_label": "Research Group A016",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.06739,
@@ -21908,7 +21766,29 @@
           "requested_mem_gb_hours": 1170047.6706,
           "underutilized_cost_dkk": 17726.4
         }
-      }
+      },
+      "section_id": "sec_f501077388aec1ad",
+      "section_label": "Section A016",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 19088.4,
+          "jobs": 32669,
+          "pi_id": "pi_9017d0cfc1dd22af",
+          "pi_label": "PI A016",
+          "project_count": 13,
+          "underutilized_cost_dkk": 17726.4
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 19088.4,
+          "gpu_hours": 0.0,
+          "jobs": 32669,
+          "project_id": "prj_d8e38eb0db6aa4de",
+          "project_label": "Project A016",
+          "underutilized_cost_dkk": 17726.4
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -21926,8 +21806,6 @@
         "requested_mem_gb_hours": 1102568.6517,
         "underutilized_cost_dkk": 17699.98
       },
-      "cost": 17916.75,
-      "cpu_efficiency": 0.030699,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.007046031630734472,
@@ -22106,43 +21984,10 @@
           "underutilized_cost_dkk": 0.54
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_22c867dd3113faab",
-        "group_label": "Research Group A020",
-        "pi_id": "pi_fa67f25e3a76bf47",
-        "pi_label": "PI A020",
-        "section_id": "sec_b96c96084baa2d0d",
-        "section_label": "Section A020"
-      },
-      "memory_efficiency": 0.01031,
-      "potential_savings": 17699.98,
-      "project_id": "prj_df775eb9a277e027",
-      "project_label": "Project A020",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.030699,
-            "jobs_with_measured_cpu": 2341
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.01031,
-            "jobs_with_measured_memory": 2402
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_22c867dd3113faab",
+      "group_label": "Research Group A020",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.029602,
@@ -22189,7 +22034,29 @@
           "requested_mem_gb_hours": 1102568.6517,
           "underutilized_cost_dkk": 17699.98
         }
-      }
+      },
+      "section_id": "sec_b96c96084baa2d0d",
+      "section_label": "Section A020",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 17916.75,
+          "jobs": 2773,
+          "pi_id": "pi_fa67f25e3a76bf47",
+          "pi_label": "PI A020",
+          "project_count": 11,
+          "underutilized_cost_dkk": 17699.98
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 17916.75,
+          "gpu_hours": 0.0,
+          "jobs": 2773,
+          "project_id": "prj_df775eb9a277e027",
+          "project_label": "Project A020",
+          "underutilized_cost_dkk": 17699.98
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -22207,8 +22074,6 @@
         "requested_mem_gb_hours": 693071.6356,
         "underutilized_cost_dkk": 11156.24
       },
-      "cost": 11313.31,
-      "cpu_efficiency": 0.110032,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.09708661407118511,
@@ -23011,43 +22876,10 @@
           "underutilized_cost_dkk": 0.37
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_d6e51d0771b04b4e",
-        "group_label": "Research Group A009",
-        "pi_id": "pi_2cbdc8ae34fa2b40",
-        "pi_label": "PI A009",
-        "section_id": "sec_59251b8218ff93b5",
-        "section_label": "Section A009"
-      },
-      "memory_efficiency": 0.032358,
-      "potential_savings": 11156.24,
-      "project_id": "prj_b38ba414518d3203",
-      "project_label": "Project A009",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.110032,
-            "jobs_with_measured_cpu": 777
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.032358,
-            "jobs_with_measured_memory": 774
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_d6e51d0771b04b4e",
+      "group_label": "Research Group A009",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.114957,
@@ -23094,7 +22926,29 @@
           "requested_mem_gb_hours": 693071.6356,
           "underutilized_cost_dkk": 11156.24
         }
-      }
+      },
+      "section_id": "sec_59251b8218ff93b5",
+      "section_label": "Section A009",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 11313.31,
+          "jobs": 854,
+          "pi_id": "pi_2cbdc8ae34fa2b40",
+          "pi_label": "PI A009",
+          "project_count": 50,
+          "underutilized_cost_dkk": 11156.24
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 11313.31,
+          "gpu_hours": 0.0,
+          "jobs": 854,
+          "project_id": "prj_b38ba414518d3203",
+          "project_label": "Project A009",
+          "underutilized_cost_dkk": 11156.24
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -23112,8 +22966,6 @@
         "requested_mem_gb_hours": 605955.1573,
         "underutilized_cost_dkk": 9193.89
       },
-      "cost": 13344.55,
-      "cpu_efficiency": 0.136271,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.24859981285678937,
@@ -23884,43 +23736,10 @@
           "underutilized_cost_dkk": 314.38
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_ee74146dd6b05d3e",
-        "group_label": "Research Group A031",
-        "pi_id": "pi_2c4398b58d4a1fa2",
-        "pi_label": "PI A031",
-        "section_id": "sec_cf8d14e9729005a0",
-        "section_label": "Section A031"
-      },
-      "memory_efficiency": 0.040645,
-      "potential_savings": 9193.89,
-      "project_id": "prj_be4ce6a7925c7f19",
-      "project_label": "Project A031",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.136271,
-            "jobs_with_measured_cpu": 59787
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.040645,
-            "jobs_with_measured_memory": 55659
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_ee74146dd6b05d3e",
+      "group_label": "Research Group A031",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.09425,
@@ -23967,7 +23786,29 @@
           "requested_mem_gb_hours": 605955.1573,
           "underutilized_cost_dkk": 9193.89
         }
-      }
+      },
+      "section_id": "sec_cf8d14e9729005a0",
+      "section_label": "Section A031",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 13344.55,
+          "jobs": 60873,
+          "pi_id": "pi_2c4398b58d4a1fa2",
+          "pi_label": "PI A031",
+          "project_count": 48,
+          "underutilized_cost_dkk": 9193.89
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 13344.55,
+          "gpu_hours": 0.0,
+          "jobs": 60873,
+          "project_id": "prj_be4ce6a7925c7f19",
+          "project_label": "Project A031",
+          "underutilized_cost_dkk": 9193.89
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -23985,8 +23826,6 @@
         "requested_mem_gb_hours": 583777.0208,
         "underutilized_cost_dkk": 8551.51
       },
-      "cost": 9510.04,
-      "cpu_efficiency": 0.188468,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.5790816326530612,
@@ -24517,43 +24356,10 @@
           "underutilized_cost_dkk": 1082.72
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_e6efd3046d5888cf",
-        "group_label": "Research Group A026",
-        "pi_id": "pi_0f83eb6b10a6f77a",
-        "pi_label": "PI A026",
-        "section_id": "sec_ac2a1b9f7c37b00f",
-        "section_label": "Section A026"
-      },
-      "memory_efficiency": 0.066421,
-      "potential_savings": 8551.51,
-      "project_id": "prj_a7d2b1d468fd1cca",
-      "project_label": "Project A026",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.188468,
-            "jobs_with_measured_cpu": 130
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.066421,
-            "jobs_with_measured_memory": 131
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_e6efd3046d5888cf",
+      "group_label": "Research Group A026",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.130226,
@@ -24600,7 +24406,29 @@
           "requested_mem_gb_hours": 583777.0208,
           "underutilized_cost_dkk": 8551.51
         }
-      }
+      },
+      "section_id": "sec_ac2a1b9f7c37b00f",
+      "section_label": "Section A026",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 9510.04,
+          "jobs": 155,
+          "pi_id": "pi_0f83eb6b10a6f77a",
+          "pi_label": "PI A026",
+          "project_count": 33,
+          "underutilized_cost_dkk": 8551.51
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 9510.04,
+          "gpu_hours": 0.0,
+          "jobs": 155,
+          "project_id": "prj_a7d2b1d468fd1cca",
+          "project_label": "Project A026",
+          "underutilized_cost_dkk": 8551.51
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -24618,8 +24446,6 @@
         "requested_mem_gb_hours": 2595992.7672,
         "underutilized_cost_dkk": 7743.56
       },
-      "cost": 42209.75,
-      "cpu_efficiency": 0.75327,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.5383640300389191,
@@ -25390,20 +25216,10 @@
           "underutilized_cost_dkk": 23.46
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_8032e860b6541bbb",
-        "group_label": "Research Group A029",
-        "pi_id": "pi_350b6fa9e165d6a3",
-        "pi_label": "PI A029",
-        "section_id": "sec_959b7b8ba8240fbc",
-        "section_label": "Section A029"
-      },
-      "memory_efficiency": 0.452595,
-      "potential_savings": 7743.56,
-      "project_id": "prj_f08c7d6ddddbfde9",
-      "project_label": "Project A029",
-      "recommendations": [],
+      "group_id": "grp_8032e860b6541bbb",
+      "group_label": "Research Group A029",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.717611,
@@ -25450,7 +25266,29 @@
           "requested_mem_gb_hours": 2595992.7672,
           "underutilized_cost_dkk": 7743.56
         }
-      }
+      },
+      "section_id": "sec_959b7b8ba8240fbc",
+      "section_label": "Section A029",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 42209.75,
+          "jobs": 200,
+          "pi_id": "pi_350b6fa9e165d6a3",
+          "pi_label": "PI A029",
+          "project_count": 48,
+          "underutilized_cost_dkk": 7743.56
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 42209.75,
+          "gpu_hours": 0.0,
+          "jobs": 200,
+          "project_id": "prj_f08c7d6ddddbfde9",
+          "project_label": "Project A029",
+          "underutilized_cost_dkk": 7743.56
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -25468,8 +25306,6 @@
         "requested_mem_gb_hours": 676097.8333,
         "underutilized_cost_dkk": 7730.19
       },
-      "cost": 10991.98,
-      "cpu_efficiency": 0.272927,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.249755325668302,
@@ -25792,32 +25628,10 @@
           "underutilized_cost_dkk": 17.71
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_6a008e64bcd698d3",
-        "group_label": "Research Group A014",
-        "pi_id": "pi_c6682f36ec1dc538",
-        "pi_label": "PI A014",
-        "section_id": "sec_87ab491765ff1498",
-        "section_label": "Section A014"
-      },
-      "memory_efficiency": 0.172724,
-      "potential_savings": 7730.19,
-      "project_id": "prj_838a7ba47c9b4cef",
-      "project_label": "Project A014",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.172724,
-            "jobs_with_measured_memory": 168
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_6a008e64bcd698d3",
+      "group_label": "Research Group A014",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.285982,
@@ -25864,7 +25678,29 @@
           "requested_mem_gb_hours": 676097.8333,
           "underutilized_cost_dkk": 7730.19
         }
-      }
+      },
+      "section_id": "sec_87ab491765ff1498",
+      "section_label": "Section A014",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 10991.98,
+          "jobs": 169,
+          "pi_id": "pi_c6682f36ec1dc538",
+          "pi_label": "PI A014",
+          "project_count": 20,
+          "underutilized_cost_dkk": 7730.19
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 10991.98,
+          "gpu_hours": 0.0,
+          "jobs": 169,
+          "project_id": "prj_838a7ba47c9b4cef",
+          "project_label": "Project A014",
+          "underutilized_cost_dkk": 7730.19
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -25882,8 +25718,6 @@
         "requested_mem_gb_hours": 752780.7046,
         "underutilized_cost_dkk": 6950.94
       },
-      "cost": 12561.02,
-      "cpu_efficiency": 0.13387,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.35584126103415287,
@@ -26414,43 +26248,10 @@
           "underutilized_cost_dkk": 44.9
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_21246eb347485f5e",
-        "group_label": "Research Group A011",
-        "pi_id": "pi_357ff8c215ca5306",
-        "pi_label": "PI A011",
-        "section_id": "sec_7daf42d1860b62a7",
-        "section_label": "Section A011"
-      },
-      "memory_efficiency": 0.011368,
-      "potential_savings": 6950.94,
-      "project_id": "prj_d539dc14e44a7ca1",
-      "project_label": "Project A011",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.13387,
-            "jobs_with_measured_cpu": 22058
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.011368,
-            "jobs_with_measured_memory": 21238
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_21246eb347485f5e",
+      "group_label": "Research Group A011",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.141619,
@@ -26497,7 +26298,29 @@
           "requested_mem_gb_hours": 752780.7046,
           "underutilized_cost_dkk": 6950.94
         }
-      }
+      },
+      "section_id": "sec_7daf42d1860b62a7",
+      "section_label": "Section A011",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 12561.02,
+          "jobs": 22122,
+          "pi_id": "pi_357ff8c215ca5306",
+          "pi_label": "PI A011",
+          "project_count": 33,
+          "underutilized_cost_dkk": 6950.94
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 12561.02,
+          "gpu_hours": 0.0,
+          "jobs": 22122,
+          "project_id": "prj_d539dc14e44a7ca1",
+          "project_label": "Project A011",
+          "underutilized_cost_dkk": 6950.94
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -26515,8 +26338,6 @@
         "requested_mem_gb_hours": 425654.4661,
         "underutilized_cost_dkk": 6711.85
       },
-      "cost": 6916.97,
-      "cpu_efficiency": 0.129394,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.035475084510810086,
@@ -26967,43 +26788,10 @@
           "underutilized_cost_dkk": 0.36
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_1b748012f6928f9c",
-        "group_label": "Research Group A002",
-        "pi_id": "pi_b9a12e84d949d87f",
-        "pi_label": "PI A002",
-        "section_id": "sec_7e71b4bf667ddc82",
-        "section_label": "Section A002"
-      },
-      "memory_efficiency": 0.209076,
-      "potential_savings": 6711.85,
-      "project_id": "prj_05ecf3fe8b12b32a",
-      "project_label": "Project A002",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.129394,
-            "jobs_with_measured_cpu": 58
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.209076,
-            "jobs_with_measured_memory": 51
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_1b748012f6928f9c",
+      "group_label": "Research Group A002",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.051054,
@@ -27050,7 +26838,29 @@
           "requested_mem_gb_hours": 425654.4661,
           "underutilized_cost_dkk": 6711.85
         }
-      }
+      },
+      "section_id": "sec_7e71b4bf667ddc82",
+      "section_label": "Section A002",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 6916.97,
+          "jobs": 67,
+          "pi_id": "pi_b9a12e84d949d87f",
+          "pi_label": "PI A002",
+          "project_count": 28,
+          "underutilized_cost_dkk": 6711.85
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 6916.97,
+          "gpu_hours": 0.0,
+          "jobs": 67,
+          "project_id": "prj_05ecf3fe8b12b32a",
+          "project_label": "Project A002",
+          "underutilized_cost_dkk": 6711.85
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -27068,8 +26878,6 @@
         "requested_mem_gb_hours": 166261.2667,
         "underutilized_cost_dkk": 6191.43
       },
-      "cost": 6192.71,
-      "cpu_efficiency": 0.247246,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.0,
@@ -27408,43 +27216,10 @@
           "underutilized_cost_dkk": 0.03
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_26b8139dcbc00b0e",
-        "group_label": "Research Group A033",
-        "pi_id": "pi_7736228f78aca6e9",
-        "pi_label": "PI A033",
-        "section_id": "sec_35d8b812ffdae2bf",
-        "section_label": "Section A033"
-      },
-      "memory_efficiency": 0.116097,
-      "potential_savings": 6191.43,
-      "project_id": "prj_f76131ea0e41f312",
-      "project_label": "Project A033",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.247246,
-            "jobs_with_measured_cpu": 168
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.116097,
-            "jobs_with_measured_memory": 172
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_26b8139dcbc00b0e",
+      "group_label": "Research Group A033",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.043043,
@@ -27491,7 +27266,29 @@
           "requested_mem_gb_hours": 166261.2667,
           "underutilized_cost_dkk": 6191.43
         }
-      }
+      },
+      "section_id": "sec_35d8b812ffdae2bf",
+      "section_label": "Section A033",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 6192.71,
+          "jobs": 172,
+          "pi_id": "pi_7736228f78aca6e9",
+          "pi_label": "PI A033",
+          "project_count": 21,
+          "underutilized_cost_dkk": 6191.43
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 6192.71,
+          "gpu_hours": 0.0,
+          "jobs": 172,
+          "project_id": "prj_f76131ea0e41f312",
+          "project_label": "Project A033",
+          "underutilized_cost_dkk": 6191.43
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -27509,8 +27306,6 @@
         "requested_mem_gb_hours": 401649.6007,
         "underutilized_cost_dkk": 3785.19
       },
-      "cost": 8557.65,
-      "cpu_efficiency": 0.284293,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.017813020188267376,
@@ -28473,32 +28268,10 @@
           "underutilized_cost_dkk": 0.36
         }
       ],
-      "gpu_hours": 129.2519,
-      "hierarchy": {
-        "group_id": "grp_d9c2ddec8a58b87e",
-        "group_label": "Research Group A006",
-        "pi_id": "pi_efee99a267b576ce",
-        "pi_label": "PI A006",
-        "section_id": "sec_0c9e3580bc494cac",
-        "section_label": "Section A006"
-      },
-      "memory_efficiency": 0.106318,
-      "potential_savings": 3785.19,
-      "project_id": "prj_0ee6803d8ee3fb63",
-      "project_label": "Project A006",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.106318,
-            "jobs_with_measured_memory": 1691
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_d9c2ddec8a58b87e",
+      "group_label": "Research Group A006",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.422465,
@@ -28545,7 +28318,29 @@
           "requested_mem_gb_hours": 401649.6007,
           "underutilized_cost_dkk": 3785.19
         }
-      }
+      },
+      "section_id": "sec_0c9e3580bc494cac",
+      "section_label": "Section A006",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 8557.65,
+          "jobs": 1711,
+          "pi_id": "pi_efee99a267b576ce",
+          "pi_label": "PI A006",
+          "project_count": 60,
+          "underutilized_cost_dkk": 3785.19
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 8557.65,
+          "gpu_hours": 129.2519,
+          "jobs": 1711,
+          "project_id": "prj_0ee6803d8ee3fb63",
+          "project_label": "Project A006",
+          "underutilized_cost_dkk": 3785.19
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -28563,8 +28358,6 @@
         "requested_mem_gb_hours": 794209.9406,
         "underutilized_cost_dkk": 2163.07
       },
-      "cost": 12906.2,
-      "cpu_efficiency": 0.474184,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.929018486233107,
@@ -29175,32 +28968,10 @@
           "underutilized_cost_dkk": 0.37
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_beaa0c6b9d50c420",
-        "group_label": "Research Group A030",
-        "pi_id": "pi_4a12240236168bf4",
-        "pi_label": "PI A030",
-        "section_id": "sec_43ed6d6705116324",
-        "section_label": "Section A030"
-      },
-      "memory_efficiency": 0.049318,
-      "potential_savings": 2163.07,
-      "project_id": "prj_9e0a8075bc17ae1c",
-      "project_label": "Project A030",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.049318,
-            "jobs_with_measured_memory": 7493
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_beaa0c6b9d50c420",
+      "group_label": "Research Group A030",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.404538,
@@ -29247,7 +29018,29 @@
           "requested_mem_gb_hours": 794209.9406,
           "underutilized_cost_dkk": 2163.07
         }
-      }
+      },
+      "section_id": "sec_43ed6d6705116324",
+      "section_label": "Section A030",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 12906.2,
+          "jobs": 7980,
+          "pi_id": "pi_4a12240236168bf4",
+          "pi_label": "PI A030",
+          "project_count": 38,
+          "underutilized_cost_dkk": 2163.07
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 12906.2,
+          "gpu_hours": 0.0,
+          "jobs": 7980,
+          "project_id": "prj_9e0a8075bc17ae1c",
+          "project_label": "Project A030",
+          "underutilized_cost_dkk": 2163.07
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -29265,8 +29058,6 @@
         "requested_mem_gb_hours": 133383.3872,
         "underutilized_cost_dkk": 1812.33
       },
-      "cost": 2172.04,
-      "cpu_efficiency": 0.503676,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.33231663527515115,
@@ -29717,32 +29508,10 @@
           "underutilized_cost_dkk": 0.0
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_53f3c949cdf7f5d6",
-        "group_label": "Research Group A022",
-        "pi_id": "pi_141c9b58382d4deb",
-        "pi_label": "PI A022",
-        "section_id": "sec_46c104bf58609339",
-        "section_label": "Section A022"
-      },
-      "memory_efficiency": 0.155709,
-      "potential_savings": 1812.33,
-      "project_id": "prj_a452d16976e6adb6",
-      "project_label": "Project A022",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.155709,
-            "jobs_with_measured_memory": 1865
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_53f3c949cdf7f5d6",
+      "group_label": "Research Group A022",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.493963,
@@ -29789,7 +29558,29 @@
           "requested_mem_gb_hours": 133383.3872,
           "underutilized_cost_dkk": 1812.33
         }
-      }
+      },
+      "section_id": "sec_46c104bf58609339",
+      "section_label": "Section A022",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 2172.04,
+          "jobs": 1870,
+          "pi_id": "pi_141c9b58382d4deb",
+          "pi_label": "PI A022",
+          "project_count": 28,
+          "underutilized_cost_dkk": 1812.33
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 2172.04,
+          "gpu_hours": 0.0,
+          "jobs": 1870,
+          "project_id": "prj_a452d16976e6adb6",
+          "project_label": "Project A022",
+          "underutilized_cost_dkk": 1812.33
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -29807,8 +29598,6 @@
         "requested_mem_gb_hours": 46259.9556,
         "underutilized_cost_dkk": 1058.38
       },
-      "cost": 1254.39,
-      "cpu_efficiency": 0.144388,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.0,
@@ -30083,43 +29872,10 @@
           "underutilized_cost_dkk": 58.12
         }
       ],
-      "gpu_hours": 38.6669,
-      "hierarchy": {
-        "group_id": "grp_d84a22165629ca35",
-        "group_label": "Research Group A024",
-        "pi_id": "pi_b6aef0650d8d8d02",
-        "pi_label": "PI A024",
-        "section_id": "sec_a46893fce7ca359b",
-        "section_label": "Section A024"
-      },
-      "memory_efficiency": 0.0697,
-      "potential_savings": 1058.38,
-      "project_id": "prj_cbcce359c7c2b519",
-      "project_label": "Project A024",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.144388,
-            "jobs_with_measured_cpu": 114
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.0697,
-            "jobs_with_measured_memory": 108
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_d84a22165629ca35",
+      "group_label": "Research Group A024",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.146967,
@@ -30166,7 +29922,29 @@
           "requested_mem_gb_hours": 46259.9556,
           "underutilized_cost_dkk": 1058.38
         }
-      }
+      },
+      "section_id": "sec_a46893fce7ca359b",
+      "section_label": "Section A024",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 1254.39,
+          "jobs": 115,
+          "pi_id": "pi_b6aef0650d8d8d02",
+          "pi_label": "PI A024",
+          "project_count": 17,
+          "underutilized_cost_dkk": 1058.38
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 1254.39,
+          "gpu_hours": 38.6669,
+          "jobs": 115,
+          "project_id": "prj_cbcce359c7c2b519",
+          "project_label": "Project A024",
+          "underutilized_cost_dkk": 1058.38
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -30184,8 +29962,6 @@
         "requested_mem_gb_hours": 67226.5511,
         "underutilized_cost_dkk": 945.42
       },
-      "cost": 1092.43,
-      "cpu_efficiency": 0.188846,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.0,
@@ -30604,43 +30380,10 @@
           "underutilized_cost_dkk": 10.69
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_792f58895a35e06a",
-        "group_label": "Research Group A007",
-        "pi_id": "pi_f3a5aeaad5101700",
-        "pi_label": "PI A007",
-        "section_id": "sec_a867068878cac5bf",
-        "section_label": "Section A007"
-      },
-      "memory_efficiency": 0.135666,
-      "potential_savings": 945.42,
-      "project_id": "prj_ea802aad1ce6fd77",
-      "project_label": "Project A007",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.188846,
-            "jobs_with_measured_cpu": 163
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.135666,
-            "jobs_with_measured_memory": 158
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_792f58895a35e06a",
+      "group_label": "Research Group A007",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.212168,
@@ -30687,7 +30430,29 @@
           "requested_mem_gb_hours": 67226.5511,
           "underutilized_cost_dkk": 945.42
         }
-      }
+      },
+      "section_id": "sec_a867068878cac5bf",
+      "section_label": "Section A007",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 1092.43,
+          "jobs": 175,
+          "pi_id": "pi_f3a5aeaad5101700",
+          "pi_label": "PI A007",
+          "project_count": 26,
+          "underutilized_cost_dkk": 945.42
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 1092.43,
+          "gpu_hours": 0.0,
+          "jobs": 175,
+          "project_id": "prj_ea802aad1ce6fd77",
+          "project_label": "Project A007",
+          "underutilized_cost_dkk": 945.42
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -30705,8 +30470,6 @@
         "requested_mem_gb_hours": 26715.3578,
         "underutilized_cost_dkk": 245.78
       },
-      "cost": 564.7,
-      "cpu_efficiency": 0.338783,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.0,
@@ -31157,20 +30920,10 @@
           "underutilized_cost_dkk": 43.22
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_ad32d02ba2a10604",
-        "group_label": "Research Group A017",
-        "pi_id": "pi_62bd1729d75b36cd",
-        "pi_label": "PI A017",
-        "section_id": "sec_aebc43c8c4d68545",
-        "section_label": "Section A017"
-      },
-      "memory_efficiency": 0.260936,
-      "potential_savings": 245.78,
-      "project_id": "prj_1544544e9c438066",
-      "project_label": "Project A017",
-      "recommendations": [],
+      "group_id": "grp_ad32d02ba2a10604",
+      "group_label": "Research Group A017",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.307446,
@@ -31217,7 +30970,29 @@
           "requested_mem_gb_hours": 26715.3578,
           "underutilized_cost_dkk": 245.78
         }
-      }
+      },
+      "section_id": "sec_aebc43c8c4d68545",
+      "section_label": "Section A017",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 564.7,
+          "jobs": 65,
+          "pi_id": "pi_62bd1729d75b36cd",
+          "pi_label": "PI A017",
+          "project_count": 28,
+          "underutilized_cost_dkk": 245.78
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 564.7,
+          "gpu_hours": 0.0,
+          "jobs": 65,
+          "project_id": "prj_1544544e9c438066",
+          "project_label": "Project A017",
+          "underutilized_cost_dkk": 245.78
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -31235,8 +31010,6 @@
         "requested_mem_gb_hours": 33007.5769,
         "underutilized_cost_dkk": 235.06
       },
-      "cost": 536.49,
-      "cpu_efficiency": 0.123615,
       "daily_trends": [
         {
           "avg_cpu_efficiency": null,
@@ -31671,43 +31444,10 @@
           "underutilized_cost_dkk": 1.98
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_d1f88ad00c613fd0",
-        "group_label": "Research Group A008",
-        "pi_id": "pi_84746034baccf17f",
-        "pi_label": "PI A008",
-        "section_id": "sec_496cac80e85cc3ab",
-        "section_label": "Section A008"
-      },
-      "memory_efficiency": 0.021668,
-      "potential_savings": 235.06,
-      "project_id": "prj_3fa480d4b779cd5e",
-      "project_label": "Project A008",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.123615,
-            "jobs_with_measured_cpu": 1388
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.021668,
-            "jobs_with_measured_memory": 1721
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_d1f88ad00c613fd0",
+      "group_label": "Research Group A008",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.125147,
@@ -31754,7 +31494,29 @@
           "requested_mem_gb_hours": 33007.5769,
           "underutilized_cost_dkk": 235.06
         }
-      }
+      },
+      "section_id": "sec_496cac80e85cc3ab",
+      "section_label": "Section A008",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 536.49,
+          "jobs": 4618,
+          "pi_id": "pi_84746034baccf17f",
+          "pi_label": "PI A008",
+          "project_count": 27,
+          "underutilized_cost_dkk": 235.06
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 536.49,
+          "gpu_hours": 0.0,
+          "jobs": 4618,
+          "project_id": "prj_3fa480d4b779cd5e",
+          "project_label": "Project A008",
+          "underutilized_cost_dkk": 235.06
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -31772,8 +31534,6 @@
         "requested_mem_gb_hours": 84670.3422,
         "underutilized_cost_dkk": 22.92
       },
-      "cost": 1375.89,
-      "cpu_efficiency": 0.431357,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.9833614126241061,
@@ -31856,32 +31616,10 @@
           "underutilized_cost_dkk": 3.12
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_aba969f68dbd4754",
-        "group_label": "Research Group A023",
-        "pi_id": "pi_7e27e95043e586f4",
-        "pi_label": "PI A023",
-        "section_id": "sec_b7dd2d9ad44caf8d",
-        "section_label": "Section A023"
-      },
-      "memory_efficiency": 6e-06,
-      "potential_savings": 22.92,
-      "project_id": "prj_68c93fab58ad8637",
-      "project_label": "Project A023",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 6e-06,
-            "jobs_with_measured_memory": 16
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_aba969f68dbd4754",
+      "group_label": "Research Group A023",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.431357,
@@ -31928,7 +31666,29 @@
           "requested_mem_gb_hours": 84670.3422,
           "underutilized_cost_dkk": 22.92
         }
-      }
+      },
+      "section_id": "sec_b7dd2d9ad44caf8d",
+      "section_label": "Section A023",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 1375.89,
+          "jobs": 21,
+          "pi_id": "pi_7e27e95043e586f4",
+          "pi_label": "PI A023",
+          "project_count": 5,
+          "underutilized_cost_dkk": 22.92
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 1375.89,
+          "gpu_hours": 0.0,
+          "jobs": 21,
+          "project_id": "prj_68c93fab58ad8637",
+          "project_label": "Project A023",
+          "underutilized_cost_dkk": 22.92
+        }
+      ]
     },
     {
       "all_time_summary": {
@@ -31946,8 +31706,6 @@
         "requested_mem_gb_hours": 459.443,
         "underutilized_cost_dkk": 1.52
       },
-      "cost": 7.64,
-      "cpu_efficiency": 0.054722,
       "daily_trends": [
         {
           "avg_cpu_efficiency": 0.8444211994421199,
@@ -32062,43 +31820,10 @@
           "underutilized_cost_dkk": 0.04
         }
       ],
-      "gpu_hours": 0.0,
-      "hierarchy": {
-        "group_id": "grp_36b8993e7f6a1c43",
-        "group_label": "Research Group A012",
-        "pi_id": "pi_60c94f8b6a34013a",
-        "pi_label": "PI A012",
-        "section_id": "sec_042c0b56079c0d37",
-        "section_label": "Section A012"
-      },
-      "memory_efficiency": 0.005467,
-      "potential_savings": 1.52,
-      "project_id": "prj_1754f9eb4e11f64a",
-      "project_label": "Project A012",
-      "recommendations": [
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_cpu_efficiency": 0.054722,
-            "jobs_with_measured_cpu": 125
-          },
-          "severity": "high",
-          "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-          "title": "Low measured CPU utilization",
-          "type": "cpu_efficiency"
-        },
-        {
-          "confidence": "medium",
-          "evidence": {
-            "avg_memory_efficiency": 0.005467,
-            "jobs_with_measured_memory": 125
-          },
-          "severity": "medium",
-          "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-          "title": "Requested memory is much higher than MaxRSS",
-          "type": "memory_efficiency"
-        }
-      ],
+      "group_id": "grp_36b8993e7f6a1c43",
+      "group_label": "Research Group A012",
+      "pi_count": 1,
+      "project_count": 1,
       "rolling_summaries": {
         "30d": {
           "avg_cpu_efficiency": 0.474807,
@@ -32145,7 +31870,29 @@
           "requested_mem_gb_hours": 459.443,
           "underutilized_cost_dkk": 1.52
         }
-      }
+      },
+      "section_id": "sec_042c0b56079c0d37",
+      "section_label": "Section A012",
+      "top_pis": [
+        {
+          "estimated_cost_dkk": 7.64,
+          "jobs": 125,
+          "pi_id": "pi_60c94f8b6a34013a",
+          "pi_label": "PI A012",
+          "project_count": 7,
+          "underutilized_cost_dkk": 1.52
+        }
+      ],
+      "top_projects": [
+        {
+          "estimated_cost_dkk": 7.64,
+          "gpu_hours": 0.0,
+          "jobs": 125,
+          "project_id": "prj_1754f9eb4e11f64a",
+          "project_label": "Project A012",
+          "underutilized_cost_dkk": 1.52
+        }
+      ]
     }
   ],
   "schema_version": "project_hierarchy.v1"

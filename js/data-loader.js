@@ -45,6 +45,10 @@ function normalizeGlobal(index) {
     cluster_summary: global.cluster_summary || 'global/cluster_summary.json',
     percentiles: global.percentiles || 'global/percentiles.json',
     account_summary: global.account_summary || global.accounts || null,
+    projects: global.projects || null,
+    pi_summaries: global.pi_summaries || null,
+    research_groups: global.research_groups || null,
+    sections: global.sections || null,
   };
 }
 
@@ -61,10 +65,14 @@ async function tryLoadTree(base) {
   const globalIndex = normalizeGlobal(index);
   const usersIndex = asArray(index.users);
 
-  const [clusterSummary, percentiles, accountSummary] = await Promise.all([
+  const [clusterSummary, percentiles, accountSummary, projectHierarchy, piHierarchy, groupHierarchy, sectionHierarchy] = await Promise.all([
     loadJson(`${base}${globalIndex.cluster_summary}`),
     loadJson(`${base}${globalIndex.percentiles}`),
     globalIndex.account_summary ? tryOptionalJson(`${base}${globalIndex.account_summary}`) : null,
+    globalIndex.projects ? tryOptionalJson(`${base}${globalIndex.projects}`) : null,
+    globalIndex.pi_summaries ? tryOptionalJson(`${base}${globalIndex.pi_summaries}`) : null,
+    globalIndex.research_groups ? tryOptionalJson(`${base}${globalIndex.research_groups}`) : null,
+    globalIndex.sections ? tryOptionalJson(`${base}${globalIndex.sections}`) : null,
   ]);
 
   const userTokens = usersIndex.map((item) => asObject(item).user_token).filter(Boolean);
@@ -83,6 +91,10 @@ async function tryLoadTree(base) {
     clusterSummary,
     percentiles,
     accountSummary,
+    projectHierarchy,
+    piHierarchy,
+    groupHierarchy,
+    sectionHierarchy,
     users,
   };
 }
@@ -282,6 +294,49 @@ function buildRecommendationSummary(users) {
     .sort((a, b) => b.affectedUsers - a.affectedUsers || b.wasteContext - a.wasteContext);
 }
 
+
+function normalizeSummaryItem(item, idKey, labelKey, fallbackPrefix, index) {
+  const row = asObject(item);
+  const summary = asObject(row.all_time_summary);
+  return {
+    id: row[idKey] || `${fallbackPrefix}-${index + 1}`,
+    label: row[labelKey] || row.project_pseudonym || `${fallbackPrefix}-${String(index + 1).padStart(3, '0')}`,
+    hierarchy: asObject(row.hierarchy),
+    allTime: summary,
+    rollingSummaries: asObject(row.rolling_summaries),
+    dailyTrends: asArray(row.daily_trends),
+    recommendations: asArray(row.recommendations).map(normalizeRecommendation),
+    jobs: numberOrZero(summary.jobs),
+    completedJobs: numberOrZero(summary.completed_jobs),
+    failedJobs: numberOrZero(summary.failed_jobs),
+    cpu: summary.avg_cpu_efficiency,
+    memory: summary.avg_memory_efficiency,
+    cost: numberOrZero(summary.estimated_cost_dkk),
+    savings: numberOrZero(summary.underutilized_cost_dkk),
+    gpu: numberOrZero(summary.gpu_hours),
+    topProjects: asArray(row.top_projects),
+    topPis: asArray(row.top_pis),
+    topGroups: asArray(row.top_groups),
+    projectCount: numberOrZero(row.project_count),
+    piCount: numberOrZero(row.pi_count),
+    groupCount: numberOrZero(row.group_count),
+  };
+}
+
+function normalizeHierarchy(tree) {
+  const projectsRoot = asObject(tree.projectHierarchy);
+  const piRoot = asObject(tree.piHierarchy);
+  const groupRoot = asObject(tree.groupHierarchy);
+  const sectionRoot = asObject(tree.sectionHierarchy);
+  return {
+    coverage: asObject(projectsRoot.coverage),
+    projects: asArray(projectsRoot.projects).map((item, index) => normalizeSummaryItem(item, 'project_id', 'project_label', 'Project', index)),
+    pis: asArray(piRoot.pis).map((item, index) => normalizeSummaryItem(item, 'pi_id', 'pi_label', 'PI', index)),
+    groups: asArray(groupRoot.groups).map((item, index) => normalizeSummaryItem(item, 'group_id', 'group_label', 'Group', index)),
+    sections: asArray(sectionRoot.sections).map((item, index) => normalizeSummaryItem(item, 'section_id', 'section_label', 'Section', index)),
+  };
+}
+
 function normalizeProjects(accountSummary) {
   const sourceRows = asArray(accountSummary && (accountSummary.accounts || accountSummary.projects || accountSummary.daily_account_summary));
   return sourceRows.map((row, index) => {
@@ -310,7 +365,8 @@ function buildDerivedData(tree) {
   const allInefficientJobs = users
     .flatMap((user) => user.topJobs)
     .sort((a, b) => b.inefficiencyScore - a.inefficiencyScore);
-  const projects = normalizeProjects(tree.accountSummary);
+  const hierarchy = normalizeHierarchy(tree);
+  const projects = hierarchy.projects.length ? hierarchy.projects : normalizeProjects(tree.accountSummary);
 
   return {
     source: tree.source,
@@ -344,6 +400,10 @@ function buildDerivedData(tree) {
     recommendationSummary: buildRecommendationSummary(users),
     inefficientJobs: allInefficientJobs,
     projects,
+    pis: hierarchy.pis,
+    groups: hierarchy.groups,
+    sections: hierarchy.sections,
+    hierarchyCoverage: hierarchy.coverage,
     datasetMeta: {
       sourceDatabase: 'efficiency_v3/data/mjolnir_efficiency_90d_validation.sqlite',
       validationWindow: reportDates.length ? `${reportDates[0]} to ${reportDates[reportDates.length - 1]}` : 'Unavailable',
@@ -353,6 +413,9 @@ function buildDerivedData(tree) {
       rowCounts: VALIDATION_ROW_COUNTS,
       userCount: users.length,
       projectCount: projects.length,
+      piCount: hierarchy.pis.length,
+      groupCount: hierarchy.groups.length,
+      sectionCount: hierarchy.sections.length,
       recommendationCount: users.reduce((sum, user) => sum + user.recommendations.length, 0),
       inefficientJobCount: allInefficientJobs.length,
       accountExportAvailable: projects.length > 0,
@@ -412,6 +475,10 @@ export async function loadMjolnirData() {
         recommendationSummary: [],
         inefficientJobs: [],
         projects: [],
+        pis: [],
+        groups: [],
+        sections: [],
+        hierarchyCoverage: {},
         datasetMeta: {
           sourceDatabase: 'Unavailable',
           validationWindow: 'Unavailable',
@@ -421,6 +488,9 @@ export async function loadMjolnirData() {
           rowCounts: VALIDATION_ROW_COUNTS,
           userCount: 0,
           projectCount: 0,
+          piCount: 0,
+          groupCount: 0,
+          sectionCount: 0,
           recommendationCount: 0,
           inefficientJobCount: 0,
           accountExportAvailable: false,
