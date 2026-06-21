@@ -1,0 +1,208 @@
+{
+  "all_time_summary": {
+    "avg_cpu_efficiency": 0.225035,
+    "avg_memory_efficiency": 0.013419,
+    "completed_jobs": 3,
+    "cpu_hours_allocated": 2.3083,
+    "estimated_cost_dkk": 0.27,
+    "failed_jobs": 10,
+    "gpu_hours": 0.0,
+    "jobs": 13,
+    "jobs_with_measured_cpu": 5,
+    "jobs_with_measured_memory": 7,
+    "measured_cpu_hours": 0.8069,
+    "requested_mem_gb_hours": 16.315,
+    "underutilized_cost_dkk": 0.16
+  },
+  "daily_trends": [
+    {
+      "avg_cpu_efficiency": 0.49563492063492065,
+      "avg_memory_efficiency": 0.0067790126800537105,
+      "completed_jobs": 1,
+      "cpu_hours_allocated": 0.7,
+      "estimated_cost_dkk": 0.11,
+      "failed_jobs": 4,
+      "gpu_hours": 0.0,
+      "jobs": 5,
+      "jobs_with_measured_cpu": 1,
+      "jobs_with_measured_memory": 2,
+      "measured_cpu_hours": 0.3469,
+      "report_date": "2026-04-28",
+      "requested_mem_gb_hours": 7.0,
+      "underutilized_cost_dkk": 0.06
+    },
+    {
+      "avg_cpu_efficiency": 0.0,
+      "avg_memory_efficiency": 0.0002803357442220052,
+      "completed_jobs": 0,
+      "cpu_hours_allocated": 0.1742,
+      "estimated_cost_dkk": 0.01,
+      "failed_jobs": 5,
+      "gpu_hours": 0.0,
+      "jobs": 5,
+      "jobs_with_measured_cpu": 2,
+      "jobs_with_measured_memory": 3,
+      "measured_cpu_hours": 0.0,
+      "report_date": "2026-05-01",
+      "requested_mem_gb_hours": 0.71,
+      "underutilized_cost_dkk": 0.01
+    },
+    {
+      "avg_cpu_efficiency": 0.3147705821885805,
+      "avg_memory_efficiency": 0.03976792494455973,
+      "completed_jobs": 2,
+      "cpu_hours_allocated": 1.4342,
+      "estimated_cost_dkk": 0.14,
+      "failed_jobs": 1,
+      "gpu_hours": 0.0,
+      "jobs": 3,
+      "jobs_with_measured_cpu": 2,
+      "jobs_with_measured_memory": 2,
+      "measured_cpu_hours": 0.46,
+      "report_date": "2026-05-05",
+      "requested_mem_gb_hours": 8.605,
+      "underutilized_cost_dkk": 0.09
+    }
+  ],
+  "generated_at": "2026-06-21T13:16:45.491341+00:00",
+  "recommendations": [
+    {
+      "confidence": "medium",
+      "evidence": {
+        "avg_cpu_efficiency": 0.225035,
+        "jobs_with_measured_cpu": 5
+      },
+      "severity": "high",
+      "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
+      "title": "Low measured CPU utilization",
+      "type": "cpu_efficiency"
+    },
+    {
+      "confidence": "medium",
+      "evidence": {
+        "avg_memory_efficiency": 0.013419,
+        "jobs_with_measured_memory": 7
+      },
+      "severity": "medium",
+      "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
+      "title": "Requested memory is much higher than MaxRSS",
+      "type": "memory_efficiency"
+    }
+  ],
+  "rolling_summaries": {
+    "30d": {
+      "avg_cpu_efficiency": 0.225035,
+      "avg_memory_efficiency": 0.013419,
+      "completed_jobs": 3,
+      "cpu_hours_allocated": 2.3083,
+      "estimated_cost_dkk": 0.27,
+      "failed_jobs": 10,
+      "gpu_hours": 0.0,
+      "jobs": 13,
+      "jobs_with_measured_cpu": 5,
+      "jobs_with_measured_memory": 7,
+      "measured_cpu_hours": 0.8069,
+      "requested_mem_gb_hours": 16.315,
+      "underutilized_cost_dkk": 0.16
+    },
+    "7d": {
+      "avg_cpu_efficiency": 0.157385,
+      "avg_memory_efficiency": 0.016075,
+      "completed_jobs": 2,
+      "cpu_hours_allocated": 1.6083,
+      "estimated_cost_dkk": 0.15,
+      "failed_jobs": 6,
+      "gpu_hours": 0.0,
+      "jobs": 8,
+      "jobs_with_measured_cpu": 4,
+      "jobs_with_measured_memory": 5,
+      "measured_cpu_hours": 0.46,
+      "requested_mem_gb_hours": 9.315,
+      "underutilized_cost_dkk": 0.11
+    },
+    "90d": {
+      "avg_cpu_efficiency": 0.225035,
+      "avg_memory_efficiency": 0.013419,
+      "completed_jobs": 3,
+      "cpu_hours_allocated": 2.3083,
+      "estimated_cost_dkk": 0.27,
+      "failed_jobs": 10,
+      "gpu_hours": 0.0,
+      "jobs": 13,
+      "jobs_with_measured_cpu": 5,
+      "jobs_with_measured_memory": 7,
+      "measured_cpu_hours": 0.8069,
+      "requested_mem_gb_hours": 16.315,
+      "underutilized_cost_dkk": 0.16
+    }
+  },
+  "schema_version": "v3.0",
+  "top_inefficient_jobs": [
+    {
+      "alloc_cpus": 10,
+      "elapsed_hours": 0.07,
+      "estimated_cost_dkk": 0.11,
+      "gpu_count": 0,
+      "jobid": "44343344",
+      "measured_cpu_efficiency": 0.49563492063492065,
+      "memory_efficiency": 0.013549299240112304,
+      "partition_name": "cpuqueue",
+      "report_date": "2026-04-28",
+      "state": "COMPLETED",
+      "underutilized_cost_dkk": 0.06
+    },
+    {
+      "alloc_cpus": 15,
+      "elapsed_hours": 0.0569,
+      "estimated_cost_dkk": 0.08,
+      "gpu_count": 0,
+      "jobid": "44394783",
+      "measured_cpu_efficiency": 0.3460162601626016,
+      "memory_efficiency": 0.021174610985649957,
+      "partition_name": "cpuqueue",
+      "report_date": "2026-05-05",
+      "state": "COMPLETED",
+      "underutilized_cost_dkk": 0.05
+    },
+    {
+      "alloc_cpus": 6,
+      "elapsed_hours": 0.0967,
+      "estimated_cost_dkk": 0.06,
+      "gpu_count": 0,
+      "jobid": "44394411",
+      "measured_cpu_efficiency": 0.2835249042145594,
+      "memory_efficiency": 0.05836123890346951,
+      "partition_name": "cpuqueue",
+      "report_date": "2026-05-05",
+      "state": "COMPLETED",
+      "underutilized_cost_dkk": 0.04
+    },
+    {
+      "alloc_cpus": 1,
+      "elapsed_hours": 0.1719,
+      "estimated_cost_dkk": 0.01,
+      "gpu_count": 0,
+      "jobid": "44362011",
+      "measured_cpu_efficiency": 0.0,
+      "memory_efficiency": 0.0008215904235839844,
+      "partition_name": "cpuqueue",
+      "report_date": "2026-05-01",
+      "state": "TIMEOUT",
+      "underutilized_cost_dkk": 0.01
+    },
+    {
+      "alloc_cpus": 8,
+      "elapsed_hours": 0.0003,
+      "estimated_cost_dkk": 0.0,
+      "gpu_count": 0,
+      "jobid": "44361394",
+      "measured_cpu_efficiency": 0.0,
+      "memory_efficiency": null,
+      "partition_name": "cpuqueue",
+      "report_date": "2026-05-01",
+      "state": "FAILED",
+      "underutilized_cost_dkk": 0.0
+    }
+  ],
+  "user_token": "8fbcc0484083ae8af2bf561a7f88cb8f7d93a80be6720d7a2cb600cd53b17180"
+}
