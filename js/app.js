@@ -13,7 +13,7 @@ const navGroups = [
     items: [
       { id: 'landing', label: 'Overview', icon: 'home' },
       { id: 'cluster', label: 'Trends', icon: 'chart' },
-      { id: 'cluster-health', label: 'Cluster Health', icon: 'cluster' },
+      { id: 'cluster-health', label: 'Cluster Resource Health', icon: 'cluster' },
       { id: 'rankings', label: 'Rankings', icon: 'trophy' },
       { id: 'benchmarks', label: 'Percentiles', icon: 'gauge' },
       { id: 'recommendations', label: 'Recommendations', icon: 'spark' },
@@ -31,7 +31,7 @@ const navGroups = [
     heading: 'Personal',
     items: [
       { id: 'users', label: 'Community Comparison', icon: 'users' },
-      { id: 'recovery', label: 'Reveal My Dashboard', icon: 'key' },
+      { id: 'recovery', label: 'View My Resource Insights', icon: 'key' },
     ],
   },
   {
@@ -122,7 +122,7 @@ function personalRouteToken(route) { return isPersonalRoute(route) ? route.split
 function isHierarchyDetailRoute(route) { return /^(project|pi|group|section)\/[A-Za-z0-9_-]+$/.test(route || ''); }
 function detailRouteParts(route) { const parts = String(route || '').split('/'); return { type: parts[0], id: parts[1] }; }
 function pageTitle(route) {
-  if (isPersonalRoute(route)) return 'Personal Dashboard';
+  if (isPersonalRoute(route)) return 'My Resource Insights';
   if (isHierarchyDetailRoute(route)) {
     const part = detailRouteParts(route).type;
     return part === 'pi' ? 'PI Detail' : `${part.charAt(0).toUpperCase()}${part.slice(1)} Detail`;
@@ -242,7 +242,7 @@ function landingPage() {
       <div>
         <h2>Mjolnir Resource Insights</h2>
         <p>Mjolnir Resource Insights provides researchers and Principal Investigators with a clear view of how compute resources are being used across the Mjolnir platform.</p>
-        <p>The dashboard combines resource consumption, cost drivers, project-level trends, and optimization opportunities to help research groups make informed decisions about their use of shared HPC resources.</p>
+        <p>It combines resource consumption, cost drivers, project-level trends, and optimization opportunities to help research groups make informed decisions about their use of shared HPC resources.</p>
         <p class="subtle">Future versions will also include storage usage, storage growth, and sustainability metrics.</p>
       </div>
     </section>
@@ -251,7 +251,7 @@ function landingPage() {
         <div class="eyebrow">${dot('green')} REAL MJOLNIR DATA - 90-day validation dataset</div>
         <h1>See how Mjolnir's resources are really being used.</h1>
         <p>Helping researchers understand resource usage, cost drivers, and optimization opportunities across Mjolnir.</p>
-        <div class="hero-actions"><a class="btn btn-primary" href="#/cluster-health">Open health dashboard</a><a class="btn" href="#/rankings">View rankings</a><a class="btn" href="#/recovery">Reveal My Dashboard</a></div>
+        <div class="hero-actions"><a class="btn btn-primary" href="#/cluster-health">View Cluster Resource Health</a><a class="btn" href="#/rankings">View rankings</a><a class="btn" href="#/recovery">View My Resource Insights</a></div>
       </div>
       <div class="hero-panel">
         <div class="hero-panel-head"><div class="panel-title">90-day operating picture</div><div class="subtle">${meta.validationWindow || 'Validation window unavailable'}</div></div>
@@ -305,7 +305,7 @@ function clusterHealthPage() {
   const savingsTrend = trendDirection(rolling7.underutilized_cost_dkk, rolling30.underutilized_cost_dkk, true);
   return `
     <div class="stack">
-      <section class="section"><div class="section-head"><h2>Cluster Health Dashboard</h2><span class="subtle">All metrics from the 90-day validation export</span></div><div class="cards-grid">${[
+      <section class="section"><div class="section-head"><h2>Cluster Resource Health</h2><span class="subtle">All metrics from the 90-day validation export</span></div><div class="cards-grid">${[
         statBlock('Total jobs', fmt(allTime.jobs), 'Measured job metrics rows'),
         statBlock('Completed jobs', fmt(allTime.completed_jobs), 'Successful workload volume', 'good'),
         statBlock('Failed jobs', fmt(allTime.failed_jobs), `${pct(failureRate, 1)} failure rate`, failureRate > 0.1 ? 'warn' : 'good'),
@@ -523,7 +523,7 @@ function userPage() {
   return `
     <div class="stack">
       ${infoPanel('What is Community Comparison?', 'Compare your resource usage patterns with similar users. Individual identities remain protected. Comparisons are intended for context and learning, not ranking.')}
-      <section class="section"><div class="section-head"><h2>Community Comparison</h2><span class="subtle">Pseudonymous public users</span></div><p class="subtle">This page shows how public pseudonymous users compare on resource usage and optimization opportunity. Personal dashboards will later reveal only the signed-in user's real username.</p></section>
+      <section class="section"><div class="section-head"><h2>Community Comparison</h2><span class="subtle">Pseudonymous public users</span></div><p class="subtle">This page shows how public pseudonymous users compare on resource usage and optimization opportunity. Individual Resource Insights pages will later reveal only the signed-in user's real username.</p></section>
       <section class="table-card">${tableFromRows(['Pseudonym', 'CPU efficiency', 'Memory efficiency', 'Savings opportunity', 'Jobs', 'Recommendations'], rows)}</section>
       </div>`;
 }
@@ -533,7 +533,7 @@ function costPage() {
   const rows = asArray(data?.clusterSummary?.dailyTrends);
   return `
     <div class="stack">
-      ${infoPanel('What drives cost on Mjolnir?', 'Jobs are billed by whichever resource is larger relative to demand: reserved CPU cores or reserved memory. Memory often ends up driving cost because it is easy to over-request "just in case." The Cost-Bearer model looks at each job, decides whether CPU or memory is the dominant cost driver, and estimates the optimization opportunity only on that resource - a conservative, defensible savings number. GPU optimization opportunity is not shown below because GPU utilization is not yet measured on Mjolnir. Future versions of this dashboard may also include storage usage and sustainability metrics.')}
+      ${infoPanel('What drives cost on Mjolnir?', 'Jobs are billed by whichever resource is larger relative to demand: reserved CPU cores or reserved memory. Memory often ends up driving cost because it is easy to over-request "just in case." The Cost-Bearer model looks at each job, decides whether CPU or memory is the dominant cost driver, and estimates the optimization opportunity only on that resource - a conservative, defensible savings number. GPU optimization opportunity is not shown below because GPU utilization is not yet measured on Mjolnir. Future versions of Resource Insights may also include storage usage and sustainability metrics.')}
       <section class="section"><div class="section-head"><h2>Resource Cost Insights</h2><span class="subtle">Spend, cost drivers, and optimization opportunities</span></div><div class="cards-grid">${[
         statBlock('Estimated cost', money(allTime.estimated_cost_dkk), '90-day observed cost'),
         statBlock('Potential savings', money(allTime.underutilized_cost_dkk), `${money(annualized(allTime.underutilized_cost_dkk))} annualized run-rate`, 'warn'),
@@ -556,14 +556,14 @@ function recoveryPage() {
   const statusClass = status?.ok ? 'success' : 'info';
   const statusMessage = status
     ? `<div class="form-status ${statusClass}">${escapeHtml(status.message)}</div>`
-    : '<div class="subtle">Enter your Mjolnir username. The future recovery service will look up the Airtable identity record and email the personal dashboard URL.</div>';
+    : '<div class="subtle">Enter your Mjolnir username. The future recovery service will look up the Airtable identity record and email your Resource Insights link.</div>';
   return `
     <div class="stack">
-      <section class="section"><div class="section-head"><h2>Reveal My Dashboard</h2><span class="subtle">Self-service recovery workflow</span></div><p class="subtle" style="line-height:1.8">Public rankings use pseudonyms only. This form is the planned recovery entry point for users who want their personal dashboard link without exposing usernames in the public dataset.</p><form class="recovery-form" data-recovery-form><label for="recovery-username">Mjolnir username</label><div class="recovery-row"><input id="recovery-username" class="search" name="username" autocomplete="username" placeholder="Enter your Mjolnir username" /><button class="btn btn-primary" type="submit">Request email</button></div>${statusMessage}</form></section>
+      <section class="section"><div class="section-head"><h2>View My Resource Insights</h2><span class="subtle">Self-service recovery workflow</span></div><p class="subtle" style="line-height:1.8">Public rankings use pseudonyms only. This form is the planned recovery entry point for users who want their Resource Insights link without exposing usernames in the public dataset.</p><form class="recovery-form" data-recovery-form><label for="recovery-username">Mjolnir username</label><div class="recovery-row"><input id="recovery-username" class="search" name="username" autocomplete="username" placeholder="Enter your Mjolnir username" /><button class="btn btn-primary" type="submit">Request email</button></div>${statusMessage}</form></section>
       <section class="section"><div class="section-head"><h2>What happens next?</h2><span class="subtle">No public identity leak</span></div><div class="cards-grid">${[
         statBlock('1. Lookup', 'Airtable', 'Server-side lookup by username'),
         statBlock('2. Email', 'Private', 'URL is sent only to the registered email'),
-        statBlock('3. Dashboard', '/u/token', 'Personal route uses a high-entropy token'),
+        statBlock('3. Resource Insights', '/u/token', 'Personal route uses a high-entropy token'),
       ].join('')}</div></section>
       </div>`;
 }
@@ -664,15 +664,15 @@ function peerComparisonTable(rows) {
 
 function personalDashboardPage() {
   if (state.personalLoading) {
-    return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>Loading personal dashboard</h2><span class="subtle">${escapeHtml(state.personalToken || '')}</span></div><div class="empty-state">Loading private mock bundle for this route token.</div></section>`;
+    return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>Loading My Resource Insights</h2><span class="subtle">${escapeHtml(state.personalToken || '')}</span></div><div class="empty-state">Loading private mock bundle for this route token.</div></section>`;
   }
   if (state.personalError) {
-    return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>Personal dashboard unavailable</h2><span class="pill warn">Mock data missing</span></div><p class="subtle" style="line-height:1.8">No mock private bundle was found for this route token. Public dashboard data has not been changed.</p><div class="empty-state">${escapeHtml(state.personalError)}</div></section>`;
+    return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>My Resource Insights unavailable</h2><span class="pill warn">Mock data missing</span></div><p class="subtle" style="line-height:1.8">No mock private bundle was found for this route token. The public Resource Insights data has not been changed.</p><div class="empty-state">${escapeHtml(state.personalError)}</div></section>`;
   }
 
   const vm = state.personalViewModel;
   if (!vm) {
-    return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>Personal dashboard route</h2><span class="subtle">Private data required</span></div><div class="empty-state">Open a route such as <strong>#/u/mock-token-alex</strong> to load the prototype personal dashboard.</div></section>`;
+    return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>My Resource Insights</h2><span class="subtle">Private data required</span></div><div class="empty-state">Open a route such as <strong>#/u/mock-token-alex</strong> to load the prototype Resource Insights view.</div></section>`;
   }
 
   const metrics = asObject(vm.metrics);
@@ -712,7 +712,7 @@ function methodologyPage() {
   const rows = asObject(meta.rowCounts);
   return `
     <div class="stack">
-      <section class="section"><div class="section-head"><h2>Data provenance</h2><span class="subtle">Raw jobs to dashboard widgets</span></div><div class="cards-grid">${[
+      <section class="section"><div class="section-head"><h2>Data provenance</h2><span class="subtle">Raw jobs to Resource Insights widgets</span></div><div class="cards-grid">${[
         statBlock('Source database', '90-day validation', meta.sourceDatabase || 'Unavailable'),
         statBlock('Validation window', meta.validationWindow || 'Unavailable', 'Daily cluster summary range'),
         statBlock('Export date', meta.exportDate ? new Date(meta.exportDate).toLocaleString() : '-', 'JSON generation timestamp'),
@@ -720,15 +720,15 @@ function methodologyPage() {
         statBlock('Projects', meta.accountExportAvailable ? fmt(meta.projectCount) : 'Not exported', 'Public-safe project data status'),
         statBlock('Recommendations', fmt(meta.recommendationCount), 'Generated from user summaries'),
       ].join('')}</div></section>
-      <section class="section"><div class="section-head"><h2>Import row counts</h2><span class="subtle">Validated source tables</span></div>${tableFromRows(['Table', 'Rows', 'Dashboard use'], [
+      <section class="section"><div class="section-head"><h2>Import row counts</h2><span class="subtle">Validated source tables</span></div>${tableFromRows(['Table', 'Rows', 'Resource Insights use'], [
         ['raw jobs', fmt(rows.jobs), 'Input for metrics calculation'],
         ['job_metrics', fmt(rows.job_metrics), 'Efficiency and cost metrics'],
         ['daily_user_summary', fmt(rows.daily_user_summary), 'User bundles, percentiles, recommendations'],
         ['daily_account_summary', fmt(rows.daily_account_summary), 'Future anonymized project summaries'],
         ['daily_cluster_summary', fmt(rows.daily_cluster_summary), 'Cluster trend charts and health KPIs'],
       ])}</section>
-      <section class="section"><div class="section-head"><h2>Lineage</h2><span class="subtle">Transformation path</span></div><div class="lineage"><span>raw jobs</span><b>metrics</b><b>daily summaries</b><b>JSON export</b><b>data-loader.js</b><strong>dashboard widgets</strong></div><p class="subtle" style="line-height:1.8">Pages consume normalized objects from the data loader. Public views show pseudonyms only and omit usernames, job names, node details, and filesystem paths.</p></section>
-      <section class="section"><div class="section-head"><h2>Roadmap</h2><span class="subtle">Where this dashboard is headed</span></div><div class="panel-grid">
+      <section class="section"><div class="section-head"><h2>Lineage</h2><span class="subtle">Transformation path</span></div><div class="lineage"><span>raw jobs</span><b>metrics</b><b>daily summaries</b><b>JSON export</b><b>data-loader.js</b><strong>Resource Insights widgets</strong></div><p class="subtle" style="line-height:1.8">Pages consume normalized objects from the data loader. Public views show pseudonyms only and omit usernames, job names, node details, and filesystem paths.</p></section>
+      <section class="section"><div class="section-head"><h2>Roadmap</h2><span class="subtle">Where Resource Insights is headed</span></div><div class="panel-grid">
         <div><h3 style="margin:0 0 8px;font-size:0.95rem">Current metrics</h3><ul style="margin:0;padding-left:18px;line-height:1.8;color:var(--text)"><li>CPU</li><li>Memory</li><li>GPU allocation</li><li>Cost-Bearer analysis</li></ul></div>
         <div><h3 style="margin:0 0 8px;font-size:0.95rem">Planned metrics</h3><ul style="margin:0;padding-left:18px;line-height:1.8;color:var(--text)"><li>Storage usage</li><li>Storage growth</li><li>Energy consumption</li><li>Sustainability indicators</li></ul></div>
       </div></section>
