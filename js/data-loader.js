@@ -29,6 +29,35 @@ function numberOrZero(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+// Revised Cost-Bearer waste model (docs/COST_BEARER_RESOURCE_AUDIT.md).
+// Reads the exported cost_bearer_* fields when present, and falls back to deriving
+// the bearer from cpu/mem sub-costs so older JSON (without the new fields) still
+// renders. cost_bearer_waste aliases the legacy underutilized_cost_dkk.
+function costBearerView(row) {
+  const source = asObject(row);
+  const cpuCost = numberOrZero(source.cpu_cost_dkk);
+  const memCost = numberOrZero(source.mem_cost_dkk);
+  const gpuCost = numberOrZero(source.gpu_cost_dkk);
+  let bearer = source.cost_bearer;
+  if (bearer !== 'cpu' && bearer !== 'memory') {
+    bearer = memCost > cpuCost ? 'memory' : 'cpu';
+  }
+  const bearerCost = source.cost_bearer_cost_dkk !== undefined && source.cost_bearer_cost_dkk !== null
+    ? numberOrZero(source.cost_bearer_cost_dkk)
+    : Math.max(cpuCost, memCost);
+  const waste = source.cost_bearer_waste_dkk ?? source.underutilized_cost_dkk;
+  return {
+    costBearer: bearer,
+    cpuCost,
+    memCost,
+    gpuCost,
+    costBearerCost: bearerCost,
+    costBearerEfficiency: source.cost_bearer_efficiency ?? null,
+    costBearerWaste: waste === null || waste === undefined ? null : numberOrZero(waste),
+    gpuWaste: null,
+  };
+}
+
 function avg(values) {
   const numbers = values.map(Number).filter(Number.isFinite);
   if (!numbers.length) return null;
@@ -131,6 +160,7 @@ function normalizeUser(user, index) {
     const memory = row.memory_efficiency;
     const cpuGap = cpu === null || cpu === undefined ? 0 : Math.max(0, 1 - numberOrZero(cpu));
     const memoryGap = memory === null || memory === undefined ? 0 : Math.max(0, 1 - numberOrZero(memory));
+    const bearer = costBearerView(row);
     return {
       userLabel: label,
       wastedCost,
@@ -140,9 +170,14 @@ function normalizeUser(user, index) {
       gpuCount: numberOrZero(row.gpu_count),
       elapsedHours: numberOrZero(row.elapsed_hours),
       inefficiencyScore: wastedCost * (1 + ((cpuGap + memoryGap) / 2)),
+      costBearer: bearer.costBearer,
+      costBearerCost: bearer.costBearerCost,
+      costBearerEfficiency: bearer.costBearerEfficiency,
+      costBearerWaste: bearer.costBearerWaste,
     };
   });
 
+  const summaryBearer = costBearerView(summary);
   return {
     label,
     cpu: summary.avg_cpu_efficiency,
@@ -150,6 +185,10 @@ function normalizeUser(user, index) {
     gpu: numberOrZero(summary.gpu_hours),
     savings: numberOrZero(summary.underutilized_cost_dkk),
     cost: numberOrZero(summary.estimated_cost_dkk),
+    costBearer: summaryBearer.costBearer,
+    costBearerCost: summaryBearer.costBearerCost,
+    costBearerEfficiency: summaryBearer.costBearerEfficiency,
+    costBearerWaste: summaryBearer.costBearerWaste,
     jobs: numberOrZero(summary.jobs),
     completedJobs: numberOrZero(summary.completed_jobs),
     failedJobs: numberOrZero(summary.failed_jobs),
@@ -182,6 +221,7 @@ function normalizePersonalJob(job) {
   const wastedCost = numberOrZero(row.underutilized_cost_dkk);
   const cpuGap = cpu === null || cpu === undefined ? 0 : Math.max(0, 1 - numberOrZero(cpu));
   const memoryGap = memory === null || memory === undefined ? 0 : Math.max(0, 1 - numberOrZero(memory));
+  const bearer = costBearerView(row);
   return {
     label: row.job_label || row.label || 'Personal job',
     wastedCost,
@@ -192,6 +232,10 @@ function normalizePersonalJob(job) {
     gpuCount: numberOrZero(row.gpu_count),
     recommendation: row.recommendation || '',
     inefficiencyScore: numberOrZero(row.inefficiency_score) || wastedCost * (1 + ((cpuGap + memoryGap) / 2)),
+    costBearer: bearer.costBearer,
+    costBearerCost: bearer.costBearerCost,
+    costBearerEfficiency: bearer.costBearerEfficiency,
+    costBearerWaste: bearer.costBearerWaste,
   };
 }
 
@@ -234,6 +278,15 @@ function normalizePersonalUserViewModel(bundle, routeToken) {
       completedJobs: numberOrZero(summary.completed_jobs),
       failedJobs: numberOrZero(summary.failed_jobs),
       gpuHours: numberOrZero(summary.gpu_hours),
+      ...(() => {
+        const bearer = costBearerView(summary);
+        return {
+          costBearer: bearer.costBearer,
+          costBearerCost: bearer.costBearerCost,
+          costBearerEfficiency: bearer.costBearerEfficiency,
+          costBearerWaste: bearer.costBearerWaste ?? numberOrZero(summary.underutilized_cost_dkk),
+        };
+      })(),
     },
     ranking: {
       rank: numberOrZero(ranking.rank),
@@ -314,6 +367,15 @@ function normalizeSummaryItem(item, idKey, labelKey, fallbackPrefix, index) {
     cost: numberOrZero(summary.estimated_cost_dkk),
     savings: numberOrZero(summary.underutilized_cost_dkk),
     gpu: numberOrZero(summary.gpu_hours),
+    ...(() => {
+      const bearer = costBearerView(summary);
+      return {
+        costBearer: bearer.costBearer,
+        costBearerCost: bearer.costBearerCost,
+        costBearerEfficiency: bearer.costBearerEfficiency,
+        costBearerWaste: bearer.costBearerWaste ?? numberOrZero(summary.underutilized_cost_dkk),
+      };
+    })(),
     topProjects: asArray(row.top_projects),
     topPis: asArray(row.top_pis),
     topGroups: asArray(row.top_groups),
@@ -379,6 +441,7 @@ function buildDerivedData(tree) {
       rolling7d: asObject(cluster.cluster_rolling_summaries && cluster.cluster_rolling_summaries['7d']),
       rolling90d: asObject(cluster.cluster_rolling_summaries && cluster.cluster_rolling_summaries['90d']),
       dailyTrends,
+      measurementCoverage: asObject(cluster.measurement_coverage),
     },
     percentiles: {
       cpu: asObject(p.avg_cpu_efficiency),

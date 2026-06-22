@@ -63,6 +63,24 @@ function pct(value, digits = 0) { return value === null || value === undefined |
 function money(value, digits = 0) { return value === null || value === undefined || Number.isNaN(Number(value)) ? '-' : `${Number(value).toLocaleString('en-US', { maximumFractionDigits: digits })} DKK`; }
 function fmt(value, digits = 0) { return value === null || value === undefined || Number.isNaN(Number(value)) ? '-' : Number(value).toLocaleString('en-US', { maximumFractionDigits: digits }); }
 function annualized(value) { return num(value) * (365 / 90); }
+// Revised Cost-Bearer waste model (docs/COST_BEARER_RESOURCE_AUDIT.md).
+function bearerLabel(value) { return value === 'memory' ? 'Memory' : value === 'cpu' ? 'CPU' : '-'; }
+// Required display safeguards from the independent audit (APPROVE WITH CHANGES).
+const GPU_WASTE_NOTE = 'GPU utilization is not currently measured. GPU waste is therefore unknown and is not included in waste calculations.';
+const LOWER_BOUND_NOTE = 'Waste estimates are based on measured CPU and memory utilization only and should be considered a lower-bound estimate.';
+const AGGREGATE_NOTE = 'Aggregate waste is calculated as the sum of job-level cost-bearer waste and may not equal aggregate cost multiplied by aggregate efficiency.';
+function disclaimer(text) { return `<div class="disclaimer" role="note"><span class="pill warn">Note</span><span>${escapeHtml(text)}</span></div>`; }
+// Measured / unmeasured bearer split for the lower-bound disclosure.
+function coverageCards(coverage) {
+  const c = coverage || {};
+  const cards = [
+    statBlock('CPU-bearer jobs measured', fmt(c.cpu_bearer_jobs_measured), 'Bearer efficiency observed'),
+    statBlock('CPU-bearer jobs unmeasured', fmt(c.cpu_bearer_jobs_unmeasured), c.cpu_bearer_jobs_unmeasured_pct != null ? `${c.cpu_bearer_jobs_unmeasured_pct}% of CPU-bearer jobs` : 'No measurement available', 'warn'),
+    statBlock('Memory-bearer jobs measured', fmt(c.memory_bearer_jobs_measured), 'Bearer efficiency observed'),
+    statBlock('Memory-bearer jobs unmeasured', fmt(c.memory_bearer_jobs_unmeasured), c.memory_bearer_jobs_unmeasured_pct != null ? `${c.memory_bearer_jobs_unmeasured_pct}% of memory-bearer jobs` : 'No measurement available', 'warn'),
+  ];
+  return `<div class="cards-grid">${cards.join('')}</div>`;
+}
 function escapeHtml(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
 function isPersonalRoute(route) { return /^u\/[A-Za-z0-9_-]+$/.test(route || ''); }
 function personalRouteToken(route) { return isPersonalRoute(route) ? route.split('/')[1] : null; }
@@ -261,7 +279,14 @@ function clusterHealthPage() {
           statBlock('Estimated cost', money(allTime.estimated_cost_dkk), '90-day estimated spend'),
           statBlock('Potential savings', money(allTime.underutilized_cost_dkk), savingsTrend.text, savingsTrend.tone),
           statBlock('GPU hours', fmt(allTime.gpu_hours, 1), 'Measured GPU allocation time'),
-        ].join('')}</div></section>
+          statBlock('GPU spend', money(allTime.gpu_cost_dkk), 'Estimated GPU cost'),
+          statBlock('GPU waste', 'Unknown', 'GPU utilization not measured'),
+          statBlock('Cost bearer', bearerLabel(allTime.cost_bearer), 'Dominant cost resource (CPU vs memory)'),
+          statBlock('Cost bearer cost', money(allTime.cost_bearer_cost_dkk), 'Cost attributable to the bearer resource'),
+          statBlock('Cost bearer efficiency', pct(allTime.cost_bearer_efficiency), 'Measured efficiency of the bearer resource'),
+          statBlock('Cost bearer waste', money(allTime.cost_bearer_waste_dkk ?? allTime.underutilized_cost_dkk), 'Revised Cost-Bearer waste (charged to the bearer resource)'),
+        ].join('')}</div>${disclaimer(LOWER_BOUND_NOTE)}${disclaimer(GPU_WASTE_NOTE)}${disclaimer(AGGREGATE_NOTE)}</section>
+        <section class="section"><div class="section-head"><h2>Measurement coverage</h2><span class="subtle">How much of the cluster has measured utilization</span></div>${coverageCards(data?.clusterSummary?.measurementCoverage)}</section>
         <section class="section"><div class="section-head"><h2>Immediate operational reading</h2><span class="subtle">Actionable interpretation</span></div><div class="insight-grid">${[
           insight('CPU requests', `Average CPU efficiency is ${pct(allTime.avg_cpu_efficiency)}. Focus first on users with high savings opportunity and low measured CPU use.`),
           insight('Memory requests', `Average memory efficiency is ${pct(allTime.avg_memory_efficiency)}. Many jobs likely request much more memory than they use.`),
@@ -354,11 +379,13 @@ function inefficientJobsTable(rows) {
     escapeHtml(job.userLabel),
     fmt(job.inefficiencyScore, 1),
     money(job.wastedCost),
+    bearerLabel(job.costBearer),
+    pct(job.costBearerEfficiency),
     pct(job.cpuEfficiency),
     pct(job.memoryEfficiency),
     fmt(job.elapsedHours, 1),
   ]);
-  return tableFromRows(['Pseudonym', 'Inefficiency score', 'Wasted cost', 'CPU efficiency', 'Memory efficiency', 'Elapsed hours'], tableRows);
+  return tableFromRows(['Pseudonym', 'Inefficiency score', 'Wasted cost', 'Cost bearer', 'Bearer efficiency', 'CPU efficiency', 'Memory efficiency', 'Elapsed hours'], tableRows);
 }
 
 function inefficientJobsPage() {
@@ -494,7 +521,14 @@ function costPage() {
           statBlock('Estimated cost', money(allTime.estimated_cost_dkk), '90-day observed cost'),
           statBlock('Potential savings', money(allTime.underutilized_cost_dkk), `${money(annualized(allTime.underutilized_cost_dkk))} annualized run-rate`, 'warn'),
           statBlock('Waste share', pct(num(allTime.underutilized_cost_dkk) / Math.max(1, num(allTime.estimated_cost_dkk)), 1), 'Underutilized / estimated cost'),
-        ].join('')}</div></section>
+          statBlock('GPU spend', money(allTime.gpu_cost_dkk), 'Estimated GPU cost'),
+          statBlock('GPU waste', 'Unknown', 'GPU utilization not measured'),
+          statBlock('Cost bearer', bearerLabel(allTime.cost_bearer), 'Dominant cost resource (CPU vs memory)'),
+          statBlock('Cost bearer cost', money(allTime.cost_bearer_cost_dkk), 'Cost attributable to the bearer resource'),
+          statBlock('Cost bearer efficiency', pct(allTime.cost_bearer_efficiency), 'Measured efficiency of the bearer resource'),
+          statBlock('Cost bearer waste', money(allTime.cost_bearer_waste_dkk ?? allTime.underutilized_cost_dkk), 'Revised Cost-Bearer waste'),
+        ].join('')}</div>${disclaimer(LOWER_BOUND_NOTE)}${disclaimer(GPU_WASTE_NOTE)}${disclaimer(AGGREGATE_NOTE)}</section>
+        <section class="section"><div class="section-head"><h2>Measurement coverage</h2><span class="subtle">Measured vs unmeasured jobs by cost bearer</span></div>${coverageCards(data?.clusterSummary?.measurementCoverage)}</section>
         ${lineChart('Daily cost opportunity', rows, [chartSeries(rows, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(rows, 'underutilized_cost_dkk', 'Savings opportunity', '#ff6b7a')], money, { zeroBase: true })}
         <section class="section"><div class="section-head"><h2>Cost actions</h2><span class="subtle">Impact-ranked</span></div><div class="rec-list">${recommendationCards(5).join('')}</div></section>
       </div>
@@ -582,20 +616,23 @@ function personalContextCards(metrics, percentile) {
     statBlock('Memory efficiency', pct(metrics.memoryEfficiency), `Decision signal: ${memoryBand.label}. ${memoryBand.detail}`, memoryBand.tone),
     statBlock('Savings opportunity', money(metrics.potentialSavings), `Prioritize actions with the largest repeatable savings. ${savingsBand.label}.`, 'warn'),
     statBlock('Estimated spend', money(metrics.estimatedCost), 'Context only: use this to size the opportunity, not as a score.'),
+    statBlock('Cost bearer', bearerLabel(metrics.costBearer), 'Resource that drives most of your cost (CPU vs memory).'),
+    statBlock('Cost bearer waste', money(metrics.costBearerWaste ?? metrics.potentialSavings), 'Revised Cost-Bearer waste charged to your bearer resource.'),
     statBlock('Job volume', fmt(metrics.jobs), 'Confidence signal: more jobs make the recommendations more reliable.'),
     statBlock('Failure count', fmt(metrics.failedJobs), 'Reliability signal: failed jobs can hide or distort efficiency patterns.'),
-  ].join('')}</div>`;
+  ].join('')}</div>${disclaimer(LOWER_BOUND_NOTE)}${disclaimer(AGGREGATE_NOTE)}`;
 }
 
 function personalJobsTable(rows) {
   const tableRows = asArray(rows).map((job) => [
     escapeHtml(job.label),
     money(job.wastedCost),
+    bearerLabel(job.costBearer),
     pct(job.cpuEfficiency),
     pct(job.memoryEfficiency),
     escapeHtml(job.recommendation || 'Review resource request'),
   ]);
-  return tableFromRows(['Job label', 'Savings opportunity', 'CPU use', 'Memory use', 'Decision'], tableRows);
+  return tableFromRows(['Job label', 'Savings opportunity', 'Cost bearer', 'CPU use', 'Memory use', 'Decision'], tableRows);
 }
 
 function peerComparisonTable(rows) {
