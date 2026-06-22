@@ -164,6 +164,8 @@ button, input, select { font: inherit; }
 .intro-card-icon svg { width: 22px; height: 22px; }
 .intro-card h2 { margin: 0 0 6px; font-size: 1.15rem; }
 .intro-card p { margin: 0; color: var(--text); font-size: 14px; line-height: 1.6; max-width: 70ch; }
+.intro-card p + p { margin-top: 10px; }
+.intro-card p.subtle { color: var(--muted); font-size: 13px; }
 .hero {
   display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr); gap: 18px;
   align-items: stretch;
@@ -208,8 +210,9 @@ button, input, select { font: inherit; }
   gap: 18px;
 }
 .stack { display: grid; gap: 18px; }
+.stack > *, .dashboard-grid > *, .panel-grid > *, .trend-grid > * { min-width: 0; }
 .section, .table-card { padding: 18px; }
-.section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .section-head h2 { font-size: 1.05rem; }
 .subtle { color: var(--muted); font-size: 13px; }
 
@@ -228,6 +231,8 @@ button, input, select { font: inherit; }
 .stat-card {
   padding: 14px;
   background: var(--surface-3);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .stat-card .value { font-size: 1.5rem; font-weight: 800; margin-top: 6px; }
 .stat-card .label { color: var(--muted); font-size: 12px; }
@@ -506,8 +511,8 @@ td:last-child, th:last-child { text-align: right; }
     background: rgba(0, 0, 0, 0.5);
     z-index: 55;
   }
-  .mobile-topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; }
-  .topbar { padding: 6px 16px 12px; }
+  .mobile-topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; transition: padding 0.18s ease; }
+  .topbar { padding: 6px 16px 12px; transition: padding 0.18s ease; }
   .page { padding: 14px 16px 20px; }
   .sticky-header {
     position: sticky;
@@ -519,6 +524,18 @@ td:last-child, th:last-child { text-align: right; }
     border-bottom: 1px solid var(--border);
     box-shadow: var(--shadow);
   }
+  .sticky-header .brand-mark { transition: width 0.18s ease, height 0.18s ease; }
+  .sticky-header .brand-sub { transition: opacity 0.15s ease, max-height 0.15s ease; max-height: 16px; }
+  .sticky-header .crumb { transition: padding 0.18s ease; }
+  /* Shrinks the sticky header ~15-20% once scrolled, while keeping the
+     page title and hamburger menu visible (mobile-topbar/.topbar stay,
+     only their padding/scale shrink). */
+  .sticky-header.is-compact .mobile-topbar { padding: 9px 16px 7px; }
+  .sticky-header.is-compact .mobile-topbar .brand-mark { width: 30px; height: 30px; }
+  .sticky-header.is-compact .mobile-topbar .brand-sub { opacity: 0; max-height: 0; overflow: hidden; margin-top: 0; }
+  .sticky-header.is-compact .mobile-topbar .brand-name { font-size: 15px; }
+  .sticky-header.is-compact .topbar { padding: 5px 16px 9px; }
+  .sticky-header.is-compact .crumb { padding: 7px 11px; }
 }
 
 @media (max-width: 720px) {
