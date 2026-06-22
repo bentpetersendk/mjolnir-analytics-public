@@ -182,10 +182,6 @@ function tableFromRows(headers, rows) {
   return `<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
-function localNav(active) {
-  return `<aside class="local-nav">${navItems.map((item) => `<a class="${item.label === active ? 'active' : ''}" href="#/${item.id}">${item.label}</a>`).join('')}</aside>`;
-}
-
 function recommendationCards(limit = 3) {
   const groups = asArray(data?.recommendationSummary);
   return groups.slice(0, limit).map((item) => recCard(
@@ -244,9 +240,7 @@ function landingPage() {
 function clusterPage() {
   const rows = asArray(data?.clusterSummary?.dailyTrends);
   return `
-    <div class="page-layout">
-      ${localNav('Trends')}
-      <div class="stack">
+    <div class="stack">
         <section class="section"><div class="section-head"><h2>Efficiency and cost trends</h2><span class="subtle">Daily values with rolling averages</span></div><p class="subtle">Use these charts to spot whether Mjolnir is becoming more efficient or drifting toward larger resource gaps.</p></section>
         <div class="trend-grid">
           ${lineChart('CPU efficiency', rows, [chartSeries(rows, 'avg_cpu_efficiency', 'Daily', '#3e8cff'), rollingSeries(rows, 'avg_cpu_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_cpu_efficiency', 30, '30-day', '#ffb84d')], pct, { zeroBase: true })}
@@ -254,8 +248,7 @@ function clusterPage() {
           ${lineChart('Daily cost and waste', rows, [chartSeries(rows, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(rows, 'underutilized_cost_dkk', 'Underutilized cost', '#ff6b7a')], money, { zeroBase: true })}
           ${lineChart('GPU hours', rows, [chartSeries(rows, 'gpu_hours', 'GPU hours', '#9cd0ff'), rollingSeries(rows, 'gpu_hours', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'gpu_hours', 30, '30-day', '#ffb84d')], fmt, { zeroBase: true })}
         </div>
-      </div>
-    </div>`;
+      </div>`;
 }
 
 function clusterHealthPage() {
@@ -267,9 +260,7 @@ function clusterHealthPage() {
   const memoryTrend = trendDirection(rolling7.avg_memory_efficiency, rolling30.avg_memory_efficiency);
   const savingsTrend = trendDirection(rolling7.underutilized_cost_dkk, rolling30.underutilized_cost_dkk, true);
   return `
-    <div class="page-layout">
-      ${localNav('Cluster Health')}
-      <div class="stack">
+    <div class="stack">
         <section class="section"><div class="section-head"><h2>Cluster Health Dashboard</h2><span class="subtle">All metrics from the 90-day validation export</span></div><div class="cards-grid">${[
           statBlock('Total jobs', fmt(allTime.jobs), 'Measured job metrics rows'),
           statBlock('Completed jobs', fmt(allTime.completed_jobs), 'Successful workload volume', 'good'),
@@ -292,8 +283,7 @@ function clusterHealthPage() {
           insight('Memory requests', `Average memory efficiency is ${pct(allTime.avg_memory_efficiency)}. Many jobs likely request much more memory than they use.`),
           insight('Cost control', `${money(allTime.underutilized_cost_dkk)} of 90-day cost is marked as underutilized. Treat this as the main optimization queue.`),
         ].join('')}</div></section>
-      </div>
-    </div>`;
+      </div>`;
 }
 
 function insight(title, body) {
@@ -315,16 +305,13 @@ function rankingTable(title, rows, valueLabel, valueFormatter, key) {
 function rankingsPage() {
   const rankings = asObject(data?.rankings);
   return `
-    <div class="page-layout">
-      ${localNav('Rankings')}
-      <div class="stack">
+    <div class="stack">
         <section class="section"><div class="section-head"><h2>Pseudonymous efficiency leaderboards</h2><span class="subtle">No usernames, emails, job names, or paths</span></div><p class="subtle">Rankings are designed to show efficient behavior and savings opportunity without exposing real user identity.</p></section>
         ${rankingTable('Best CPU efficiency', asArray(rankings.bestCpu), 'CPU efficiency', pct, 'cpu')}
         ${rankingTable('Best memory efficiency', asArray(rankings.bestMemory), 'Memory efficiency', pct, 'memory')}
         ${rankingTable('Most improved CPU efficiency', asArray(rankings.mostImproved), 'Improvement', (value) => pct(value, 1), 'cpuImprovement')}
         ${rankingTable('Largest savings opportunity', asArray(rankings.largestSavings), 'Potential savings', money, 'savings')}
-      </div>
-    </div>`;
+      </div>`;
 }
 
 function percentileBar(label, values, formatter, tone = 'info') {
@@ -337,9 +324,7 @@ function percentileBar(label, values, formatter, tone = 'info') {
 function benchmarkPage() {
   const percentiles = asObject(data?.percentiles);
   return `
-    <div class="page-layout">
-      ${localNav('Percentiles')}
-      <div class="stack">
+    <div class="stack">
         <section class="section"><div class="section-head"><h2>Percentile visualizations</h2><span class="subtle">Cluster population context</span></div><p class="subtle">Percentiles help users understand whether their jobs are above or below peer behavior without showing real peer identities.</p></section>
         <div class="trend-grid">
           ${percentileBar('CPU efficiency percentiles', asObject(percentiles.cpu), pct, 'info')}
@@ -347,8 +332,7 @@ function benchmarkPage() {
           ${percentileBar('Cost percentiles', asObject(percentiles.cost), money, 'warn')}
           ${percentileBar('GPU hour percentiles', asObject(percentiles.gpu), fmt, 'info')}
         </div>
-      </div>
-    </div>`;
+      </div>`;
 }
 
 function recommendationsPage() {
@@ -361,17 +345,14 @@ function recommendationsPage() {
     money(group.wasteContext),
   ]);
   return `
-    <div class="page-layout">
-      ${localNav('Recommendations')}
-      <div class="stack">
+    <div class="stack">
         <section class="section"><div class="section-head"><h2>Recommendation Dashboard</h2><span class="subtle">Aggregated across pseudonymous users</span></div><div class="cards-grid">${[
           statBlock('Affected users', fmt(groups.reduce((sum, group) => sum + group.affectedUsers, 0)), 'Recommendation-user relationships'),
           statBlock('Recommendation types', fmt(groups.length), 'Grouped by action category'),
           statBlock('Waste context', money(groups.reduce((sum, group) => sum + num(group.wasteContext), 0)), 'Potential savings associated with affected users'),
         ].join('')}</div></section>
         <section class="section"><div class="section-head"><h2>Most common actions</h2><span class="subtle">Do these first</span></div>${tableFromRows(['Type', 'Action', 'Affected users', 'Estimated savings', 'Waste context'], rows)}</section>
-      </div>
-    </div>`;
+      </div>`;
 }
 
 function inefficientJobsTable(rows) {
@@ -391,13 +372,10 @@ function inefficientJobsTable(rows) {
 function inefficientJobsPage() {
   const rows = asArray(data?.inefficientJobs).slice(0, 100);
   return `
-    <div class="page-layout">
-      ${localNav('Inefficient Jobs')}
-      <div class="stack">
+    <div class="stack">
         <section class="section"><div class="section-head"><h2>Top inefficient job examples</h2><span class="subtle">Public-safe job metrics only</span></div><p class="subtle">Rows are sorted by wasted cost and efficiency gaps. Job names, job identifiers, usernames, paths, and node details are not displayed.</p></section>
         <section class="table-card">${inefficientJobsTable(rows)}</section>
-      </div>
-    </div>`;
+      </div>`;
 }
 
 function metricSummaryCards(entity) {
@@ -426,9 +404,7 @@ function projectsPage() {
   const projects = asArray(data?.projects).slice().sort((a, b) => num(b.savings) - num(a.savings));
   const coverage = asObject(data?.hierarchyCoverage);
   return `
-    <div class="page-layout">
-      ${localNav('Projects')}
-      <div class="stack">
+    <div class="stack">
         <section class="section"><div class="section-head"><h2>Research Project portfolio</h2><span class="subtle">Derived from project directory extraction, not Slurm account</span></div><div class="cards-grid">${[
           statBlock('Projects', fmt(projects.length), 'Public-safe project IDs'),
           statBlock('Assigned rows', fmt(coverage.assigned_project_rows), 'Valid /maps/projects extraction', 'good'),
@@ -436,24 +412,20 @@ function projectsPage() {
         ].join('')}</div></section>
         <section class="table-card"><div class="section-head"><h2>Project ranking</h2><span class="subtle">Cost opportunity first</span></div>${tableFromRows(['Rank', 'Project', 'Jobs', 'CPU', 'Memory', 'Cost opportunity', 'GPU hours'], hierarchyRows(projects, 'project'))}</section>
         <section class="section"><div class="section-head"><h2>Portfolio trends</h2><span class="subtle">Cluster-level context until project export is available</span></div>${lineChart('Project portfolio cost opportunity', asArray(data?.clusterSummary?.dailyTrends), [chartSeries(asArray(data?.clusterSummary?.dailyTrends), 'underutilized_cost_dkk', 'Opportunity', '#ff6b7a'), chartSeries(asArray(data?.clusterSummary?.dailyTrends), 'estimated_cost_dkk', 'Estimated cost', '#3e8cff')], money, { zeroBase: true })}</section>
-      </div>
-    </div>`;
+      </div>`;
 }
 
 function hierarchyIndexPage(kind, title, items, detailPrefix, countLabel) {
   const sorted = asArray(items).slice().sort((a, b) => num(b.savings) - num(a.savings));
   return `
-    <div class="page-layout">
-      ${localNav(title)}
-      <div class="stack">
+    <div class="stack">
         <section class="section"><div class="section-head"><h2>${title}</h2><span class="subtle">Hierarchy rollup view</span></div><div class="cards-grid">${[
           statBlock(countLabel, fmt(sorted.length), 'Loaded from project hierarchy export'),
           statBlock('Jobs', fmt(sorted.reduce((sum, item) => sum + num(item.jobs), 0)), 'Aggregated workload'),
           statBlock('Cost opportunity', money(sorted.reduce((sum, item) => sum + num(item.savings), 0)), 'Underutilized cost'),
         ].join('')}</div></section>
         <section class="table-card"><div class="section-head"><h2>${kind} ranking</h2><span class="subtle">Cost opportunity first</span></div>${tableFromRows(['Rank', kind, 'Jobs', 'CPU', 'Memory', 'Cost opportunity', 'GPU hours'], hierarchyRows(sorted, detailPrefix))}</section>
-      </div>
-    </div>`;
+      </div>`;
 }
 
 function pisPage() { return hierarchyIndexPage('PI', 'PIs', data?.pis, 'pi', 'PIs'); }
@@ -501,22 +473,17 @@ function userPage() {
   const users = asArray(data?.users).slice(0, 25);
   const rows = users.map((user) => [escapeHtml(user.label), pct(user.cpu), pct(user.memory), money(user.savings), fmt(user.jobs), fmt(user.recommendations.length)]);
   return `
-    <div class="page-layout">
-      ${localNav('Peer Compare')}
-      <div class="stack">
+    <div class="stack">
         <section class="section"><div class="section-head"><h2>Peer comparison</h2><span class="subtle">Pseudonymous public users</span></div><p class="subtle">This page shows how public pseudonymous users compare on efficiency and savings opportunity. Personal dashboards will later reveal only the signed-in user's real username.</p></section>
         <section class="table-card">${tableFromRows(['Pseudonym', 'CPU efficiency', 'Memory efficiency', 'Savings opportunity', 'Jobs', 'Recommendations'], rows)}</section>
-      </div>
-    </div>`;
+      </div>`;
 }
 
 function costPage() {
   const allTime = asObject(data?.clusterSummary?.allTime);
   const rows = asArray(data?.clusterSummary?.dailyTrends);
   return `
-    <div class="page-layout">
-      ${localNav('Cost')}
-      <div class="stack">
+    <div class="stack">
         <section class="section"><div class="section-head"><h2>Cost Dashboard</h2><span class="subtle">Spend, savings, and waste</span></div><div class="cards-grid">${[
           statBlock('Estimated cost', money(allTime.estimated_cost_dkk), '90-day observed cost'),
           statBlock('Potential savings', money(allTime.underutilized_cost_dkk), `${money(annualized(allTime.underutilized_cost_dkk))} annualized run-rate`, 'warn'),
@@ -531,8 +498,7 @@ function costPage() {
         <section class="section"><div class="section-head"><h2>Measurement coverage</h2><span class="subtle">Measured vs unmeasured jobs by cost bearer</span></div>${coverageCards(data?.clusterSummary?.measurementCoverage)}</section>
         ${lineChart('Daily cost opportunity', rows, [chartSeries(rows, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(rows, 'underutilized_cost_dkk', 'Savings opportunity', '#ff6b7a')], money, { zeroBase: true })}
         <section class="section"><div class="section-head"><h2>Cost actions</h2><span class="subtle">Impact-ranked</span></div><div class="rec-list">${recommendationCards(5).join('')}</div></section>
-      </div>
-    </div>`;
+      </div>`;
 }
 
 function recoveryPage() {
@@ -542,17 +508,14 @@ function recoveryPage() {
     ? `<div class="form-status ${statusClass}">${escapeHtml(status.message)}</div>`
     : '<div class="subtle">Enter your Mjolnir username. The future recovery service will look up the Airtable identity record and email the personal dashboard URL.</div>';
   return `
-    <div class="page-layout">
-      ${localNav('Reveal My Dashboard')}
-      <div class="stack">
+    <div class="stack">
         <section class="section"><div class="section-head"><h2>Reveal My Dashboard</h2><span class="subtle">Self-service recovery workflow</span></div><p class="subtle" style="line-height:1.8">Public rankings use pseudonyms only. This form is the planned recovery entry point for users who want their personal dashboard link without exposing usernames in the public dataset.</p><form class="recovery-form" data-recovery-form><label for="recovery-username">Mjolnir username</label><div class="recovery-row"><input id="recovery-username" class="search" name="username" autocomplete="username" placeholder="Enter your Mjolnir username" /><button class="btn btn-primary" type="submit">Request email</button></div>${statusMessage}</form></section>
         <section class="section"><div class="section-head"><h2>What happens next?</h2><span class="subtle">No public identity leak</span></div><div class="cards-grid">${[
           statBlock('1. Lookup', 'Airtable', 'Server-side lookup by username'),
           statBlock('2. Email', 'Private', 'URL is sent only to the registered email'),
           statBlock('3. Dashboard', '/u/token', 'Personal route uses a high-entropy token'),
         ].join('')}</div></section>
-      </div>
-    </div>`;
+      </div>`;
 }
 
 function prototypeBanner() {
@@ -698,9 +661,7 @@ function methodologyPage() {
   const meta = asObject(data?.datasetMeta);
   const rows = asObject(meta.rowCounts);
   return `
-    <div class="page-layout">
-      ${localNav('Methodology')}
-      <div class="stack">
+    <div class="stack">
         <section class="section"><div class="section-head"><h2>Data provenance</h2><span class="subtle">Raw jobs to dashboard widgets</span></div><div class="cards-grid">${[
           statBlock('Source database', '90-day validation', meta.sourceDatabase || 'Unavailable'),
           statBlock('Validation window', meta.validationWindow || 'Unavailable', 'Daily cluster summary range'),
@@ -717,8 +678,7 @@ function methodologyPage() {
           ['daily_cluster_summary', fmt(rows.daily_cluster_summary), 'Cluster trend charts and health KPIs'],
         ])}</section>
         <section class="section"><div class="section-head"><h2>Lineage</h2><span class="subtle">Transformation path</span></div><div class="lineage"><span>raw jobs</span><b>metrics</b><b>daily summaries</b><b>JSON export</b><b>data-loader.js</b><strong>dashboard widgets</strong></div><p class="subtle" style="line-height:1.8">Pages consume normalized objects from the data loader. Public views show pseudonyms only and omit usernames, job names, node details, and filesystem paths.</p></section>
-      </div>
-    </div>`;
+      </div>`;
 }
 
 function dot(tone) {

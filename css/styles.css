@@ -222,16 +222,6 @@ th, td { padding: 12px 10px; border-bottom: 1px solid var(--border); text-align:
 th { color: var(--muted); font-weight: 600; }
 td:last-child, th:last-child { text-align: right; }
 
-.page-layout {
-  display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 18px;
-}
-.local-nav {
-  padding: 16px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface);
-}
-.local-nav a { display: block; padding: 10px 12px; border-radius: 10px; color: var(--muted); }
-.local-nav a.active { background: rgba(62, 140, 255, 0.12); color: var(--text); }
-
-
 .recovery-form {
   display: grid;
   gap: 12px;
@@ -440,7 +430,7 @@ td:last-child, th:last-child { text-align: right; }
 .hidden { display: none !important; }
 
 @media (max-width: 1200px) {
-  .hero, .dashboard-grid, .panel-grid, .page-layout { grid-template-columns: 1fr; }
+  .hero, .dashboard-grid, .panel-grid { grid-template-columns: 1fr; }
   .mini-grid, .cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sidebar { display: none; }
   .app-shell { grid-template-columns: 1fr; }
