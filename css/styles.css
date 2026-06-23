@@ -244,6 +244,7 @@ button, input, select { font: inherit; }
 .pill.good { color: #a9ffd1; background: rgba(83, 216, 138, 0.12); }
 .pill.warn { color: #ffd08a; background: rgba(255, 184, 77, 0.12); }
 .pill.info { color: #9cd0ff; background: rgba(62, 140, 255, 0.12); }
+.pill.bad { color: #ffb3bd; background: rgba(255, 107, 122, 0.14); }
 
 .rec-list, .alerts-list { display: grid; gap: 10px; }
 .rec-card, .alert-item {
@@ -630,6 +631,45 @@ td:last-child, th:last-child { text-align: right; }
 }
 .metric-card.info, .stat-card.info {
   border-color: rgba(62, 140, 255, 0.34);
+}
+.metric-card.bad, .stat-card.bad {
+  border-color: rgba(255, 107, 122, 0.4);
+}
+.gauge-card .breakdown-track {
+  margin: 10px 0 8px;
+}
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.filter-field select {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.sort-button {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+.sort-button:hover {
+  color: var(--accent, #3e8cff);
 }
 .one-col {
   grid-template-columns: 1fr;

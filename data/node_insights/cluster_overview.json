@@ -1,0 +1,142 @@
+{
+  "schema_version": "node-insights-v1",
+  "generated_at": "2026-06-23T10:19:14Z",
+  "source": "live-slurm",
+  "totals": {
+    "nodes_total": 20,
+    "nodes_available": 14,
+    "nodes_draining": 6,
+    "nodes_down": 0
+  },
+  "cpu": {
+    "alloc": 952,
+    "total": 2720,
+    "alloc_pct": 0.35
+  },
+  "memory_mib": {
+    "alloc": 14346033,
+    "total": 23401887,
+    "alloc_pct": 0.6130288980542467
+  },
+  "gpu": {
+    "alloc": 6,
+    "total": 10,
+    "alloc_pct": 0.6,
+    "online_total": 6,
+    "alloc_pct_of_online": 1.0
+  },
+  "queue": {
+    "jobs_total": 522,
+    "running": 82,
+    "pending": 440,
+    "by_partition": [
+      {
+        "partition": "cpuqueue",
+        "running": 76,
+        "pending": 429
+      },
+      {
+        "partition": "gpuqueue",
+        "running": 6,
+        "pending": 11
+      }
+    ],
+    "pending_reasons": [
+      {
+        "reason": "Priority",
+        "count": 398
+      },
+      {
+        "reason": "ReqNodeNotAvail",
+        "count": 33
+      },
+      {
+        "reason": "JobArrayTaskLimit",
+        "count": 5
+      },
+      {
+        "reason": "Resources",
+        "count": 2
+      },
+      {
+        "reason": "Dependency",
+        "count": 2
+      }
+    ]
+  },
+  "maintenance": {
+    "nodes_draining": 6,
+    "nodes": [
+      {
+        "node": "mjolnircomp03fl",
+        "reason": "maintenance",
+        "since": "2026-06-23T11:11:35"
+      },
+      {
+        "node": "mjolnircomp13fl",
+        "reason": "maintenance",
+        "since": "2026-06-23T09:28:36"
+      },
+      {
+        "node": "mjolnircomp14fl",
+        "reason": "maintenance",
+        "since": "2026-06-23T09:28:36"
+      },
+      {
+        "node": "mjolnircomp16fl",
+        "reason": "maintenance",
+        "since": "2026-06-23T09:28:36"
+      },
+      {
+        "node": "mjolnircomp17fl",
+        "reason": "maintenance",
+        "since": "2026-06-23T09:28:36"
+      },
+      {
+        "node": "mjolnirgpu03fl",
+        "reason": "maintenance",
+        "since": "2026-06-17T10:31:35"
+      }
+    ]
+  },
+  "by_class": [
+    {
+      "class": "Standard Compute",
+      "count": 13
+    },
+    {
+      "class": "GPU",
+      "count": 3
+    },
+    {
+      "class": "High Memory",
+      "count": 2
+    },
+    {
+      "class": "Other",
+      "count": 2
+    }
+  ],
+  "by_partition": [
+    {
+      "partition": "cpuqueue",
+      "node_count": 20
+    },
+    {
+      "partition": "lazyqueue",
+      "node_count": 20
+    },
+    {
+      "partition": "filetransfer",
+      "node_count": 14
+    },
+    {
+      "partition": "gpuqueue",
+      "node_count": 3
+    },
+    {
+      "partition": "teaching",
+      "node_count": 1
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { loadMjolnirData, loadPersonalData } from './data-loader.js';
+import { loadMjolnirData, loadPersonalData, loadNodeInsightsData } from './data-loader.js';
 import { requestDashboardRecovery } from './recovery-service.js';
 
 const app = document.querySelector('#app');
@@ -18,6 +18,15 @@ const navGroups = [
       { id: 'benchmarks', label: 'Percentiles', icon: 'gauge' },
       { id: 'recommendations', label: 'Recommendations', icon: 'spark' },
       { id: 'inefficient-jobs', label: 'Optimization Opportunities', icon: 'alert' },
+    ],
+  },
+  {
+    heading: 'Infrastructure',
+    items: [
+      { id: 'infrastructure', label: 'Infrastructure', icon: 'server' },
+      { id: 'nodes', label: 'Nodes', icon: 'cluster' },
+      { id: 'hardware', label: 'Hardware', icon: 'cpu' },
+      { id: 'capacity', label: 'Capacity', icon: 'gauge' },
     ],
   },
   {
@@ -59,9 +68,11 @@ const state = {
   personalLoading: false,
   personalError: null,
   menuOpen: false,
+  nodeFilters: { class: 'all', partition: 'all', state: 'all', sortKey: 'node', sortDir: 'asc' },
 };
 
 let data = null;
+let nodeInsights = null;
 
 function icon(name) {
   const icons = {
@@ -84,6 +95,8 @@ function icon(name) {
     bell: '<path d="M6 17h12l-1.3-2.1A8.5 8.5 0 0 1 15 10V9a3 3 0 0 0-6 0v1a8.5 8.5 0 0 1-1.7 4.9z"/><path d="M10 19a2 2 0 0 0 4 0"/>',
     settings: '<path d="M12 8.5A3.5 3.5 0 1 0 15.5 12 3.5 3.5 0 0 0 12 8.5Z"/><path d="M19 12a7.1 7.1 0 0 0-.1-1l2.1-1.6-2-3.5-2.5.8a7 7 0 0 0-1.7-1l-.4-2.7H9.6l-.4 2.7a7 7 0 0 0-1.7 1l-2.5-.8-2 3.5L5.1 11A7.1 7.1 0 0 0 5 12c0 .3 0 .7.1 1l-2.1 1.6 2 3.5 2.5-.8a7 7 0 0 0 1.7 1l.4 2.7h4.8l.4-2.7a7 7 0 0 0 1.7-1l2.5.8 2-3.5L18.9 13c.1-.3.1-.7.1-1Z"/>',
     info: '<path fill-rule="evenodd" d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14Z"/><rect x="11" y="10.5" width="2" height="7" rx="1"/><rect x="11" y="6.5" width="2" height="2" rx="1"/>',
+    server: '<rect x="4" y="4" width="16" height="5" rx="1" fill="none"/><rect x="4" y="11" width="16" height="5" rx="1" fill="none"/><path d="M7 6.5h.01M7 13.5h.01" stroke-width="2.4"/><path d="M4 18.5h16" fill="none"/>',
+    cpu: '<rect x="7" y="7" width="10" height="10" rx="1.5" fill="none"/><path d="M9 4v3M12 4v3M15 4v3M9 17v3M12 17v3M15 17v3M4 9h3M4 12h3M4 15h3M17 9h3M17 12h3M17 15h3" fill="none"/>',
   };
   return `<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || icons.home}</svg>`;
 }
@@ -121,12 +134,15 @@ function isPersonalRoute(route) { return /^u\/[A-Za-z0-9_-]+$/.test(route || '')
 function personalRouteToken(route) { return isPersonalRoute(route) ? route.split('/')[1] : null; }
 function isHierarchyDetailRoute(route) { return /^(project|pi|group|section)\/[A-Za-z0-9_-]+$/.test(route || ''); }
 function detailRouteParts(route) { const parts = String(route || '').split('/'); return { type: parts[0], id: parts[1] }; }
+function isNodeDetailRoute(route) { return /^node\/[A-Za-z0-9_.-]+$/.test(route || ''); }
+function nodeDetailRouteName(route) { return isNodeDetailRoute(route) ? route.split('/')[1] : null; }
 function pageTitle(route) {
   if (isPersonalRoute(route)) return 'My Resource Insights';
   if (isHierarchyDetailRoute(route)) {
     const part = detailRouteParts(route).type;
     return part === 'pi' ? 'PI Detail' : `${part.charAt(0).toUpperCase()}${part.slice(1)} Detail`;
   }
+  if (isNodeDetailRoute(route)) return 'Node Detail';
   return allRouteItems.find((item) => item.id === route)?.label || 'Overview';
 }
 function trendDirection(current, previous, lowerIsBetter = false) { const delta = num(current) - num(previous); const good = lowerIsBetter ? delta < 0 : delta > 0; if (Math.abs(delta) < 0.0001) return { text: 'Flat', tone: 'info' }; return { text: `${good ? 'Improving' : 'Needs attention'} (${delta > 0 ? '+' : ''}${pct(delta, 1)})`, tone: good ? 'good' : 'warn' }; }
@@ -215,6 +231,271 @@ function tableFromRows(headers, rows) {
     ? rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')
     : `<tr><td colspan="${headers.length}">No data available.</td></tr>`;
   return `<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+// Node Insights: live Slurm fleet state (sinfo / scontrol -d / squeue).
+// Public-safe aggregate and node-hardware views only - no Airtable, no
+// usernames, no job-identity or job-directory fields, no per-job identity.
+// GPU allocation always comes from scontrol -d show node's GresUsed field,
+// never from plain AllocTRES.
+const ALLOCATION_THRESHOLDS = { warn: 0.7, bad: 0.9 };
+function allocationReading(pctValue) {
+  if (pctValue === null || pctValue === undefined || Number.isNaN(Number(pctValue))) return 'info';
+  if (pctValue >= ALLOCATION_THRESHOLDS.bad) return 'bad';
+  if (pctValue >= ALLOCATION_THRESHOLDS.warn) return 'warn';
+  return 'good';
+}
+function toneFromReading(reading) { return reading === 'bad' || reading === 'warn' || reading === 'good' ? reading : ''; }
+function gib(mib, digits = 0) { return mib === null || mib === undefined || Number.isNaN(Number(mib)) ? '-' : `${fmt(Number(mib) / 1024, digits)} GiB`; }
+
+function nodeInsightsUnavailable(pageLabel) {
+  return `<div class="empty-state">${escapeHtml(pageLabel)} data has not been collected yet.</div>`;
+}
+
+function allocationGauge(label, alloc, total, formatter, note) {
+  const pctValue = total ? Number(alloc) / Number(total) : null;
+  const tone = allocationReading(pctValue);
+  const widthPct = pctValue === null ? 0 : Math.max(2, Math.min(100, pctValue * 100));
+  return `<article class="stat-card gauge-card ${tone}">
+    <div class="label">${escapeHtml(label)}</div>
+    <div class="value">${formatter(alloc)} / ${formatter(total)}</div>
+    <div class="breakdown-track"><i style="width:${widthPct.toFixed(1)}%"></i></div>
+    <div class="subtle">${pct(pctValue)} allocated${note ? ` &middot; ${escapeHtml(note)}` : ''}</div>
+  </article>`;
+}
+
+function nodeStatePill(node) {
+  const tone = node.drain ? 'warn' : (node.state_base === 'DOWN' ? 'bad' : 'good');
+  const label = node.drain ? `${node.state_base} (maintenance)` : node.state_base;
+  return `<span class="pill ${tone}">${escapeHtml(label || 'unknown')}</span>`;
+}
+
+function selectFilter(filterKey, label, options, selected) {
+  return `<label class="filter-field"><span>${escapeHtml(label)}</span><select data-action="filter-nodes" data-filter="${filterKey}">
+    <option value="all" ${selected === 'all' ? 'selected' : ''}>All</option>
+    ${options.map((o) => `<option value="${escapeHtml(o)}" ${selected === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}
+  </select></label>`;
+}
+
+function sortableTableFromRows(columns, rows, sortKey, sortDir) {
+  const headers = columns.map(([label, key]) => {
+    if (!key) return `<th>${escapeHtml(label)}</th>`;
+    const active = key === sortKey;
+    const arrow = active ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '';
+    return `<th><button type="button" class="sort-button" data-action="sort-nodes" data-key="${key}">${escapeHtml(label)}${arrow}</button></th>`;
+  }).join('');
+  const body = rows.length
+    ? rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')
+    : `<tr><td colspan="${columns.length}">No nodes match the current filters.</td></tr>`;
+  return `<table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function infrastructureOverviewPage() {
+  if (!nodeInsights || !nodeInsights.available) return nodeInsightsUnavailable('Infrastructure Overview');
+  const co = asObject(nodeInsights.clusterOverview);
+  const totals = asObject(co.totals);
+  const cpu = asObject(co.cpu);
+  const mem = asObject(co.memory_mib);
+  const gpu = asObject(co.gpu);
+  const queue = asObject(co.queue);
+  const maintenance = asObject(co.maintenance);
+  const byClass = asArray(co.by_class);
+  const byPartition = asArray(co.by_partition);
+  const topReason = asArray(queue.pending_reasons)[0];
+
+  return `
+    <div class="stack">
+      <section class="section"><div class="section-head"><h2>Fleet status</h2><span class="subtle">Snapshot: ${escapeHtml(nodeInsights.generatedAt || 'unknown')}</span></div><div class="cards-grid">${[
+        statBlock('Total nodes', fmt(totals.nodes_total), 'Live Slurm node count'),
+        statBlock('Available nodes', fmt(totals.nodes_available), 'Not draining, not down', 'good'),
+        statBlock('Draining nodes', fmt(totals.nodes_draining), 'Scheduled for maintenance', totals.nodes_draining ? 'warn' : 'good'),
+        statBlock('Down nodes', fmt(totals.nodes_down), 'Unreachable or failed', totals.nodes_down ? 'bad' : 'good'),
+      ].join('')}</div></section>
+      <div class="cards-grid">
+        ${allocationGauge('CPU allocation', cpu.alloc, cpu.total, fmt)}
+        ${allocationGauge('Memory allocation', mem.alloc, mem.total, gib)}
+        ${allocationGauge('GPU allocation', gpu.alloc, gpu.total, fmt, gpu.alloc_pct_of_online !== null && gpu.alloc_pct_of_online !== undefined ? `${pct(gpu.alloc_pct_of_online)} of online GPUs` : null)}
+      </div>
+      <section class="section"><div class="section-head"><h2>Queue right now</h2><span class="subtle">Aggregate counts only - no job or user identity</span></div><div class="cards-grid">${[
+        statBlock('Jobs in queue', fmt(queue.jobs_total), 'Running + pending'),
+        statBlock('Running', fmt(queue.running), 'Across all partitions', 'good'),
+        statBlock('Pending', fmt(queue.pending), 'Waiting to start', 'info'),
+      ].join('')}</div>
+        ${tableFromRows(['Partition', 'Running', 'Pending'], asArray(queue.by_partition).map((p) => [escapeHtml(p.partition), fmt(p.running), fmt(p.pending)]))}
+        <p class="subtle" style="margin-top:10px">Top pending reason: <strong>${escapeHtml((topReason && topReason.reason) || 'none')}</strong>${topReason ? ` (${fmt(topReason.count)} jobs)` : ''}</p>
+      </section>
+      <section class="section"><div class="section-head"><h2>Nodes in maintenance (${fmt(maintenance.nodes_draining)})</h2><span class="subtle"><a href="#/nodes">View Node Inventory</a></span></div>
+        ${asArray(maintenance.nodes).length
+          ? tableFromRows(['Node', 'Reason', 'Since'], asArray(maintenance.nodes).map((n) => [`<a href="#/node/${escapeHtml(n.node)}">${escapeHtml(n.node)}</a>`, escapeHtml(n.reason || '-'), escapeHtml(n.since || '-')]))
+          : '<div class="empty-state">No nodes are currently draining.</div>'}
+      </section>
+      <div class="trend-grid">
+        <section class="section"><div class="section-head"><h2>By class</h2><span class="subtle">Live classification rules</span></div>${tableFromRows(['Class', 'Nodes'], byClass.map((c) => [escapeHtml(c.class), fmt(c.count)]))}</section>
+        <section class="section"><div class="section-head"><h2>By partition</h2><span class="subtle">Node membership</span></div>${tableFromRows(['Partition', 'Nodes'], byPartition.map((p) => [escapeHtml(p.partition), fmt(p.node_count)]))}</section>
+      </div>
+      ${disclaimer('GPU allocation reflects scheduler reservation (GresUsed from scontrol -d show node), not measured GPU utilization. GPU utilization is not currently measured on Mjolnir.')}
+    </div>`;
+}
+
+function nodeInventoryPage() {
+  if (!nodeInsights || !nodeInsights.available) return nodeInsightsUnavailable('Node Inventory');
+  const allNodes = asArray(nodeInsights.nodeInventory.nodes);
+  const filters = state.nodeFilters;
+  const classes = Array.from(new Set(allNodes.map((n) => n.class_label))).sort();
+  const partitions = Array.from(new Set(allNodes.flatMap((n) => asArray(n.partitions)))).sort();
+  const states = Array.from(new Set(allNodes.map((n) => n.state))).sort();
+
+  const filtered = allNodes.filter((n) =>
+    (filters.class === 'all' || n.class_label === filters.class) &&
+    (filters.partition === 'all' || asArray(n.partitions).includes(filters.partition)) &&
+    (filters.state === 'all' || n.state === filters.state));
+
+  const dir = filters.sortDir === 'desc' ? -1 : 1;
+  const sorted = filtered.slice().sort((a, b) => {
+    const av = a[filters.sortKey];
+    const bv = b[filters.sortKey];
+    if (typeof av === 'string' || typeof bv === 'string') return dir * String(av || '').localeCompare(String(bv || ''));
+    return dir * (num(av) - num(bv));
+  });
+
+  const tableRows = sorted.map((n) => [
+    `<a href="#/node/${escapeHtml(n.node)}"><strong>${escapeHtml(n.node)}</strong></a>`,
+    escapeHtml(n.class_label),
+    fmt(n.cpu_total),
+    n.cpu_alloc_pct === null || n.cpu_alloc_pct === undefined ? '-' : pct(n.cpu_alloc_pct),
+    gib(n.real_memory_mib),
+    n.mem_alloc_pct === null || n.mem_alloc_pct === undefined ? '-' : pct(n.mem_alloc_pct),
+    n.gpu_total ? `${fmt(n.gpu_total)}x ${escapeHtml((n.gpu_type || 'GPU').toUpperCase())}` : '-',
+    n.gpu_total ? `${fmt(n.gpu_alloc)}/${fmt(n.gpu_total)} (${pct(n.gpu_alloc_pct)})` : '-',
+    nodeStatePill(n),
+    escapeHtml(asArray(n.partitions).join(', ')),
+  ]);
+
+  return `
+    <div class="stack">
+      <section class="section">
+        <div class="section-head"><h2>Node Inventory</h2><span class="subtle">${fmt(sorted.length)} of ${fmt(allNodes.length)} nodes</span></div>
+        <div class="filter-bar">
+          ${selectFilter('class', 'Class', classes, filters.class)}
+          ${selectFilter('partition', 'Partition', partitions, filters.partition)}
+          ${selectFilter('state', 'State', states, filters.state)}
+        </div>
+        <div class="table-card">${sortableTableFromRows([
+          ['Node', 'node'], ['Class', 'class_label'], ['CPUs', 'cpu_total'], ['CPU %', 'cpu_alloc_pct'],
+          ['RAM', 'real_memory_mib'], ['Mem %', 'mem_alloc_pct'], ['GPUs', 'gpu_total'], ['GPU %', 'gpu_alloc_pct'],
+          ['State', 'state'], ['Partitions', null],
+        ], tableRows, filters.sortKey, filters.sortDir)}</div>
+      </section>
+      ${disclaimer('GPU% reflects scheduler-reserved GPUs from scontrol -d show node (GresUsed), not measured GPU utilization.')}
+    </div>`;
+}
+
+function hardwareInventoryPage() {
+  if (!nodeInsights || !nodeInsights.available) return nodeInsightsUnavailable('Hardware Inventory');
+  const hw = asObject(nodeInsights.hardwareInventory);
+  const fleet = asObject(hw.fleet);
+  const profiles = asArray(hw.profiles);
+  const slurmVersions = asArray(hw.slurm_versions);
+  const osBuilds = asArray(hw.os_kernel_builds);
+  const drift = asObject(hw.kernel_drift);
+
+  return `
+    <div class="stack">
+      <section class="section"><div class="section-head"><h2>Fleet composition</h2><span class="subtle">Asset inventory, from scontrol show node static fields</span></div><div class="cards-grid">${[
+        statBlock('Nodes', fmt(fleet.nodes_total), 'Total fleet size'),
+        statBlock('Logical CPUs', fmt(fleet.logical_cpus_total), `${fmt(fleet.physical_cores_total)} physical cores`),
+        statBlock('RAM', gib(fleet.ram_mib_total), 'Configured fleet-wide'),
+        statBlock('GPUs', fmt(fleet.gpu_total), asArray(fleet.gpu_types).map((t) => String(t).toUpperCase()).join(', ') || 'None'),
+      ].join('')}</div></section>
+      <section class="table-card"><div class="section-head"><h2>Hardware profiles</h2><span class="subtle">${fmt(profiles.length)} distinct tiers</span></div>${tableFromRows(
+        ['Profile', 'Nodes', 'CPUs', 'RAM', 'GPU'],
+        profiles.map((p) => [escapeHtml(p.label), fmt(p.node_count), fmt(p.cpu_total), gib(p.real_memory_mib), p.gpu_count ? `${fmt(p.gpu_count)}x ${escapeHtml(String(p.gpu_type || '').toUpperCase())}` : '-'])
+      )}</section>
+      <div class="trend-grid">
+        <section class="section"><div class="section-head"><h2>Slurm version</h2><span class="subtle">Daemon version per node</span></div>${tableFromRows(['Version', 'Nodes'], slurmVersions.map((v) => [escapeHtml(v.version), fmt(v.node_count)]))}</section>
+        <section class="section"><div class="section-head"><h2>OS / kernel drift</h2><span class="subtle">${escapeHtml(drift.note || '')}</span></div>${tableFromRows(['Kernel build', 'Nodes'], osBuilds.map((o) => [escapeHtml(o.os), fmt(o.node_count)]))}</section>
+      </div>
+    </div>`;
+}
+
+function capacityPlanningPage() {
+  if (!nodeInsights || !nodeInsights.available) return nodeInsightsUnavailable('Capacity Planning');
+  const cp = asObject(nodeInsights.capacityPlanning);
+  const historyStatus = asObject(cp.history_status);
+  const pressure = asObject(cp.pressure);
+  const cpu = asObject(pressure.cpu);
+  const mem = asObject(pressure.memory);
+  const gpu = asObject(pressure.gpu);
+  const qp = asObject(cp.queue_pressure);
+  const maint = asObject(cp.maintenance_exposure);
+  const fleetTotal = asObject(asObject(nodeInsights.clusterOverview).totals).nodes_total;
+
+  return `
+    <div class="stack">
+      ${disclaimer(historyStatus.note || 'Historical trend collection has not started yet.')}
+      <section class="section"><div class="section-head"><h2>Current pressure</h2><span class="subtle">Live snapshot only - no trend history yet</span></div><div class="cards-grid">${[
+        statBlock('CPU pressure', pct(cpu.alloc_pct), `${fmt(cpu.alloc)} / ${fmt(cpu.total)} logical CPUs allocated`, toneFromReading(cpu.reading)),
+        statBlock('Memory pressure', pct(mem.alloc_pct), `${gib(mem.alloc)} / ${gib(mem.total)} allocated`, toneFromReading(mem.reading)),
+        statBlock('GPU pressure', pct(gpu.alloc_pct_of_online !== null && gpu.alloc_pct_of_online !== undefined ? gpu.alloc_pct_of_online : gpu.alloc_pct), `${fmt(gpu.alloc)} / ${fmt(gpu.total)} GPUs allocated (${fmt(gpu.online_total)} online)`, toneFromReading(gpu.reading)),
+      ].join('')}</div></section>
+      <section class="section"><div class="section-head"><h2>Pending-job pressure right now</h2><span class="subtle">${fmt(qp.pending_total)} pending jobs</span></div>
+        ${tableFromRows(['Reason', 'Count'], asArray(qp.pending_reasons).map((r) => [escapeHtml(r.reason), fmt(r.count)]))}
+        <p class="subtle" style="margin-top:10px">${escapeHtml(qp.read || '')}</p>
+      </section>
+      <section class="section"><div class="section-head"><h2>Maintenance exposure</h2><span class="subtle">${fmt(maint.nodes_draining)} of ${fmt(fleetTotal)} nodes draining</span></div><div class="cards-grid">${[
+        statBlock('Nodes draining', `${fmt(maint.nodes_draining)} (${pct(maint.nodes_draining_pct)})`, 'Share of fleet offline for maintenance', maint.nodes_draining ? 'warn' : 'good'),
+        statBlock('CPU capacity removed', `${fmt(maint.cpu_removed)} (${pct(maint.cpu_removed_pct)})`, 'Logical CPUs unavailable due to maintenance'),
+        statBlock('GPU capacity removed', `${fmt(maint.gpu_removed)} (${pct(maint.gpu_removed_pct)})`, 'GPUs unavailable due to maintenance', maint.gpu_removed ? 'warn' : 'good'),
+      ].join('')}</div></section>
+    </div>`;
+}
+
+function nodeDetailPage(nodeName) {
+  if (!nodeInsights || !nodeInsights.available) return nodeInsightsUnavailable('Node Detail');
+  const node = asArray(nodeInsights.nodeInventory.nodes).find((n) => n.node === nodeName);
+  if (!node) {
+    return `<div class="stack"><section class="section"><div class="section-head"><h2>Node not found</h2><span class="pill warn">Unknown node</span></div><div class="empty-state">No live Slurm record was found for ${escapeHtml(nodeName)}. <a href="#/nodes">Back to Node Inventory</a></div></section></div>`;
+  }
+  const gpuIdleCpuBusy = node.gpu_total > 0 && node.gpu_alloc === 0 && node.cpu_alloc > 0;
+  return `
+    <div class="stack">
+      <section class="section">
+        <div class="section-head"><h2>${escapeHtml(node.node)}</h2>${nodeStatePill(node)}</div>
+        ${node.drain ? disclaimer(`Maintenance reason: "${node.drain_reason || 'unspecified'}"${node.drain_since ? ` - since ${node.drain_since}` : ''}`) : ''}
+        <div class="cards-grid">${[
+          statBlock('Class', escapeHtml(node.class_label || '-'), 'Live classification'),
+          statBlock('Partitions', escapeHtml(asArray(node.partitions).join(', ') || '-'), 'Queue membership'),
+          statBlock('Architecture', escapeHtml(node.arch || '-'), 'CPU architecture'),
+        ].join('')}</div>
+      </section>
+      <div class="trend-grid">
+        <section class="section"><div class="section-head"><h2>Hardware</h2><span class="subtle">Static fields from scontrol show node</span></div>${tableFromRows(['Field', 'Value'], [
+          ['Sockets', fmt(node.sockets)],
+          ['Cores / socket', fmt(node.cores_per_socket)],
+          ['Threads / core', fmt(node.threads_per_core)],
+          ['Logical CPUs', fmt(node.cpu_total)],
+          ['Physical cores', fmt(node.physical_cores)],
+          ['RAM', gib(node.real_memory_mib)],
+          ['GPU', node.gpu_total ? `${fmt(node.gpu_total)}x ${escapeHtml(String(node.gpu_type || '').toUpperCase())}` : 'None'],
+          ['Slurm version', escapeHtml(node.slurm_version || '-')],
+          ['OS / kernel', escapeHtml(node.os || '-')],
+          ['Boot time', escapeHtml(node.boot_time || '-')],
+          ['Slurmd start time', escapeHtml(node.slurmd_start_time || '-')],
+        ])}</section>
+        <section class="section"><div class="section-head"><h2>Live allocation</h2><span class="subtle">From scontrol -d show node (GresUsed for GPU)</span></div>${tableFromRows(['Field', 'Value'], [
+          ['CPU allocation', `${fmt(node.cpu_alloc)} / ${fmt(node.cpu_total)} (${pct(node.cpu_alloc_pct)})`],
+          ['CPU load', node.cpu_load === null || node.cpu_load === undefined ? '-' : fmt(node.cpu_load, 2)],
+          ['Memory allocation', `${gib(node.alloc_mem_mib)} / ${gib(node.real_memory_mib)} (${pct(node.mem_alloc_pct)})`],
+          ['Memory free', gib(node.free_mem_mib)],
+          ['GPU allocation', node.gpu_total ? `${fmt(node.gpu_alloc)} / ${fmt(node.gpu_total)} (${pct(node.gpu_alloc_pct)})` : 'No GPUs on this node'],
+          ['GPU indexes allocated', node.gpu_indexes_allocated ? escapeHtml(node.gpu_indexes_allocated) : 'None'],
+          ['Running jobs on this node', fmt(node.running_jobs_count)],
+        ])}</section>
+      </div>
+      ${gpuIdleCpuBusy ? insight('GPU-idle, CPU-busy', `This node has ${fmt(node.cpu_alloc)} CPUs allocated but 0 of its ${fmt(node.gpu_total)} GPUs are reserved.${node.drain ? ' It is draining for maintenance but still absorbing CPU-only work.' : ''}`) : ''}
+      ${disclaimer('Job-level detail (which user or job is running here) requires admin access and is not shown in this public view. No usernames, job names, or job IDs are exposed on this page.')}
+      <p class="subtle"><a href="#/nodes">&larr; Back to Node Inventory</a></p>
+    </div>`;
 }
 
 function recommendationCards(limit = 3) {
@@ -774,6 +1055,10 @@ function render() {
     benchmarks: benchmarkPage,
     recommendations: recommendationsPage,
     'inefficient-jobs': inefficientJobsPage,
+    infrastructure: infrastructureOverviewPage,
+    nodes: nodeInventoryPage,
+    hardware: hardwareInventoryPage,
+    capacity: capacityPlanningPage,
     projects: projectsPage,
     pis: pisPage,
     groups: groupsPage,
@@ -785,9 +1070,11 @@ function render() {
   };
   const content = isPersonalRoute(state.route)
     ? personalDashboardPage()
-    : isHierarchyDetailRoute(state.route)
-      ? hierarchyDetailPage(detailRouteParts(state.route).type, detailRouteParts(state.route).id)
-      : (renderers[state.route] || renderers.landing)();
+    : isNodeDetailRoute(state.route)
+      ? nodeDetailPage(nodeDetailRouteName(state.route))
+      : isHierarchyDetailRoute(state.route)
+        ? hierarchyDetailPage(detailRouteParts(state.route).type, detailRouteParts(state.route).id)
+        : (renderers[state.route] || renderers.landing)();
   app.innerHTML = renderShell(content);
   wireEvents();
 }
@@ -829,6 +1116,25 @@ function wireEvents() {
   document.querySelector('[data-action="close-menu"]')?.addEventListener('click', () => {
     state.menuOpen = false;
     render();
+  });
+  document.querySelectorAll('[data-action="filter-nodes"]').forEach((el) => {
+    el.addEventListener('change', (event) => {
+      const filterKey = event.currentTarget.dataset.filter;
+      state.nodeFilters[filterKey] = event.currentTarget.value;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="sort-nodes"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      const key = event.currentTarget.dataset.key;
+      if (state.nodeFilters.sortKey === key) {
+        state.nodeFilters.sortDir = state.nodeFilters.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.nodeFilters.sortKey = key;
+        state.nodeFilters.sortDir = 'asc';
+      }
+      render();
+    });
   });
   document.querySelector('[data-recovery-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -896,7 +1202,7 @@ function handleRoute() {
 window.addEventListener('hashchange', handleRoute);
 
 async function init() {
-  data = await loadMjolnirData();
+  [data, nodeInsights] = await Promise.all([loadMjolnirData(), loadNodeInsightsData()]);
   render();
   if (isPersonalRoute(state.route)) await loadPersonalRoute(state.route);
 }

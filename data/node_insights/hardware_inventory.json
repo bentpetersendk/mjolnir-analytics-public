@@ -1,0 +1,162 @@
+{
+  "schema_version": "node-insights-v1",
+  "generated_at": "2026-06-23T10:19:14Z",
+  "source": "live-slurm",
+  "fleet": {
+    "nodes_total": 20,
+    "logical_cpus_total": 2720,
+    "physical_cores_total": 1360,
+    "ram_mib_total": 23401887,
+    "ram_gib_total": 22853.4,
+    "gpu_total": 10,
+    "gpu_types": [
+      "a100"
+    ]
+  },
+  "profiles": [
+    {
+      "label": "96c / 1000.0 GiB RAM",
+      "node_count": 11,
+      "cpu_total": 96,
+      "real_memory_mib": 1024000,
+      "real_memory_gib": 1000.0,
+      "gpu_type": null,
+      "gpu_count": 0,
+      "nodes": [
+        "mjolnircomp01fl",
+        "mjolnircomp02fl",
+        "mjolnircomp03fl",
+        "mjolnircomp04fl",
+        "mjolnircomp10fl",
+        "mjolnircomp11fl",
+        "mjolnircomp12fl",
+        "mjolnircomp13fl",
+        "mjolnircomp14fl",
+        "mjolnircomp15fl",
+        "mjolnircomp16fl"
+      ]
+    },
+    {
+      "label": "96c / 2000.0 GiB RAM",
+      "node_count": 2,
+      "cpu_total": 96,
+      "real_memory_mib": 2048000,
+      "real_memory_gib": 2000.0,
+      "gpu_type": null,
+      "gpu_count": 0,
+      "nodes": [
+        "mjolnircomp08fl",
+        "mjolnircomp09fl"
+      ]
+    },
+    {
+      "label": "256c / 1955.5 GiB RAM / 4x A100",
+      "node_count": 2,
+      "cpu_total": 256,
+      "real_memory_mib": 2002400,
+      "real_memory_gib": 1955.5,
+      "gpu_type": "a100",
+      "gpu_count": 4,
+      "nodes": [
+        "mjolnirgpu02fl",
+        "mjolnirgpu03fl"
+      ]
+    },
+    {
+      "label": "128c / 500.0 GiB RAM",
+      "node_count": 1,
+      "cpu_total": 128,
+      "real_memory_mib": 512000,
+      "real_memory_gib": 500.0,
+      "gpu_type": null,
+      "gpu_count": 0,
+      "nodes": [
+        "mjolnircomp05fl"
+      ]
+    },
+    {
+      "label": "128c / 442.5 GiB RAM",
+      "node_count": 1,
+      "cpu_total": 128,
+      "real_memory_mib": 453087,
+      "real_memory_gib": 442.5,
+      "gpu_type": null,
+      "gpu_count": 0,
+      "nodes": [
+        "mjolnircomp06fl"
+      ]
+    },
+    {
+      "label": "64c / 1000.0 GiB RAM",
+      "node_count": 1,
+      "cpu_total": 64,
+      "real_memory_mib": 1024000,
+      "real_memory_gib": 1000.0,
+      "gpu_type": null,
+      "gpu_count": 0,
+      "nodes": [
+        "mjolnircomp07fl"
+      ]
+    },
+    {
+      "label": "512c / 1000.0 GiB RAM",
+      "node_count": 1,
+      "cpu_total": 512,
+      "real_memory_mib": 1024000,
+      "real_memory_gib": 1000.0,
+      "gpu_type": null,
+      "gpu_count": 0,
+      "nodes": [
+        "mjolnircomp17fl"
+      ]
+    },
+    {
+      "label": "128c / 1000.0 GiB RAM / 2x A100",
+      "node_count": 1,
+      "cpu_total": 128,
+      "real_memory_mib": 1024000,
+      "real_memory_gib": 1000.0,
+      "gpu_type": "a100",
+      "gpu_count": 2,
+      "nodes": [
+        "mjolnirgpu01fl"
+      ]
+    }
+  ],
+  "slurm_versions": [
+    {
+      "version": "20.11.9",
+      "node_count": 20
+    }
+  ],
+  "os_kernel_builds": [
+    {
+      "os": "Linux 4.18.0-553.134.1.el8_10.x86_64 #1 SMP Fri Jun 12 18:47:05 EDT 2026",
+      "node_count": 6
+    },
+    {
+      "os": "Linux 4.18.0-553.132.1.el8_10.x86_64 #1 SMP Wed Jun 10 07:35:57 EDT 2026",
+      "node_count": 6
+    },
+    {
+      "os": "Linux 4.18.0-553.136.1.el8_10.x86_64 #1 SMP Thu Jun 18 14:53:04 EDT 2026",
+      "node_count": 3
+    },
+    {
+      "os": "Linux 4.18.0-553.40.1.el8_10.x86_64 #1 SMP Thu Feb 6 21:20:51 EST 2025",
+      "node_count": 3
+    },
+    {
+      "os": "Linux 4.18.0-553.52.1.el8_10.x86_64 #1 SMP Mon May 5 10:03:48 EDT 2025",
+      "node_count": 1
+    },
+    {
+      "os": "Linux 4.18.0-553.71.1.el8_10.x86_64 #1 SMP Fri Aug 15 18:19:39 EDT 2025",
+      "node_count": 1
+    }
+  ],
+  "kernel_drift": {
+    "distinct_builds": 6,
+    "note": "Distinct OS/kernel build strings observed across the fleet right now. Patch levels are not synchronized when this is greater than 1."
+  }
+}

@@ -1,6 +1,7 @@
 const REAL_BASE = './data/efficiency_v3/site_data_90d_validation/';
 const SAMPLE_BASE = './sample-data/';
 const PERSONAL_DATA_BASE = window.MJOLNIR_PERSONAL_DATA_BASE || './private-user-data/';
+const NODE_INSIGHTS_BASE = './data/node_insights/';
 
 const VALIDATION_ROW_COUNTS = {
   jobs: 2364601,
@@ -506,6 +507,54 @@ export async function loadPersonalData(routeToken) {
 }
 
 export const loadPersonalDashboardData = loadPersonalData;
+
+// Node Insights: live Slurm fleet state (sinfo/scontrol/squeue), collected by
+// the private repo's scripts/collect_node_insights.py. Public-safe aggregate/
+// node-hardware data only - no Airtable, no usernames, no per-job identity
+// fields. See docs/NODE_INSIGHTS_SLURM_AUDIT.md and
+// docs/NODE_INSIGHTS_SLURM_DESIGN.md in the private repo.
+function emptyNodeInsights(error) {
+  return {
+    available: false,
+    error: error ? String(error) : null,
+    source: null,
+    generatedAt: null,
+    schemaVersion: null,
+    clusterOverview: {},
+    nodeInventory: { nodeCount: 0, nodes: [] },
+    hardwareInventory: {},
+    capacityPlanning: {},
+  };
+}
+
+export async function loadNodeInsightsData() {
+  try {
+    const index = await loadJson(`${NODE_INSIGHTS_BASE}index.json`);
+    const files = asObject(index.files);
+    const [clusterOverview, nodeInventory, hardwareInventory, capacityPlanning] = await Promise.all([
+      loadJson(`${NODE_INSIGHTS_BASE}${files.cluster_overview || 'cluster_overview.json'}`),
+      loadJson(`${NODE_INSIGHTS_BASE}${files.node_inventory || 'node_inventory.json'}`),
+      loadJson(`${NODE_INSIGHTS_BASE}${files.hardware_inventory || 'hardware_inventory.json'}`),
+      loadJson(`${NODE_INSIGHTS_BASE}${files.capacity_planning || 'capacity_planning.json'}`),
+    ]);
+    return {
+      available: true,
+      error: null,
+      source: index.source || 'live-slurm',
+      generatedAt: index.generated_at || null,
+      schemaVersion: index.schema_version || null,
+      clusterOverview: asObject(clusterOverview),
+      nodeInventory: {
+        nodeCount: numberOrZero(nodeInventory && nodeInventory.node_count),
+        nodes: asArray(nodeInventory && nodeInventory.nodes),
+      },
+      hardwareInventory: asObject(hardwareInventory),
+      capacityPlanning: asObject(capacityPlanning),
+    };
+  } catch (error) {
+    return emptyNodeInsights(error);
+  }
+}
 
 export async function loadMjolnirData() {
   try {
