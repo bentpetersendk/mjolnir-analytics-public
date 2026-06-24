@@ -5,9 +5,22 @@ After=network.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/maps/projects/mjolnir_admin/scratch/mjolnir-efficiency-dashboard-public
-ExecStart=/usr/bin/python3 scripts/collect_node_insights.py --db data/node_insights.sqlite
-Restart=always
+User=jsd606
+Group=users
+# No WorkingDirectory= here on purpose: this repo lives on an NFS export
+# (Isilon) with root_squash enabled. systemd chdir()s into WorkingDirectory
+# while the process is still root, *before* dropping to User=/Group=, and
+# root gets EACCES on this export (confirmed: `sudo cd <repo>` -> Permission
+# denied, even though the jsd606 user itself can cd in fine). That chdir
+# failure surfaces as "Main process exited, code=exited, status=200/CHDIR".
+# Using absolute paths in ExecStart sidesteps it entirely, since by the time
+# the script runs, privileges are already dropped to User=jsd606.
+ExecStart=/usr/bin/python3 /maps/projects/mjolnir_admin/scratch/mjolnir-efficiency-dashboard-public/scripts/collect_node_insights.py --db /maps/projects/mjolnir_admin/scratch/mjolnir-efficiency-dashboard-public/data/node_insights.sqlite
+# Type=oneshot only accepts on-failure/on-abnormal/on-watchdog/on-abort -
+# systemd refuses to load the unit with Restart=always here (confirmed on
+# systemd 239 / EL8). on-failure is the closest equivalent: retry once on a
+# failed run, then let the next hourly timer tick take over.
+Restart=on-failure
 RestartSec=60
 TimeoutStartSec=60
 StandardOutput=journal
@@ -15,8 +28,10 @@ StandardError=journal
 SyslogIdentifier=mjolnir-node-collector
 
 # Hardening: this script only shells out to read-only Slurm CLIs (sinfo,
-# scontrol, squeue) and writes to data/node_insights.sqlite in its working
-# directory - no network access or elevated privileges are required.
+# scontrol, squeue) and writes to data/node_insights.sqlite - no network
+# access or elevated privileges are required. ProtectSystem/PrivateTmp only
+# touch /usr,/boot,/etc and /tmp, not the NFS-mounted repo, so they don't
+# trigger the root_squash issue above.
 NoNewPrivileges=true
 ProtectSystem=full
 PrivateTmp=true

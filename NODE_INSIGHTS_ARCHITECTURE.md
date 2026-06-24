@@ -223,9 +223,21 @@ sudo systemctl enable --now mjolnir-node-collector.timer
 - `Persistent=true` on the timer means a missed run (headnode reboot,
   maintenance window) fires as soon as the timer is next active, so
   collection resumes automatically without manual intervention.
-- `Restart=always` / `RestartSec=60` on the service means a failed run
+- `Restart=on-failure` / `RestartSec=60` on the service means a failed run
   (e.g. Slurm controller briefly unreachable) retries a minute later rather
-  than waiting for the next hourly tick.
+  than waiting for the next hourly tick. `Restart=always` is **not** valid
+  for `Type=oneshot` - systemd 239 (this host) refuses to load the unit with
+  it ("Service has Restart= set to either always or on-success, which isn't
+  allowed for Type=oneshot services").
+- `User=jsd606` / `Group=users` run the collector as the repo's owner, not
+  root, and there is **no `WorkingDirectory=`** - this repo lives on an NFS
+  export (Isilon, `root_squash` enabled), and systemd performs the
+  `WorkingDirectory=` chdir while the unit is still root, before dropping to
+  `User=`. Root gets `EACCES` on this export even though `jsd606` can `cd`
+  into it fine, and the unit fails with
+  `Main process exited, code=exited, status=200/CHDIR`. `ExecStart` uses
+  absolute paths for both the script and `--db` instead, since by the time
+  it runs the process has already dropped to `User=jsd606`.
 - Logs go to journald (`SyslogIdentifier=mjolnir-node-collector`); inspect
   with `journalctl -u mjolnir-node-collector.service`.
 - `WorkingDirectory` points at this repo's checkout on the headnode; update
