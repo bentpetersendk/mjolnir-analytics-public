@@ -2,6 +2,7 @@ const REAL_BASE = './data/efficiency_v3/site_data_90d_validation/';
 const SAMPLE_BASE = './sample-data/';
 const PERSONAL_DATA_BASE = window.MJOLNIR_PERSONAL_DATA_BASE || './private-user-data/';
 const NODE_INSIGHTS_BASE = './data/node_insights/';
+const NODE_INSIGHTS_HISTORY_BASE = './site/data/';
 
 const VALIDATION_ROW_COUNTS = {
   jobs: 2364601,
@@ -553,6 +554,46 @@ export async function loadNodeInsightsData() {
     };
   } catch (error) {
     return emptyNodeInsights(error);
+  }
+}
+
+// Node Insights history: hourly snapshots collected on the headnode by
+// scripts/collect_node_insights.py, stored in data/node_insights.sqlite, and
+// exported as public-safe aggregate JSON by scripts/export_node_insights.py.
+// Aggregate-only (cluster/node counts and pressure percentages) - no
+// usernames, job IDs, job names, or account names anywhere in this tree.
+function emptyNodeInsightsHistory(error) {
+  return {
+    available: false,
+    error: error ? String(error) : null,
+    generatedAt: null,
+    retentionDays: null,
+    capacity: [],
+    nodes: {},
+  };
+}
+
+export async function loadNodeInsightsHistory() {
+  try {
+    const [capacityDoc, nodeDoc] = await Promise.all([
+      loadJson(`${NODE_INSIGHTS_HISTORY_BASE}capacity_history.json`),
+      loadJson(`${NODE_INSIGHTS_HISTORY_BASE}node_history.json`),
+    ]);
+    const nodes = {};
+    asArray(nodeDoc.nodes).forEach((entry) => {
+      const row = asObject(entry);
+      if (row.node_name) nodes[row.node_name] = asArray(row.points);
+    });
+    return {
+      available: true,
+      error: null,
+      generatedAt: capacityDoc.generated_at || null,
+      retentionDays: numberOrZero(capacityDoc.retention_days) || null,
+      capacity: asArray(capacityDoc.points),
+      nodes,
+    };
+  } catch (error) {
+    return emptyNodeInsightsHistory(error);
   }
 }
 

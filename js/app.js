@@ -1,4 +1,4 @@
-import { loadMjolnirData, loadPersonalData, loadNodeInsightsData } from './data-loader.js';
+import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory } from './data-loader.js';
 import { requestDashboardRecovery } from './recovery-service.js';
 
 const app = document.querySelector('#app');
@@ -69,10 +69,12 @@ const state = {
   personalError: null,
   menuOpen: false,
   nodeFilters: { class: 'all', partition: 'all', state: 'all', sortKey: 'node', sortDir: 'asc' },
+  historyRange: '7d',
 };
 
 let data = null;
 let nodeInsights = null;
+let nodeInsightsHistory = null;
 
 function icon(name) {
   const icons = {
@@ -290,6 +292,184 @@ function sortableTableFromRows(columns, rows, sortKey, sortDir) {
   return `<table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
+// Node Insights history: hourly time series collected by
+// scripts/collect_node_insights.py into data/node_insights.sqlite and
+// exported as public-safe aggregate JSON by scripts/export_node_insights.py
+// (site/data/capacity_history.json, site/data/node_history.json). Charts
+// render with Apache ECharts (CDN <script> in index.html) after each
+// render() pass - see mountCharts() near the bottom of this file.
+const HISTORY_RANGES = [
+  { id: '24h', label: '24h', ms: 24 * 60 * 60 * 1000 },
+  { id: '7d', label: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
+  { id: '30d', label: '30d', ms: 30 * 24 * 60 * 60 * 1000 },
+  { id: '90d', label: '90d', ms: 90 * 24 * 60 * 60 * 1000 },
+];
+
+function rangeButtons() {
+  return `<div class="range-toggle">${HISTORY_RANGES.map((r) => `<button type="button" class="range-button${r.id === state.historyRange ? ' active' : ''}" data-action="set-history-range" data-range="${r.id}">${r.label}</button>`).join('')}</div>`;
+}
+
+function filterPointsByRange(points) {
+  const range = HISTORY_RANGES.find((r) => r.id === state.historyRange) || HISTORY_RANGES[1];
+  const cutoff = Date.now() - range.ms;
+  return asArray(points).filter((p) => p && p.timestamp && new Date(p.timestamp).getTime() >= cutoff);
+}
+
+function hasCapacityHistory() {
+  return Boolean(nodeInsightsHistory && nodeInsightsHistory.available && asArray(nodeInsightsHistory.capacity).length);
+}
+
+function historyUnavailableNote() {
+  return disclaimer('Historical trend collection has not started yet. Once the hourly collector (scripts/collect_node_insights.py) has been running for a while, pressure and queue trends will appear here.');
+}
+
+function capacityHistorySection(chartId, title, subtitle) {
+  if (!hasCapacityHistory()) return historyUnavailableNote();
+  return `<section class="section">
+    <div class="section-head"><h2>${escapeHtml(title)}</h2>${rangeButtons()}</div>
+    ${subtitle ? `<p class="subtle">${escapeHtml(subtitle)}</p>` : ''}
+    <div id="${chartId}" class="chart-container" data-chart-kind="capacity-history"></div>
+  </section>`;
+}
+
+function drainingHistorySection(chartId) {
+  if (!hasCapacityHistory()) return historyUnavailableNote();
+  return `<section class="section">
+    <div class="section-head"><h2>Node availability trend</h2>${rangeButtons()}</div>
+    <p class="subtle">Available, draining, and down node counts over time.</p>
+    <div id="${chartId}" class="chart-container" data-chart-kind="draining-history"></div>
+  </section>`;
+}
+
+function nodeHistorySection(chartId, nodeName, title) {
+  const points = nodeInsightsHistory && nodeInsightsHistory.available ? nodeInsightsHistory.nodes[nodeName] : null;
+  if (!points || !points.length) return historyUnavailableNote();
+  return `<section class="section">
+    <div class="section-head"><h2>${escapeHtml(title)}</h2>${rangeButtons()}</div>
+    <div id="${chartId}" class="chart-container" data-chart-kind="node-history" data-chart-node="${escapeHtml(nodeName)}"></div>
+  </section>`;
+}
+
+function cssVar(name, fallback) {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+function chartTextColor() { return cssVar('--muted', '#90a2bc'); }
+function chartLineColor() { return cssVar('--border', 'rgba(147,166,194,0.16)'); }
+function chartTimeLabel(value) { return String(value).slice(5, 16).replace('T', ' '); }
+function chartPct(rawValue) { return rawValue === null || rawValue === undefined ? null : Math.round(Number(rawValue) * 1000) / 10; }
+
+function baseChartOption(categories, extraGrid) {
+  return {
+    backgroundColor: 'transparent',
+    textStyle: { color: chartTextColor(), fontFamily: 'inherit' },
+    grid: Object.assign({ left: 48, right: 16, top: 44, bottom: 64 }, extraGrid),
+    legend: { top: 0, textStyle: { color: chartTextColor() } },
+    tooltip: { trigger: 'axis' },
+    dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 8, textStyle: { color: chartTextColor() } }],
+    xAxis: {
+      type: 'category',
+      data: categories,
+      axisLine: { lineStyle: { color: chartLineColor() } },
+      axisLabel: { color: chartTextColor(), formatter: chartTimeLabel },
+    },
+  };
+}
+
+function lineSeries(def, data) {
+  return {
+    name: def.name,
+    type: 'line',
+    smooth: true,
+    showSymbol: false,
+    yAxisIndex: def.axis || 0,
+    itemStyle: { color: def.color },
+    lineStyle: { color: def.color, width: 2 },
+    data,
+  };
+}
+
+function capacityHistoryChartOption(points) {
+  const categories = points.map((p) => p.timestamp);
+  const seriesDefs = [
+    { key: 'cpu_pct', name: 'CPU pressure', color: cssVar('--blue', '#3e8cff'), axis: 0, pct: true },
+    { key: 'memory_pct', name: 'Memory pressure', color: cssVar('--teal', '#2dd4bf'), axis: 0, pct: true },
+    { key: 'gpu_pct', name: 'GPU pressure', color: cssVar('--amber', '#ffb84d'), axis: 0, pct: true },
+    { key: 'running_jobs', name: 'Running jobs', color: cssVar('--green', '#53d88a'), axis: 1 },
+    { key: 'pending_jobs', name: 'Pending jobs', color: cssVar('--red', '#ff6b7a'), axis: 1 },
+    { key: 'draining_nodes', name: 'Draining nodes', color: cssVar('--cyan', '#30d5d0'), axis: 1 },
+  ];
+  return Object.assign(baseChartOption(categories, { right: 48 }), {
+    yAxis: [
+      { type: 'value', name: '%', min: 0, max: 100, axisLabel: { color: chartTextColor(), formatter: '{value}%' }, splitLine: { lineStyle: { color: chartLineColor() } } },
+      { type: 'value', name: 'jobs / nodes', min: 0, axisLabel: { color: chartTextColor() }, splitLine: { show: false } },
+    ],
+    series: seriesDefs.map((def) => lineSeries(def, points.map((p) => (def.pct ? chartPct(p[def.key]) : (p[def.key] === null || p[def.key] === undefined ? null : Number(p[def.key])))))),
+  });
+}
+
+function drainingHistoryChartOption(points) {
+  const categories = points.map((p) => p.timestamp);
+  const seriesDefs = [
+    { key: 'available_nodes', name: 'Available', color: cssVar('--green', '#53d88a') },
+    { key: 'draining_nodes', name: 'Draining', color: cssVar('--amber', '#ffb84d') },
+    { key: 'down_nodes', name: 'Down', color: cssVar('--red', '#ff6b7a') },
+  ];
+  return Object.assign(baseChartOption(categories), {
+    yAxis: { type: 'value', name: 'nodes', min: 0, axisLabel: { color: chartTextColor() }, splitLine: { lineStyle: { color: chartLineColor() } } },
+    series: seriesDefs.map((def) => lineSeries(def, points.map((p) => (p[def.key] === null || p[def.key] === undefined ? null : Number(p[def.key]))))),
+  });
+}
+
+function nodeHistoryChartOption(points) {
+  const categories = points.map((p) => p.timestamp);
+  const seriesDefs = [
+    { key: 'cpu_pct', name: 'CPU utilization', color: cssVar('--blue', '#3e8cff') },
+    { key: 'mem_pct', name: 'Memory utilization', color: cssVar('--teal', '#2dd4bf') },
+    { key: 'gpu_pct', name: 'GPU utilization', color: cssVar('--amber', '#ffb84d') },
+  ];
+  return Object.assign(baseChartOption(categories), {
+    yAxis: { type: 'value', name: '%', min: 0, max: 100, axisLabel: { color: chartTextColor(), formatter: '{value}%' }, splitLine: { lineStyle: { color: chartLineColor() } } },
+    series: seriesDefs.map((def) => lineSeries(def, points.map((p) => chartPct(p[def.key])))),
+  });
+}
+
+let activeCharts = [];
+function disposeCharts() {
+  activeCharts.forEach((chart) => {
+    try { chart.dispose(); } catch (error) { /* chart already gone with its DOM node */ }
+  });
+  activeCharts = [];
+}
+
+function mountCharts() {
+  disposeCharts();
+  if (!window.echarts) return;
+  document.querySelectorAll('[data-chart-kind]').forEach((el) => {
+    const kind = el.dataset.chartKind;
+    let option = null;
+    if (kind === 'capacity-history' && hasCapacityHistory()) {
+      option = capacityHistoryChartOption(filterPointsByRange(nodeInsightsHistory.capacity));
+    } else if (kind === 'draining-history' && hasCapacityHistory()) {
+      option = drainingHistoryChartOption(filterPointsByRange(nodeInsightsHistory.capacity));
+    } else if (kind === 'node-history') {
+      const points = nodeInsightsHistory && nodeInsightsHistory.available ? nodeInsightsHistory.nodes[el.dataset.chartNode] : null;
+      if (points && points.length) option = nodeHistoryChartOption(filterPointsByRange(points));
+    }
+    if (!option) return;
+    const chart = window.echarts.init(el, null, { renderer: 'svg' });
+    chart.setOption(option);
+    activeCharts.push(chart);
+  });
+}
+
+let chartResizeAttached = false;
+function setupChartResize() {
+  if (chartResizeAttached) return;
+  chartResizeAttached = true;
+  window.addEventListener('resize', () => activeCharts.forEach((chart) => chart.resize()));
+}
+
 function infrastructureOverviewPage() {
   if (!nodeInsights || !nodeInsights.available) return nodeInsightsUnavailable('Infrastructure Overview');
   const co = asObject(nodeInsights.clusterOverview);
@@ -333,6 +513,7 @@ function infrastructureOverviewPage() {
         <section class="section"><div class="section-head"><h2>By class</h2><span class="subtle">Live classification rules</span></div>${tableFromRows(['Class', 'Nodes'], byClass.map((c) => [escapeHtml(c.class), fmt(c.count)]))}</section>
         <section class="section"><div class="section-head"><h2>By partition</h2><span class="subtle">Node membership</span></div>${tableFromRows(['Partition', 'Nodes'], byPartition.map((p) => [escapeHtml(p.partition), fmt(p.node_count)]))}</section>
       </div>
+      ${capacityHistorySection('chart-infra-history', 'Cluster pressure trend', 'CPU, memory, and GPU pressure plus running/pending jobs and draining nodes over time.')}
       ${disclaimer('GPU allocation reflects scheduler reservation (GresUsed from scontrol -d show node), not measured GPU utilization. GPU utilization is not currently measured on Mjolnir.')}
     </div>`;
 }
@@ -386,6 +567,7 @@ function nodeInventoryPage() {
           ['State', 'state'], ['Partitions', null],
         ], tableRows, filters.sortKey, filters.sortDir)}</div>
       </section>
+      ${drainingHistorySection('chart-nodes-draining-history')}
       ${disclaimer('GPU% reflects scheduler-reserved GPUs from scontrol -d show node (GresUsed), not measured GPU utilization.')}
     </div>`;
 }
@@ -421,7 +603,6 @@ function hardwareInventoryPage() {
 function capacityPlanningPage() {
   if (!nodeInsights || !nodeInsights.available) return nodeInsightsUnavailable('Capacity Planning');
   const cp = asObject(nodeInsights.capacityPlanning);
-  const historyStatus = asObject(cp.history_status);
   const pressure = asObject(cp.pressure);
   const cpu = asObject(pressure.cpu);
   const mem = asObject(pressure.memory);
@@ -432,8 +613,8 @@ function capacityPlanningPage() {
 
   return `
     <div class="stack">
-      ${disclaimer(historyStatus.note || 'Historical trend collection has not started yet.')}
-      <section class="section"><div class="section-head"><h2>Current pressure</h2><span class="subtle">Live snapshot only - no trend history yet</span></div><div class="cards-grid">${[
+      ${capacityHistorySection('chart-capacity-history', 'Pressure & queue trend', 'CPU, memory, and GPU pressure plus running/pending jobs and draining nodes over time.')}
+      <section class="section"><div class="section-head"><h2>Current pressure</h2><span class="subtle">Live snapshot</span></div><div class="cards-grid">${[
         statBlock('CPU pressure', pct(cpu.alloc_pct), `${fmt(cpu.alloc)} / ${fmt(cpu.total)} logical CPUs allocated`, toneFromReading(cpu.reading)),
         statBlock('Memory pressure', pct(mem.alloc_pct), `${gib(mem.alloc)} / ${gib(mem.total)} allocated`, toneFromReading(mem.reading)),
         statBlock('GPU pressure', pct(gpu.alloc_pct_of_online !== null && gpu.alloc_pct_of_online !== undefined ? gpu.alloc_pct_of_online : gpu.alloc_pct), `${fmt(gpu.alloc)} / ${fmt(gpu.total)} GPUs allocated (${fmt(gpu.online_total)} online)`, toneFromReading(gpu.reading)),
@@ -492,6 +673,7 @@ function nodeDetailPage(nodeName) {
           ['Running jobs on this node', fmt(node.running_jobs_count)],
         ])}</section>
       </div>
+      ${nodeHistorySection('chart-node-history', node.node, 'Utilization history')}
       ${gpuIdleCpuBusy ? insight('GPU-idle, CPU-busy', `This node has ${fmt(node.cpu_alloc)} CPUs allocated but 0 of its ${fmt(node.gpu_total)} GPUs are reserved.${node.drain ? ' It is draining for maintenance but still absorbing CPU-only work.' : ''}`) : ''}
       ${disclaimer('Job-level detail (which user or job is running here) requires admin access and is not shown in this public view. No usernames, job names, or job IDs are exposed on this page.')}
       <p class="subtle"><a href="#/nodes">&larr; Back to Node Inventory</a></p>
@@ -1077,6 +1259,8 @@ function render() {
         : (renderers[state.route] || renderers.landing)();
   app.innerHTML = renderShell(content);
   wireEvents();
+  mountCharts();
+  setupChartResize();
 }
 
 let stickyHeaderScrollAttached = false;
@@ -1133,6 +1317,12 @@ function wireEvents() {
         state.nodeFilters.sortKey = key;
         state.nodeFilters.sortDir = 'asc';
       }
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="set-history-range"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      state.historyRange = event.currentTarget.dataset.range;
       render();
     });
   });
@@ -1202,7 +1392,11 @@ function handleRoute() {
 window.addEventListener('hashchange', handleRoute);
 
 async function init() {
-  [data, nodeInsights] = await Promise.all([loadMjolnirData(), loadNodeInsightsData()]);
+  [data, nodeInsights, nodeInsightsHistory] = await Promise.all([
+    loadMjolnirData(),
+    loadNodeInsightsData(),
+    loadNodeInsightsHistory(),
+  ]);
   render();
   if (isPersonalRoute(state.route)) await loadPersonalRoute(state.route);
 }
