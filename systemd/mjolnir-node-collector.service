@@ -1,7 +1,8 @@
 [Unit]
-Description=Mjolnir Node Insights - hourly Slurm fleet collector
+Description=Mjolnir Node Insights - hourly collect, export, and publish cycle
 Documentation=file:///maps/projects/mjolnir_admin/scratch/mjolnir-efficiency-dashboard-public/NODE_INSIGHTS_ARCHITECTURE.md
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
@@ -15,7 +16,7 @@ Group=users
 # failure surfaces as "Main process exited, code=exited, status=200/CHDIR".
 # Using absolute paths in ExecStart sidesteps it entirely, since by the time
 # the script runs, privileges are already dropped to User=jsd606.
-ExecStart=/usr/bin/python3 /maps/projects/mjolnir_admin/scratch/mjolnir-efficiency-dashboard-public/scripts/collect_node_insights.py --db /maps/projects/mjolnir_admin/scratch/mjolnir-efficiency-dashboard-public/data/node_insights.sqlite
+ExecStart=/usr/bin/bash /maps/projects/mjolnir_admin/scratch/mjolnir-efficiency-dashboard-public/scripts/run_node_insights_cycle.sh
 # Type=oneshot only accepts on-failure/on-abnormal/on-watchdog/on-abort -
 # systemd refuses to load the unit with Restart=always here (confirmed on
 # systemd 239 / EL8). on-failure is the closest equivalent: retry once on a
@@ -27,11 +28,11 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=mjolnir-node-collector
 
-# Hardening: this script only shells out to read-only Slurm CLIs (sinfo,
-# scontrol, squeue) and writes to data/node_insights.sqlite - no network
-# access or elevated privileges are required. ProtectSystem/PrivateTmp only
-# touch /usr,/boot,/etc and /tmp, not the NFS-mounted repo, so they don't
-# trigger the root_squash issue above.
+# Hardening: no elevated privileges are required. This cycle does reach the
+# network now (publish_dashboard.sh pushes to GitHub over SSH using a
+# deploy key scoped to this one repo). ProtectSystem/PrivateTmp only touch
+# /usr,/boot,/etc and /tmp, not the NFS-mounted repo, so they don't trigger
+# the root_squash issue above.
 NoNewPrivileges=true
 ProtectSystem=full
 PrivateTmp=true

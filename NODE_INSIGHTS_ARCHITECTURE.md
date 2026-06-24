@@ -243,21 +243,53 @@ sudo systemctl enable --now mjolnir-node-collector.timer
 - `WorkingDirectory` points at this repo's checkout on the headnode; update
   it if the deployment path changes.
 
-## 8. Deployment: `scripts/publish_dashboard.sh`
+## 8. Deployment: `scripts/run_node_insights_cycle.sh` and `scripts/publish_dashboard.sh`
 
-Run manually (or from its own periodic job, separate from the hourly
-collector) to publish the latest history to GitHub Pages:
+Every hourly tick of `mjolnir-node-collector.timer` runs
+`scripts/run_node_insights_cycle.sh`, which is the full workflow in one
+place:
 
-1. Runs `scripts/export_node_insights.py` to regenerate the three
-   `site/data/*.json` files from the current SQLite database.
-2. `git add`s exactly those three files (never `git add -A`/`.`).
-3. Commits only if they changed.
-4. Pushes to the current branch's remote.
+```
+collect_node_insights.py  (one Slurm snapshot -> SQLite)
+        ↓
+publish_dashboard.sh:
+  export_node_insights.py  (SQLite -> site/data/*.json)
+        ↓
+  detect changes           (git diff --cached, staged public files only)
+        ↓
+  ┌─ unchanged → log "No dashboard data changes detected.
+  │              Skipping commit and push." → exit 0
+  └─ changed   → log "Dashboard data changed. Publishing update."
+                 → commit → push origin HEAD
+```
+
+`set -euo pipefail` in both scripts means a failed collection never reaches
+export/publish, and a failed export (missing file, forbidden field, invalid
+JSON - see the safety gate below) never gets committed. A failed `git push`
+is checked explicitly and returns a non-zero exit code with an error log
+line (`public JSON was committed locally but NOT published to GitHub`) -
+the commit still happens locally in that case, so the next cycle's `git
+diff` correctly sees no further changes to publish until something new is
+collected, rather than retrying the same stale commit forever.
+
+`publish_dashboard.sh` can also be run standalone (e.g. manually, or from a
+separate periodic job) - it always re-exports from the current database
+state before checking for changes, so it's safe to run anytime.
+
+Change detection is staged-diff based (`git diff --cached --quiet --
+"${PUBLIC_FILES[@]}"`), so a cycle where the collected snapshot doesn't
+move any exported percentage/count (rare, but possible) produces zero
+commits - only real data changes ever reach GitHub.
 
 It never stages `data/node_insights.sqlite`, logs, or any other generated
-artifact - the explicit file list in the script is the enforcement
-mechanism, backed by `.gitignore` (`*.sqlite`, `*.sqlite-wal`,
-`*.sqlite-shm`, `*.log`) as a second line of defense.
+artifact - the explicit `PUBLIC_FILES` list in the script is the
+enforcement mechanism, backed by `.gitignore` (`*.sqlite`, `*.sqlite-wal`,
+`*.sqlite-shm`, `*.log`) as a second line of defense. Before staging
+anything, the script also re-checks every exported file for the forbidden
+field patterns (same list as Section 9) and valid JSON, and refuses to
+commit/push if either check fails - this runs unattended every hour with no
+human reviewing the diff first, so the gate has to catch problems on its
+own.
 
 ## 9. Public-safety guardrails
 
