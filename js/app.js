@@ -32,6 +32,7 @@ const navGroups = [
       { id: 'nodes', label: 'Nodes', icon: 'cluster' },
       { id: 'hardware', label: 'Hardware', icon: 'cpu' },
       { id: 'capacity', label: 'Capacity', icon: 'gauge' },
+      { id: 'platform-status', label: 'Platform Status', icon: 'gauge' },
     ],
   },
   {
@@ -61,7 +62,6 @@ const navItems = navGroups.flatMap((group) => group.items);
 const hiddenRouteItems = [
   { id: 'groups', label: 'Groups', icon: 'cluster' },
   { id: 'sections', label: 'Sections', icon: 'book' },
-  { id: 'platform-status', label: 'Platform Status', icon: 'gauge' },
 ];
 const allRouteItems = navItems.concat(hiddenRouteItems);
 
@@ -778,10 +778,7 @@ function landingPage() {
   const meta = asObject(data?.datasetMeta);
   const rows = asArray(data?.clusterSummary?.dailyTrends);
   const failureRate = num(allTime.failed_jobs) / Math.max(1, num(allTime.jobs));
-  const snapshotCount = asArray(nodeInsightsHistory?.capacity).length + rows.length;
-  const activeModuleCount = platformRegistry.filter((m) => !m.planned && m.available).length;
   return `
-    ${platformStatusPanel(platformRegistry, { snapshotCount, activeModuleCount })}
     <div class="overview-top-grid">
       <section class="intro-card">
         <div class="intro-card-icon">${icon('cluster')}</div>
@@ -829,16 +826,21 @@ function landingPage() {
     </section>`;
 }
 
-// Placeholder destination for the System Health card's "View Platform
-// Status" button - a fuller breakdown of the same buildPlatformRegistry()
-// data shown in the Overview page's Platform Status panel and System
-// Health card. Expand this page as dedicated module detail pages
-// (Queue Insights, Slurm Insights, ...) come online.
+// Dedicated Platform Status page (sidebar: Infrastructure > Platform
+// Status; also the System Health card's "View Platform Status" button).
+// The detailed breakdown formerly shown inline on the Overview page -
+// Platform Health, Collector Health, Module Status, Last Platform Update,
+// Snapshots Collected, Active Analytics Modules - all from the same
+// buildPlatformRegistry() data the Overview page's System Health card
+// summarizes. Expand this page as dedicated module detail pages (Queue
+// Insights, Slurm Insights, ...) come online.
 function platformStatusPage() {
+  const rows = asArray(data?.clusterSummary?.dailyTrends);
+  const snapshotCount = asArray(nodeInsightsHistory?.capacity).length + rows.length;
   const activeModuleCount = platformRegistry.filter((m) => !m.planned && m.available).length;
   return `
     <div class="stack">
-      ${platformStatusPanel(platformRegistry, { activeModuleCount })}
+      ${platformStatusPanel(platformRegistry, { snapshotCount, activeModuleCount })}
       <section class="section"><div class="section-head"><h2>Module detail</h2><span class="subtle">Per-collector freshness</span></div>
         <div class="stack">${platformRegistry.filter((m) => !m.planned).map((m) => (
           `<div><h3 style="margin:0 0 8px;font-size:0.95rem">${m.label}</h3>${statusBar(m.kind === 'infrastructure' ? 'infrastructure' : 'analytics', m)}</div>`
