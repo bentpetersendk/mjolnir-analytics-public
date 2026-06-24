@@ -11,7 +11,7 @@ export async function requestDashboardRecovery(username) {
     return {
       ok: false,
       mode: 'validation',
-      message: 'Enter your Mjolnir username to request your Resource Insights link.',
+      message: 'Enter your Mjolnir username to request your Analytics link.',
     };
   }
 
@@ -47,6 +47,6 @@ export async function requestDashboardRecovery(username) {
   return {
     ok: true,
     mode: 'submitted',
-    message: payload.message || 'If the username exists, the Resource Insights link will be sent by email.',
+    message: payload.message || 'If the username exists, the Analytics link will be sent by email.',
   };
 }

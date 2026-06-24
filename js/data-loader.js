@@ -484,6 +484,13 @@ function buildDerivedData(tree) {
       recommendationCount: users.reduce((sum, user) => sum + user.recommendations.length, 0),
       inefficientJobCount: allInefficientJobs.length,
       accountExportAvailable: projects.length > 0,
+      // Platform Status framework (docs/PLATFORM_STATUS.md): read straight
+      // through if the export already carries them, otherwise status.js
+      // derives sensible defaults from the fields above.
+      collectorName: cluster.collector || tree.index.collector || null,
+      collectorStatus: cluster.collector_status || tree.index.collector_status || null,
+      platformModule: cluster.platform_module || tree.index.platform_module || null,
+      dataWindowDays: cluster.data_window_days ?? tree.index.data_window_days ?? null,
     },
   };
 }
@@ -521,6 +528,10 @@ function emptyNodeInsights(error) {
     source: null,
     generatedAt: null,
     schemaVersion: null,
+    collectorName: null,
+    collectorStatus: 'failed',
+    platformModule: null,
+    dataWindowDays: null,
     clusterOverview: {},
     nodeInventory: { nodeCount: 0, nodes: [] },
     hardwareInventory: {},
@@ -544,6 +555,11 @@ export async function loadNodeInsightsData() {
       source: index.source || 'live-slurm',
       generatedAt: index.generated_at || null,
       schemaVersion: index.schema_version || null,
+      // Platform Status framework (docs/PLATFORM_STATUS.md).
+      collectorName: index.collector || 'node_insights',
+      collectorStatus: index.collector_status || null,
+      platformModule: index.platform_module || 'Node Insights',
+      dataWindowDays: index.data_window_days ?? null,
       clusterOverview: asObject(clusterOverview),
       nodeInventory: {
         nodeCount: numberOrZero(nodeInventory && nodeInventory.node_count),
@@ -568,6 +584,10 @@ function emptyNodeInsightsHistory(error) {
     error: error ? String(error) : null,
     generatedAt: null,
     retentionDays: null,
+    collectorName: null,
+    collectorStatus: 'failed',
+    platformModule: null,
+    dataWindowDays: null,
     capacity: [],
     nodes: {},
   };
@@ -589,6 +609,11 @@ export async function loadNodeInsightsHistory() {
       error: null,
       generatedAt: capacityDoc.generated_at || null,
       retentionDays: numberOrZero(capacityDoc.retention_days) || null,
+      // Platform Status framework (docs/PLATFORM_STATUS.md).
+      collectorName: capacityDoc.collector || 'node_insights',
+      collectorStatus: capacityDoc.collector_status || null,
+      platformModule: capacityDoc.platform_module || 'Node Insights',
+      dataWindowDays: capacityDoc.data_window_days ?? numberOrZero(capacityDoc.retention_days) ?? null,
       capacity: asArray(capacityDoc.points),
       nodes,
     };
@@ -647,6 +672,10 @@ export async function loadMjolnirData() {
           recommendationCount: 0,
           inefficientJobCount: 0,
           accountExportAvailable: false,
+          collectorName: null,
+          collectorStatus: 'failed',
+          platformModule: null,
+          dataWindowDays: null,
         },
         errors: [String(primaryError), String(fallbackError)],
       };

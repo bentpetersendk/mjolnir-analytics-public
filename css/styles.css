@@ -15,6 +15,7 @@
   --teal: #2dd4bf;
   --green: #53d88a;
   --amber: #ffb84d;
+  --orange: #ff8a3d;
   --red: #ff6b7a;
   --shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
   --radius: 16px;
@@ -245,6 +246,10 @@ button, input, select { font: inherit; }
 .pill.warn { color: #ffd08a; background: rgba(255, 184, 77, 0.12); }
 .pill.info { color: #9cd0ff; background: rgba(62, 140, 255, 0.12); }
 .pill.bad { color: #ffb3bd; background: rgba(255, 107, 122, 0.14); }
+.pill.stale { color: #ffc299; background: rgba(255, 138, 61, 0.14); }
+.pill.muted { color: var(--muted); background: rgba(144, 162, 188, 0.12); }
+.pill.status-pill { display: inline-flex; align-items: center; gap: 6px; }
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; }
 
 .rec-list, .alerts-list { display: grid; gap: 10px; }
 .rec-card, .alert-item {
@@ -346,6 +351,83 @@ td:last-child, th:last-child { text-align: right; }
   line-height: 1.5;
 }
 .disclaimer .pill { flex: none; }
+
+/* Data Freshness / Platform Status framework (status.js renders these). */
+.status-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  padding: 12px 16px;
+  margin-bottom: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.status-bar-item { display: grid; gap: 4px; min-width: 0; }
+.status-bar-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.status-bar-value { font-size: 13px; font-weight: 600; }
+
+.platform-status .section-head .pill { flex: none; }
+.platform-module-list { display: grid; gap: 10px; margin: 14px 0; }
+.platform-module-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px; background: var(--surface-3); border-radius: var(--radius-sm);
+}
+.platform-module-row span:first-child { font-weight: 600; font-size: 13px; }
+.platform-status-meta {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
+  margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.platform-status-meta strong { display: block; font-size: 1.15rem; margin-top: 4px; }
+.platform-status-badge {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+
+/* Overview page: System Health card sits beside the Mjolnir Analytics
+   explainer card (desktop); below it on tablet/mobile. */
+.overview-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 18px;
+  align-items: stretch;
+  margin-bottom: 18px;
+}
+.overview-top-grid .intro-card { margin-bottom: 0; height: 100%; }
+
+.system-health-card { display: flex; flex-direction: column; }
+.system-health-main { display: flex; align-items: center; gap: 18px; margin: 6px 0 18px; }
+.system-health-text { min-width: 0; }
+.system-health-headline { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+.system-health-sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+.system-health-indicator {
+  flex: 0 0 auto;
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  position: relative;
+}
+.system-health-indicator.system-health-healthy { background: var(--green); box-shadow: 0 0 0 0 rgba(83, 216, 138, 0.55); animation: pulse-green 2.4s ease-out infinite; }
+.system-health-indicator.system-health-warning { background: var(--amber); box-shadow: 0 0 0 0 rgba(255, 184, 77, 0.55); animation: pulse-orange 2.4s ease-out infinite; }
+.system-health-indicator.system-health-stale { background: var(--orange); box-shadow: 0 0 0 0 rgba(255, 138, 61, 0.55); animation: pulse-deep-orange 2.4s ease-out infinite; }
+.system-health-indicator.system-health-failed { background: var(--red); box-shadow: 0 0 0 0 rgba(255, 107, 122, 0.55); animation: pulse-red 1.6s ease-out infinite; }
+.system-health-indicator.system-health-unknown { background: var(--muted); }
+
+@keyframes pulse-green { 70% { box-shadow: 0 0 0 16px rgba(83, 216, 138, 0); } 100% { box-shadow: 0 0 0 0 rgba(83, 216, 138, 0); } }
+@keyframes pulse-orange { 70% { box-shadow: 0 0 0 16px rgba(255, 184, 77, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 184, 77, 0); } }
+@keyframes pulse-deep-orange { 70% { box-shadow: 0 0 0 16px rgba(255, 138, 61, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 138, 61, 0); } }
+@keyframes pulse-red { 70% { box-shadow: 0 0 0 16px rgba(255, 107, 122, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 107, 122, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .system-health-indicator { animation: none !important; }
+}
+
+.system-health-details { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border); }
+.system-health-detail-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.system-health-cta { margin-top: 16px; justify-content: center; width: 100%; }
+
+@media (max-width: 1024px) {
+  .overview-top-grid { grid-template-columns: 1fr; }
+  .overview-top-grid .intro-card { height: auto; }
+}
 .decision-hero,
 .personal-hero {
   display: flex;
@@ -496,6 +578,7 @@ td:last-child, th:last-child { text-align: right; }
 @media (max-width: 1200px) {
   .hero, .dashboard-grid, .panel-grid { grid-template-columns: 1fr; }
   .mini-grid, .cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .status-bar, .platform-status-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .app-shell { grid-template-columns: 1fr; }
   .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0;
@@ -541,6 +624,7 @@ td:last-child, th:last-child { text-align: right; }
 
 @media (max-width: 720px) {
   .mini-grid, .cards-grid, .percentiles, .table-toolbar, .recovery-row { grid-template-columns: 1fr; }
+  .status-bar, .platform-status-meta { grid-template-columns: 1fr; }
   .topbar-right { display: none; }
   .hero-copy { padding: 20px; }
   .hero h1 { max-width: 100%; font-size: clamp(2rem, 12vw, 3rem); }
@@ -779,4 +863,34 @@ td:last-child, th:last-child { text-align: right; }
 @media (max-width: 720px) {
   .load-banner, .prototype-banner, .personal-hero, .decision-hero { align-items: start; flex-direction: column; }
   .percentile-scale { grid-template-columns: repeat(5, minmax(48px, 1fr)); overflow-x: auto; }
+}
+
+/* ECharts mobile layout: taller charts (room for the stacked vertical
+   legend - see baseChartOption() in js/app.js), full-width equal-size range
+   buttons with a real touch target, and a tighter card so the chart uses
+   the available screen width instead of looking like a shrunk desktop card. */
+@media (max-width: 767px) {
+  .chart-container {
+    width: 100%;
+    height: 450px;
+  }
+  .chart-container[data-chart-kind="node-history"] {
+    height: 500px;
+  }
+  .section:has(.chart-container) {
+    padding: 12px;
+    overflow-x: hidden;
+  }
+  .range-toggle {
+    flex-wrap: nowrap;
+    width: 100%;
+  }
+  .range-button {
+    flex: 1 1 0;
+    min-height: 44px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }

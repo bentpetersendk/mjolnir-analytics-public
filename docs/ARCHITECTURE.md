@@ -27,3 +27,11 @@
 - Add new projections in the loader for project, group, and storage summaries.
 - Preserve the current shell and extend the view model instead of redesigning the layout.
 - Support the full historical archive by switching the loader source, not the page implementations.
+
+## Platform Status framework
+
+Every page that shows collected data also shows when it was collected and
+whether the collector behind it is healthy. See
+[PLATFORM_STATUS.md](PLATFORM_STATUS.md) for the JSON contract, the health
+logic, and how a future module (Queue Insights, Slurm Insights, Predictions,
+...) registers itself.

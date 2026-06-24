@@ -9,10 +9,11 @@ can add their own tables to the same database, keyed by the same
 tables already defined here.
 """
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB_PATH = REPO_ROOT / "data" / "node_insights.sqlite"
 
@@ -59,6 +60,21 @@ SCHEMA_STATEMENTS = (
     "CREATE INDEX IF NOT EXISTS idx_node_snapshots_timestamp ON node_snapshots(timestamp)",
     "CREATE INDEX IF NOT EXISTS idx_node_snapshots_node_name ON node_snapshots(node_name)",
     "CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+    # Platform Status framework (docs/PLATFORM_STATUS.md): one row per
+    # collector, updated on every run (success or failure) by
+    # record_collector_run() below. export_node_insights.py reads this to
+    # populate the collector_status field on every exported JSON document -
+    # the frontend only trusts an explicit "failed" here; otherwise it
+    # judges Healthy/Warning/Stale purely from how old the data is.
+    """
+    CREATE TABLE IF NOT EXISTS collector_runs (
+        collector TEXT PRIMARY KEY,
+        last_attempt_at TEXT NOT NULL,
+        last_success_at TEXT,
+        status TEXT NOT NULL,
+        message TEXT
+    )
+    """,
 )
 
 
@@ -81,3 +97,35 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         (str(SCHEMA_VERSION),),
     )
     conn.commit()
+
+
+def record_collector_run(conn: sqlite3.Connection, collector: str, ok: bool, message: Optional[str] = None) -> None:
+    """Upserts the Platform Status row for `collector` (docs/PLATFORM_STATUS.md).
+
+    Only success/failure of *this* run is recorded here - staleness (a
+    collector that keeps succeeding but hasn't run in 6+ hours) is judged
+    later from last_success_at's age, not stored as a status string.
+    """
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    existing = conn.execute(
+        "SELECT last_success_at FROM collector_runs WHERE collector = ?", (collector,)
+    ).fetchone()
+    last_success_at = now if ok else (existing["last_success_at"] if existing else None)
+    conn.execute(
+        """
+        INSERT INTO collector_runs (collector, last_attempt_at, last_success_at, status, message)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(collector) DO UPDATE SET
+            last_attempt_at = excluded.last_attempt_at,
+            last_success_at = excluded.last_success_at,
+            status = excluded.status,
+            message = excluded.message
+        """,
+        (collector, now, last_success_at, "healthy" if ok else "failed", message),
+    )
+    conn.commit()
+
+
+def get_collector_run(conn: sqlite3.Connection, collector: str) -> Optional[dict]:
+    row = conn.execute("SELECT * FROM collector_runs WHERE collector = ?", (collector,)).fetchone()
+    return dict(row) if row is not None else None

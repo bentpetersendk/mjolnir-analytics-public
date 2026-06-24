@@ -1,5 +1,10 @@
 import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory } from './data-loader.js';
 import { requestDashboardRecovery } from './recovery-service.js';
+import {
+  formatLocalDateTime, chartTimeLabel, chartTimeTooltipLabel,
+  buildPlatformRegistry, findModule, statusBar, platformStatusPanel, platformStatusBadge,
+  renderSystemHealthCard,
+} from './status.js';
 
 const app = document.querySelector('#app');
 
@@ -40,7 +45,7 @@ const navGroups = [
     heading: 'Personal',
     items: [
       { id: 'users', label: 'Community Comparison', icon: 'users' },
-      { id: 'recovery', label: 'View My Resource Insights', icon: 'key' },
+      { id: 'recovery', label: 'View My Analytics', icon: 'key' },
     ],
   },
   {
@@ -56,6 +61,7 @@ const navItems = navGroups.flatMap((group) => group.items);
 const hiddenRouteItems = [
   { id: 'groups', label: 'Groups', icon: 'cluster' },
   { id: 'sections', label: 'Sections', icon: 'book' },
+  { id: 'platform-status', label: 'Platform Status', icon: 'gauge' },
 ];
 const allRouteItems = navItems.concat(hiddenRouteItems);
 
@@ -75,6 +81,13 @@ const state = {
 let data = null;
 let nodeInsights = null;
 let nodeInsightsHistory = null;
+let platformRegistry = [];
+
+// Data Freshness / Platform Status framework (docs/PLATFORM_STATUS.md):
+// page renderers call analyticsStatusBar()/infraStatusBar() rather than
+// touching status.js directly, so every page stays on the same registry.
+function analyticsStatusBar() { return statusBar('analytics', findModule(platformRegistry, 'mjolnir-analytics')); }
+function infraStatusBar() { return statusBar('infrastructure', findModule(platformRegistry, 'node-insights')); }
 
 function icon(name) {
   const icons = {
@@ -139,7 +152,7 @@ function detailRouteParts(route) { const parts = String(route || '').split('/');
 function isNodeDetailRoute(route) { return /^node\/[A-Za-z0-9_.-]+$/.test(route || ''); }
 function nodeDetailRouteName(route) { return isNodeDetailRoute(route) ? route.split('/')[1] : null; }
 function pageTitle(route) {
-  if (isPersonalRoute(route)) return 'My Resource Insights';
+  if (isPersonalRoute(route)) return 'My Analytics';
   if (isHierarchyDetailRoute(route)) {
     const part = detailRouteParts(route).type;
     return part === 'pi' ? 'PI Detail' : `${part.charAt(0).toUpperCase()}${part.slice(1)} Detail`;
@@ -356,22 +369,72 @@ function cssVar(name, fallback) {
 }
 function chartTextColor() { return cssVar('--muted', '#90a2bc'); }
 function chartLineColor() { return cssVar('--border', 'rgba(147,166,194,0.16)'); }
-function chartTimeLabel(value) { return String(value).slice(5, 16).replace('T', ' '); }
 function chartPct(rawValue) { return rawValue === null || rawValue === undefined ? null : Math.round(Number(rawValue) * 1000) / 10; }
 
+// Shared mobile/desktop ECharts config. Every chart on the dashboard
+// (current and future - infrastructure, capacity, nodes, queue insights,
+// etc.) should build its option through baseChartOption() so it picks up
+// the responsive legend/grid/axis/tooltip/dataZoom behavior automatically
+// instead of needing page-specific mobile fixes.
+const CHART_MOBILE_BREAKPOINT = 768;
+function isMobileChartViewport() {
+  return window.matchMedia(`(max-width: ${CHART_MOBILE_BREAKPOINT - 1}px)`).matches;
+}
+
 function baseChartOption(categories, extraGrid) {
+  const mobile = isMobileChartViewport();
+  const grid = mobile
+    ? Object.assign({ left: 44, right: 12, top: 136, bottom: 56 }, extraGrid)
+    : Object.assign({ left: 48, right: 16, top: 44, bottom: 64 }, extraGrid);
+  // Mobile: vertical, scrollable legend pinned above the plot area (grid.top
+  // is pushed down to make room for it) instead of the desktop horizontal
+  // row, which wraps awkwardly once there are more than a couple of series.
+  const legend = mobile
+    ? {
+        type: 'scroll',
+        orient: 'vertical',
+        top: 4,
+        left: 'center',
+        align: 'left',
+        itemGap: 14,
+        height: 110,
+        textStyle: { color: chartTextColor(), fontSize: 12 },
+        pageIconColor: chartTextColor(),
+        pageIconInactiveColor: chartLineColor(),
+        pageTextStyle: { color: chartTextColor() },
+      }
+    : { top: 0, textStyle: { color: chartTextColor() } };
   return {
     backgroundColor: 'transparent',
     textStyle: { color: chartTextColor(), fontFamily: 'inherit' },
-    grid: Object.assign({ left: 48, right: 16, top: 44, bottom: 64 }, extraGrid),
-    legend: { top: 0, textStyle: { color: chartTextColor() } },
-    tooltip: { trigger: 'axis' },
-    dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 8, textStyle: { color: chartTextColor() } }],
+    grid,
+    legend,
+    tooltip: {
+      trigger: 'axis',
+      confine: true,
+      extraCssText: 'max-width:90vw;',
+      formatter: (params) => {
+        const list = Array.isArray(params) ? params : [params];
+        if (!list.length) return '';
+        const header = chartTimeTooltipLabel(list[0].axisValue);
+        const rows = list
+          .filter((p) => p.value !== null && p.value !== undefined)
+          .map((p) => `${p.marker}${p.seriesName}: <strong>${p.value}</strong>`)
+          .join('<br/>');
+        return `${header}<br/>${rows}`;
+      },
+    },
+    dataZoom: mobile
+      ? [{ type: 'inside' }, { type: 'slider', height: 10, bottom: 4, handleSize: '70%', textStyle: { color: chartTextColor(), fontSize: 10 } }]
+      : [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 8, textStyle: { color: chartTextColor() } }],
     xAxis: {
       type: 'category',
       data: categories,
       axisLine: { lineStyle: { color: chartLineColor() } },
-      axisLabel: { color: chartTextColor(), formatter: chartTimeLabel },
+      axisLabel: Object.assign(
+        { color: chartTextColor(), formatter: chartTimeLabel, interval: 'auto' },
+        mobile ? { rotate: 45 } : {},
+      ),
     },
   };
 }
@@ -435,6 +498,7 @@ function nodeHistoryChartOption(points) {
 }
 
 let activeCharts = [];
+let chartsRenderedForMobile = null;
 function disposeCharts() {
   activeCharts.forEach((chart) => {
     try { chart.dispose(); } catch (error) { /* chart already gone with its DOM node */ }
@@ -445,6 +509,7 @@ function disposeCharts() {
 function mountCharts() {
   disposeCharts();
   if (!window.echarts) return;
+  chartsRenderedForMobile = isMobileChartViewport();
   document.querySelectorAll('[data-chart-kind]').forEach((el) => {
     const kind = el.dataset.chartKind;
     let option = null;
@@ -467,7 +532,15 @@ let chartResizeAttached = false;
 function setupChartResize() {
   if (chartResizeAttached) return;
   chartResizeAttached = true;
-  window.addEventListener('resize', () => activeCharts.forEach((chart) => chart.resize()));
+  // Crossing the mobile breakpoint (e.g. rotating an iPhone) needs a full
+  // re-render so the legend/grid/axis switch layouts, not just a resize.
+  window.addEventListener('resize', () => {
+    if (chartsRenderedForMobile !== null && chartsRenderedForMobile !== isMobileChartViewport()) {
+      mountCharts();
+      return;
+    }
+    activeCharts.forEach((chart) => chart.resize());
+  });
 }
 
 function infrastructureOverviewPage() {
@@ -485,7 +558,8 @@ function infrastructureOverviewPage() {
 
   return `
     <div class="stack">
-      <section class="section"><div class="section-head"><h2>Fleet status</h2><span class="subtle">Snapshot: ${escapeHtml(nodeInsights.generatedAt || 'unknown')}</span></div><div class="cards-grid">${[
+      ${infraStatusBar()}
+      <section class="section"><div class="section-head"><h2>Fleet status</h2></div><div class="cards-grid">${[
         statBlock('Total nodes', fmt(totals.nodes_total), 'Live Slurm node count'),
         statBlock('Available nodes', fmt(totals.nodes_available), 'Not draining, not down', 'good'),
         statBlock('Draining nodes', fmt(totals.nodes_draining), 'Scheduled for maintenance', totals.nodes_draining ? 'warn' : 'good'),
@@ -554,6 +628,7 @@ function nodeInventoryPage() {
 
   return `
     <div class="stack">
+      ${infraStatusBar()}
       <section class="section">
         <div class="section-head"><h2>Node Inventory</h2><span class="subtle">${fmt(sorted.length)} of ${fmt(allNodes.length)} nodes</span></div>
         <div class="filter-bar">
@@ -583,6 +658,7 @@ function hardwareInventoryPage() {
 
   return `
     <div class="stack">
+      ${infraStatusBar()}
       <section class="section"><div class="section-head"><h2>Fleet composition</h2><span class="subtle">Asset inventory, from scontrol show node static fields</span></div><div class="cards-grid">${[
         statBlock('Nodes', fmt(fleet.nodes_total), 'Total fleet size'),
         statBlock('Logical CPUs', fmt(fleet.logical_cpus_total), `${fmt(fleet.physical_cores_total)} physical cores`),
@@ -613,6 +689,7 @@ function capacityPlanningPage() {
 
   return `
     <div class="stack">
+      ${infraStatusBar()}
       ${capacityHistorySection('chart-capacity-history', 'Pressure & queue trend', 'CPU, memory, and GPU pressure plus running/pending jobs and draining nodes over time.')}
       <section class="section"><div class="section-head"><h2>Current pressure</h2><span class="subtle">Live snapshot</span></div><div class="cards-grid">${[
         statBlock('CPU pressure', pct(cpu.alloc_pct), `${fmt(cpu.alloc)} / ${fmt(cpu.total)} logical CPUs allocated`, toneFromReading(cpu.reading)),
@@ -640,6 +717,7 @@ function nodeDetailPage(nodeName) {
   const gpuIdleCpuBusy = node.gpu_total > 0 && node.gpu_alloc === 0 && node.cpu_alloc > 0;
   return `
     <div class="stack">
+      ${infraStatusBar()}
       <section class="section">
         <div class="section-head"><h2>${escapeHtml(node.node)}</h2>${nodeStatePill(node)}</div>
         ${node.drain ? disclaimer(`Maintenance reason: "${node.drain_reason || 'unspecified'}"${node.drain_since ? ` - since ${node.drain_since}` : ''}`) : ''}
@@ -699,22 +777,28 @@ function landingPage() {
   const meta = asObject(data?.datasetMeta);
   const rows = asArray(data?.clusterSummary?.dailyTrends);
   const failureRate = num(allTime.failed_jobs) / Math.max(1, num(allTime.jobs));
+  const snapshotCount = asArray(nodeInsightsHistory?.capacity).length + rows.length;
+  const activeModuleCount = platformRegistry.filter((m) => !m.planned && m.available).length;
   return `
-    <section class="intro-card">
-      <div class="intro-card-icon">${icon('cluster')}</div>
-      <div>
-        <h2>Mjolnir Resource Insights</h2>
-        <p>Mjolnir Resource Insights provides researchers and Principal Investigators with a clear view of how compute resources are being used across the Mjolnir platform.</p>
-        <p>It combines resource consumption, cost drivers, project-level trends, and optimization opportunities to help research groups make informed decisions about their use of shared HPC resources.</p>
-        <p class="subtle">Future versions will also include storage usage, storage growth, and sustainability metrics.</p>
-      </div>
-    </section>
+    ${platformStatusPanel(platformRegistry, { snapshotCount, activeModuleCount })}
+    <div class="overview-top-grid">
+      <section class="intro-card">
+        <div class="intro-card-icon">${icon('cluster')}</div>
+        <div>
+          <h2>Mjolnir Analytics</h2>
+          <p>Mjolnir Analytics provides researchers and Principal Investigators with a clear view of how compute resources are being used across the Mjolnir platform.</p>
+          <p>It combines resource consumption, cost drivers, project-level trends, and optimization opportunities to help research groups make informed decisions about their use of shared HPC resources.</p>
+          <p class="subtle">Future versions will also include storage usage, storage growth, and sustainability metrics.</p>
+        </div>
+      </section>
+      ${renderSystemHealthCard(platformRegistry)}
+    </div>
     <section class="hero">
       <div class="hero-copy">
         <div class="eyebrow">${dot('green')} REAL MJOLNIR DATA - 90-day validation dataset</div>
         <h1>See how Mjolnir's resources are really being used.</h1>
         <p>Helping researchers understand resource usage, cost drivers, and optimization opportunities across Mjolnir.</p>
-        <div class="hero-actions"><a class="btn btn-primary" href="#/cluster-health">View Cluster Resource Health</a><a class="btn" href="#/rankings">View rankings</a><a class="btn" href="#/recovery">View My Resource Insights</a></div>
+        <div class="hero-actions"><a class="btn btn-primary" href="#/cluster-health">View Cluster Resource Health</a><a class="btn" href="#/rankings">View rankings</a><a class="btn" href="#/recovery">View My Analytics</a></div>
       </div>
       <div class="hero-panel">
         <div class="hero-panel-head"><div class="panel-title">90-day operating picture</div><div class="subtle">${meta.validationWindow || 'Validation window unavailable'}</div></div>
@@ -744,10 +828,29 @@ function landingPage() {
     </section>`;
 }
 
+// Placeholder destination for the System Health card's "View Platform
+// Status" button - a fuller breakdown of the same buildPlatformRegistry()
+// data shown in the Overview page's Platform Status panel and System
+// Health card. Expand this page as dedicated module detail pages
+// (Queue Insights, Slurm Insights, ...) come online.
+function platformStatusPage() {
+  const activeModuleCount = platformRegistry.filter((m) => !m.planned && m.available).length;
+  return `
+    <div class="stack">
+      ${platformStatusPanel(platformRegistry, { activeModuleCount })}
+      <section class="section"><div class="section-head"><h2>Module detail</h2><span class="subtle">Per-collector freshness</span></div>
+        <div class="stack">${platformRegistry.filter((m) => !m.planned).map((m) => (
+          `<div><h3 style="margin:0 0 8px;font-size:0.95rem">${m.label}</h3>${statusBar(m.kind === 'infrastructure' ? 'infrastructure' : 'analytics', m)}</div>`
+        )).join('')}</div>
+      </section>
+    </div>`;
+}
+
 function clusterPage() {
   const rows = asArray(data?.clusterSummary?.dailyTrends);
   return `
     <div class="stack">
+      ${analyticsStatusBar()}
       <section class="section"><div class="section-head"><h2>Efficiency and cost trends</h2><span class="subtle">Daily values with rolling averages</span></div><p class="subtle">Use these charts to spot whether Mjolnir is becoming more efficient or drifting toward larger resource gaps.</p></section>
       <div class="trend-grid">
         ${lineChart('CPU efficiency', rows, [chartSeries(rows, 'avg_cpu_efficiency', 'Daily', '#3e8cff'), rollingSeries(rows, 'avg_cpu_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_cpu_efficiency', 30, '30-day', '#ffb84d')], pct, { zeroBase: true })}
@@ -813,6 +916,7 @@ function rankingsPage() {
   const rankings = asObject(data?.rankings);
   return `
     <div class="stack">
+      ${analyticsStatusBar()}
       ${infoPanel('What do these rankings mean?', 'Rankings are not performance scores. They highlight which projects and users have the greatest optimization potential - where improving resource allocation could have the largest impact across Mjolnir. A higher ranking does not mean misuse; it means there may be more room to optimize.')}
       <section class="section"><div class="section-head"><h2>Optimization potential rankings</h2><span class="subtle">Which projects and users have the greatest optimization potential?</span></div><p class="subtle">Rankings highlight optimization potential and savings opportunity without exposing real user identity.</p></section>
       ${rankingTable('Best CPU efficiency', asArray(rankings.bestCpu), 'CPU efficiency', pct, 'cpu')}
@@ -833,6 +937,7 @@ function benchmarkPage() {
   const percentiles = asObject(data?.percentiles);
   return `
     <div class="stack">
+      ${analyticsStatusBar()}
       ${infoPanel('How do percentiles work?', 'Percentiles show how a project or user\'s resource usage compares with the broader Mjolnir community. A percentile of 90 means usage is higher than 90% of comparable peers, while a percentile of 10 means usage is lower than most peers. Percentiles provide context, not judgement, and are most useful for spotting unusually high or unusually low resource usage patterns.')}
       <section class="section"><div class="section-head"><h2>How resource usage compares across Mjolnir</h2><span class="subtle">Context, not judgement - anonymized population view</span></div><p class="subtle">Percentiles help put your resource usage in context against peer behavior without showing real peer identities.</p></section>
       <div class="trend-grid">
@@ -855,6 +960,7 @@ function recommendationsPage() {
   ]);
   return `
     <div class="stack">
+      ${analyticsStatusBar()}
       ${infoPanel('How are recommendations generated?', 'Recommendations are generated from observed resource usage patterns. They identify opportunities to improve resource allocation and reduce unnecessary costs.')}
       <section class="section"><div class="section-head"><h2>Resource Optimization Recommendations</h2><span class="subtle">Aggregated across pseudonymous users</span></div><div class="cards-grid">${[
         statBlock('Affected users', fmt(groups.reduce((sum, group) => sum + group.affectedUsers, 0)), 'Recommendation-user relationships'),
@@ -883,6 +989,7 @@ function inefficientJobsPage() {
   const rows = asArray(data?.inefficientJobs).slice(0, 100);
   return `
     <div class="stack">
+      ${analyticsStatusBar()}
       ${infoPanel('What is an optimization opportunity?', 'These examples show jobs with the largest optimization opportunity according to the Cost-Bearer model. Appearing here does not indicate a mistake - it highlights jobs where allocated resources could be better matched to actual usage.')}
       <section class="section"><div class="section-head"><h2>High-Impact Optimization Opportunities</h2><span class="subtle">Public-safe job metrics only</span></div><p class="subtle">Rows are sorted by optimization opportunity and efficiency gaps. Job names, job identifiers, usernames, paths, and node details are not displayed.</p></section>
       <section class="table-card">${inefficientJobsTable(rows)}</section>
@@ -986,7 +1093,7 @@ function userPage() {
   return `
     <div class="stack">
       ${infoPanel('What is Community Comparison?', 'Compare your resource usage patterns with similar users. Individual identities remain protected. Comparisons are intended for context and learning, not ranking.')}
-      <section class="section"><div class="section-head"><h2>Community Comparison</h2><span class="subtle">Pseudonymous public users</span></div><p class="subtle">This page shows how public pseudonymous users compare on resource usage and optimization opportunity. Individual Resource Insights pages will later reveal only the signed-in user's real username.</p></section>
+      <section class="section"><div class="section-head"><h2>Community Comparison</h2><span class="subtle">Pseudonymous public users</span></div><p class="subtle">This page shows how public pseudonymous users compare on resource usage and optimization opportunity. Individual Analytics pages will later reveal only the signed-in user's real username.</p></section>
       <section class="table-card">${tableFromRows(['Pseudonym', 'CPU efficiency', 'Memory efficiency', 'Savings opportunity', 'Jobs', 'Recommendations'], rows)}</section>
       </div>`;
 }
@@ -996,7 +1103,8 @@ function costPage() {
   const rows = asArray(data?.clusterSummary?.dailyTrends);
   return `
     <div class="stack">
-      ${infoPanel('What drives cost on Mjolnir?', 'Jobs are billed by whichever resource is larger relative to demand: reserved CPU cores or reserved memory. Memory often ends up driving cost because it is easy to over-request "just in case." The Cost-Bearer model looks at each job, decides whether CPU or memory is the dominant cost driver, and estimates the optimization opportunity only on that resource - a conservative, defensible savings number. GPU optimization opportunity is not shown below because GPU utilization is not yet measured on Mjolnir. Future versions of Resource Insights may also include storage usage and sustainability metrics.')}
+      ${analyticsStatusBar()}
+      ${infoPanel('What drives cost on Mjolnir?', 'Jobs are billed by whichever resource is larger relative to demand: reserved CPU cores or reserved memory. Memory often ends up driving cost because it is easy to over-request "just in case." The Cost-Bearer model looks at each job, decides whether CPU or memory is the dominant cost driver, and estimates the optimization opportunity only on that resource - a conservative, defensible savings number. GPU optimization opportunity is not shown below because GPU utilization is not yet measured on Mjolnir. Future versions of Analytics may also include storage usage and sustainability metrics.')}
       <section class="section"><div class="section-head"><h2>Resource Cost Insights</h2><span class="subtle">Spend, cost drivers, and optimization opportunities</span></div><div class="cards-grid">${[
         statBlock('Estimated cost', money(allTime.estimated_cost_dkk), '90-day observed cost'),
         statBlock('Potential savings', money(allTime.underutilized_cost_dkk), `${money(annualized(allTime.underutilized_cost_dkk))} annualized run-rate`, 'warn'),
@@ -1019,14 +1127,14 @@ function recoveryPage() {
   const statusClass = status?.ok ? 'success' : 'info';
   const statusMessage = status
     ? `<div class="form-status ${statusClass}">${escapeHtml(status.message)}</div>`
-    : '<div class="subtle">Enter your Mjolnir username. The future recovery service will look up the Airtable identity record and email your Resource Insights link.</div>';
+    : '<div class="subtle">Enter your Mjolnir username. The future recovery service will look up the Airtable identity record and email your Analytics link.</div>';
   return `
     <div class="stack">
-      <section class="section"><div class="section-head"><h2>View My Resource Insights</h2><span class="subtle">Self-service recovery workflow</span></div><p class="subtle" style="line-height:1.8">Public rankings use pseudonyms only. This form is the planned recovery entry point for users who want their Resource Insights link without exposing usernames in the public dataset.</p><form class="recovery-form" data-recovery-form><label for="recovery-username">Mjolnir username</label><div class="recovery-row"><input id="recovery-username" class="search" name="username" autocomplete="username" placeholder="Enter your Mjolnir username" /><button class="btn btn-primary" type="submit">Request email</button></div>${statusMessage}</form></section>
+      <section class="section"><div class="section-head"><h2>View My Analytics</h2><span class="subtle">Self-service recovery workflow</span></div><p class="subtle" style="line-height:1.8">Public rankings use pseudonyms only. This form is the planned recovery entry point for users who want their Analytics link without exposing usernames in the public dataset.</p><form class="recovery-form" data-recovery-form><label for="recovery-username">Mjolnir username</label><div class="recovery-row"><input id="recovery-username" class="search" name="username" autocomplete="username" placeholder="Enter your Mjolnir username" /><button class="btn btn-primary" type="submit">Request email</button></div>${statusMessage}</form></section>
       <section class="section"><div class="section-head"><h2>What happens next?</h2><span class="subtle">No public identity leak</span></div><div class="cards-grid">${[
         statBlock('1. Lookup', 'Airtable', 'Server-side lookup by username'),
         statBlock('2. Email', 'Private', 'URL is sent only to the registered email'),
-        statBlock('3. Resource Insights', '/u/token', 'Personal route uses a high-entropy token'),
+        statBlock('3. Analytics', '/u/token', 'Personal route uses a high-entropy token'),
       ].join('')}</div></section>
       </div>`;
 }
@@ -1127,15 +1235,15 @@ function peerComparisonTable(rows) {
 
 function personalDashboardPage() {
   if (state.personalLoading) {
-    return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>Loading My Resource Insights</h2><span class="subtle">${escapeHtml(state.personalToken || '')}</span></div><div class="empty-state">Loading private mock bundle for this route token.</div></section>`;
+    return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>Loading My Analytics</h2><span class="subtle">${escapeHtml(state.personalToken || '')}</span></div><div class="empty-state">Loading private mock bundle for this route token.</div></section>`;
   }
   if (state.personalError) {
-    return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>My Resource Insights unavailable</h2><span class="pill warn">Mock data missing</span></div><p class="subtle" style="line-height:1.8">No mock private bundle was found for this route token. The public Resource Insights data has not been changed.</p><div class="empty-state">${escapeHtml(state.personalError)}</div></section>`;
+    return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>My Analytics unavailable</h2><span class="pill warn">Mock data missing</span></div><p class="subtle" style="line-height:1.8">No mock private bundle was found for this route token. The public Analytics data has not been changed.</p><div class="empty-state">${escapeHtml(state.personalError)}</div></section>`;
   }
 
   const vm = state.personalViewModel;
   if (!vm) {
-    return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>My Resource Insights</h2><span class="subtle">Private data required</span></div><div class="empty-state">Open a route such as <strong>#/u/mock-token-alex</strong> to load the prototype Resource Insights view.</div></section>`;
+    return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>My Analytics</h2><span class="subtle">Private data required</span></div><div class="empty-state">Open a route such as <strong>#/u/mock-token-alex</strong> to load the prototype Analytics view.</div></section>`;
   }
 
   const metrics = asObject(vm.metrics);
@@ -1175,23 +1283,23 @@ function methodologyPage() {
   const rows = asObject(meta.rowCounts);
   return `
     <div class="stack">
-      <section class="section"><div class="section-head"><h2>Data provenance</h2><span class="subtle">Raw jobs to Resource Insights widgets</span></div><div class="cards-grid">${[
+      <section class="section"><div class="section-head"><h2>Data provenance</h2><span class="subtle">Raw jobs to Analytics widgets</span></div><div class="cards-grid">${[
         statBlock('Source database', '90-day validation', meta.sourceDatabase || 'Unavailable'),
         statBlock('Validation window', meta.validationWindow || 'Unavailable', 'Daily cluster summary range'),
-        statBlock('Export date', meta.exportDate ? new Date(meta.exportDate).toLocaleString() : '-', 'JSON generation timestamp'),
+        statBlock('Export date', formatLocalDateTime(meta.exportDate, '-'), 'JSON generation timestamp'),
         statBlock('Users', fmt(meta.userCount), 'Pseudonymous user bundles'),
         statBlock('Projects', meta.accountExportAvailable ? fmt(meta.projectCount) : 'Not exported', 'Public-safe project data status'),
         statBlock('Recommendations', fmt(meta.recommendationCount), 'Generated from user summaries'),
       ].join('')}</div></section>
-      <section class="section"><div class="section-head"><h2>Import row counts</h2><span class="subtle">Validated source tables</span></div>${tableFromRows(['Table', 'Rows', 'Resource Insights use'], [
+      <section class="section"><div class="section-head"><h2>Import row counts</h2><span class="subtle">Validated source tables</span></div>${tableFromRows(['Table', 'Rows', 'Analytics use'], [
         ['raw jobs', fmt(rows.jobs), 'Input for metrics calculation'],
         ['job_metrics', fmt(rows.job_metrics), 'Efficiency and cost metrics'],
         ['daily_user_summary', fmt(rows.daily_user_summary), 'User bundles, percentiles, recommendations'],
         ['daily_account_summary', fmt(rows.daily_account_summary), 'Future anonymized project summaries'],
         ['daily_cluster_summary', fmt(rows.daily_cluster_summary), 'Cluster trend charts and health KPIs'],
       ])}</section>
-      <section class="section"><div class="section-head"><h2>Lineage</h2><span class="subtle">Transformation path</span></div><div class="lineage"><span>raw jobs</span><b>metrics</b><b>daily summaries</b><b>JSON export</b><b>data-loader.js</b><strong>Resource Insights widgets</strong></div><p class="subtle" style="line-height:1.8">Pages consume normalized objects from the data loader. Public views show pseudonyms only and omit usernames, job names, node details, and filesystem paths.</p></section>
-      <section class="section"><div class="section-head"><h2>Roadmap</h2><span class="subtle">Where Resource Insights is headed</span></div><div class="panel-grid">
+      <section class="section"><div class="section-head"><h2>Lineage</h2><span class="subtle">Transformation path</span></div><div class="lineage"><span>raw jobs</span><b>metrics</b><b>daily summaries</b><b>JSON export</b><b>data-loader.js</b><strong>Analytics widgets</strong></div><p class="subtle" style="line-height:1.8">Pages consume normalized objects from the data loader. Public views show pseudonyms only and omit usernames, job names, node details, and filesystem paths.</p></section>
+      <section class="section"><div class="section-head"><h2>Roadmap</h2><span class="subtle">Where Analytics is headed</span></div><div class="panel-grid">
         <div><h3 style="margin:0 0 8px;font-size:0.95rem">Current metrics</h3><ul style="margin:0;padding-left:18px;line-height:1.8;color:var(--text)"><li>CPU</li><li>Memory</li><li>GPU allocation</li><li>Cost-Bearer analysis</li></ul></div>
         <div><h3 style="margin:0 0 8px;font-size:0.95rem">Planned metrics</h3><ul style="margin:0;padding-left:18px;line-height:1.8;color:var(--text)"><li>Storage usage</li><li>Storage growth</li><li>Energy consumption</li><li>Sustainability indicators</li></ul></div>
       </div></section>
@@ -1207,18 +1315,18 @@ function renderShell(content) {
   return `
     <div class="app-shell" data-theme="${state.theme}">
       <aside class="sidebar ${state.menuOpen ? 'open' : ''}">
-        <div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Resource Insights</div></div></div>
+        <div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Analytics</div></div></div>
         <nav class="nav-group">${navGroups.map((group) => `
           <div class="nav-section">
             <div class="nav-heading">${group.heading}</div>
             ${group.items.map((item) => navLink(item)).join('')}
           </div>`).join('')}</nav>
-        <div class="context-card"><div class="context-label">Viewing context</div><div class="context-item"><span>Environment</span><strong>Production review</strong></div><div class="context-item"><span>Mode</span><strong>${sourceText}</strong></div><div class="context-item"><span>Schema</span><strong>${data?.schemaVersion || 'unknown'}</strong></div><div class="context-item"><span>Users</span><strong>${fmt(data?.datasetMeta?.userCount || 0)}</strong></div></div>
+        <div class="context-card">${platformStatusBadge(platformRegistry)}<div class="context-label" style="margin-top:12px">Viewing context</div><div class="context-item"><span>Environment</span><strong>Production review</strong></div><div class="context-item"><span>Mode</span><strong>${sourceText}</strong></div><div class="context-item"><span>Schema</span><strong>${data?.schemaVersion || 'unknown'}</strong></div><div class="context-item"><span>Users</span><strong>${fmt(data?.datasetMeta?.userCount || 0)}</strong></div></div>
       </aside>
       <div class="sidebar-backdrop ${state.menuOpen ? 'open' : ''}" data-action="close-menu"></div>
       <main class="main">
         <div class="sticky-header">
-          <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Resource Insights</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Open navigation">${icon('menu')}</button></div>
+          <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Analytics</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Open navigation">${icon('menu')}</button></div>
           <div class="topbar"><div class="topbar-left"><div class="crumb">${icon('menu')} <span>${pageTitle(state.route)}</span></div></div><div class="topbar-right"><a class="btn" href="#/recovery">Who am I?</a><button class="toolbar-button" data-action="theme" aria-label="Toggle theme">${state.theme === 'dark' ? icon('sun') : icon('moon')}</button></div></div>
         </div>
         ${data?.source === 'real-export' ? '<div class="load-banner real"><strong>REAL MJOLNIR DATA</strong><span>90-day validation dataset</span></div>' : ''}
@@ -1229,6 +1337,7 @@ function renderShell(content) {
 
 function render() {
   document.documentElement.dataset.theme = state.theme;
+  platformRegistry = buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory });
   const renderers = {
     landing: landingPage,
     cluster: clusterPage,
@@ -1249,6 +1358,7 @@ function render() {
     cost: costPage,
     recovery: recoveryPage,
     methodology: methodologyPage,
+    'platform-status': platformStatusPage,
   };
   const content = isPersonalRoute(state.route)
     ? personalDashboardPage()

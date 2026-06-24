@@ -20,11 +20,22 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from node_insights_db import DEFAULT_DB_PATH, REPO_ROOT, connect, ensure_schema
+from node_insights_db import DEFAULT_DB_PATH, REPO_ROOT, connect, ensure_schema, get_collector_run
 
 DEFAULT_OUT_DIR = REPO_ROOT / "site" / "data"
 HISTORY_SCHEMA_VERSION = "node-insights-history-v1"
 SNAPSHOT_SCHEMA_VERSION = "node-insights-v1"
+COLLECTOR_NAME = "node_insights"
+PLATFORM_MODULE = "Node Insights"
+
+
+def collector_status_field(conn) -> Optional[str]:
+    """Platform Status framework (docs/PLATFORM_STATUS.md): only ever
+    surfaces an explicit "failed" here. Leaving it null/absent when the
+    collector is fine lets the frontend judge Healthy/Warning/Stale from
+    generated_at's age instead, which is what staleness actually means."""
+    run = get_collector_run(conn, COLLECTOR_NAME)
+    return "failed" if run and run["status"] == "failed" else None
 
 
 def utc_now_iso() -> str:
@@ -127,11 +138,16 @@ def main() -> int:
         ensure_schema(conn)
         latest = fetch_latest_snapshot(conn)
         latest_timestamp = latest["timestamp"] if latest else None
+        collector_status = collector_status_field(conn)
 
         node_insights_doc = {
             "schema_version": SNAPSHOT_SCHEMA_VERSION,
             "generated_at": generated_at,
             "source": "sqlite:node_insights",
+            "collector": COLLECTOR_NAME,
+            "collector_status": collector_status,
+            "platform_module": PLATFORM_MODULE,
+            "data_window_days": None,
             "latest_snapshot": latest,
             "pending_reasons": fetch_latest_pending_reasons(conn, latest_timestamp),
             "nodes": fetch_latest_node_states(conn, latest_timestamp),
@@ -141,6 +157,10 @@ def main() -> int:
             "schema_version": HISTORY_SCHEMA_VERSION,
             "generated_at": generated_at,
             "source": "sqlite:node_insights",
+            "collector": COLLECTOR_NAME,
+            "collector_status": collector_status,
+            "platform_module": PLATFORM_MODULE,
+            "data_window_days": args.days,
             "retention_days": args.days,
             "points": capacity_points,
         }
@@ -149,6 +169,10 @@ def main() -> int:
             "schema_version": HISTORY_SCHEMA_VERSION,
             "generated_at": generated_at,
             "source": "sqlite:node_insights",
+            "collector": COLLECTOR_NAME,
+            "collector_status": collector_status,
+            "platform_module": PLATFORM_MODULE,
+            "data_window_days": args.days,
             "retention_days": args.days,
             "nodes": node_history_nodes,
         }

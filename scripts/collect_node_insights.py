@@ -21,7 +21,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from node_insights_db import DEFAULT_DB_PATH, connect, ensure_schema
+from node_insights_db import DEFAULT_DB_PATH, connect, ensure_schema, record_collector_run
+
+COLLECTOR_NAME = "node_insights"
 
 logger = logging.getLogger("collect_node_insights")
 
@@ -228,8 +230,15 @@ def main() -> int:
 
     try:
         collected = gather(mock_dir)
-    except Exception:
+    except Exception as exc:
         logger.exception("Failed to collect Slurm fleet state; skipping this run.")
+        if not args.dry_run:
+            conn = connect(Path(args.db))
+            try:
+                ensure_schema(conn)
+                record_collector_run(conn, COLLECTOR_NAME, ok=False, message=str(exc))
+            finally:
+                conn.close()
         return 1
 
     snapshot = build_snapshot(collected["nodes"], collected["running_jobs"], collected["pending_jobs"], timestamp)
@@ -252,6 +261,7 @@ def main() -> int:
     try:
         ensure_schema(conn)
         store_snapshot(conn, snapshot, collected["pending_reasons"], node_rows)
+        record_collector_run(conn, COLLECTOR_NAME, ok=True)
     finally:
         conn.close()
     return 0
