@@ -2,7 +2,7 @@
 Description=Run Mjolnir Node Insights collector hourly
 
 [Timer]
-OnCalendar=hourly
+OnCalendar=*-*-* *:20:00
 RandomizedDelaySec=30
 Persistent=true
 Unit=mjolnir-node-collector.service
