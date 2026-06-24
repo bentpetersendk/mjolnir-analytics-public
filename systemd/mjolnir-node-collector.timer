@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Mjolnir Node Insights collector hourly
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=30
+Persistent=true
+Unit=mjolnir-node-collector.service
+
+[Install]
+WantedBy=timers.target

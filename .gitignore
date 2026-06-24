@@ -3,6 +3,9 @@
 *.sqlite3
 *.db
 *.db-*
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
 
 # Logs
 *.log
@@ -40,3 +43,9 @@ __pycache__/
 !.env.example
 
 # Public-safe deployment guardrails
+#
+# data/node_insights.sqlite (matched by the *.sqlite rule above) is the
+# Node Insights raw database and must never be pushed to GitHub Pages.
+# site/data/*.json (scripts/export_node_insights.py output) is the only
+# Node Insights data this repo publishes - it is intentionally NOT
+# ignored here so scripts/publish_dashboard.sh can commit it.

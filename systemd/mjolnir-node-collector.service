@@ -1,0 +1,25 @@
+[Unit]
+Description=Mjolnir Node Insights - hourly Slurm fleet collector
+Documentation=file:///maps/projects/mjolnir_admin/scratch/mjolnir-efficiency-dashboard-public/NODE_INSIGHTS_ARCHITECTURE.md
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/maps/projects/mjolnir_admin/scratch/mjolnir-efficiency-dashboard-public
+ExecStart=/usr/bin/python3 scripts/collect_node_insights.py --db data/node_insights.sqlite
+Restart=always
+RestartSec=60
+TimeoutStartSec=60
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mjolnir-node-collector
+
+# Hardening: this script only shells out to read-only Slurm CLIs (sinfo,
+# scontrol, squeue) and writes to data/node_insights.sqlite in its working
+# directory - no network access or elevated privileges are required.
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
