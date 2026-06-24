@@ -26,4 +26,11 @@ assert "isNodeDetailRoute" in app
 assert "GresUsed" in app
 assert "WorkDir" not in loader
 assert "JobName" not in app and "JobName" not in loader
+
+# Node Insights history (Phase 2: persistent historical monitoring).
+assert "loadNodeInsightsHistory" in app
+assert "loadNodeInsightsHistory" in loader
+assert "mountCharts" in app
+for fn in ("capacityHistorySection", "drainingHistorySection", "nodeHistorySection"):
+    assert fn in app, f"missing Node Insights history renderer: {fn}"
 print('ui checks passed')

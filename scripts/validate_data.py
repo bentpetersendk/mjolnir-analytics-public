@@ -185,3 +185,46 @@ else:
 
     print(f'Node Insights export OK: {len(nodes)} nodes, no forbidden fields, '
           f'GPU {gpu_alloc_from_inventory}/{gpu_total_from_inventory} from GresUsed')
+
+# ---------------------------------------------------------------------------
+# Node Insights history (Phase 2: persistent historical monitoring). Public
+# JSON generated from data/node_insights.sqlite by
+# scripts/export_node_insights.py. Aggregate-only - same forbidden-field
+# guardrails as the live snapshot above, plus structural checks on the
+# time-series shape.
+# ---------------------------------------------------------------------------
+NI_HISTORY_DIR = root / 'site' / 'data'
+ni_history_files = {
+    'node_insights': NI_HISTORY_DIR / 'node_insights.json',
+    'capacity_history': NI_HISTORY_DIR / 'capacity_history.json',
+    'node_history': NI_HISTORY_DIR / 'node_history.json',
+}
+missing_history = [name for name, p in ni_history_files.items() if not p.exists()]
+if missing_history:
+    print(f'SKIPPED Node Insights history validation: missing {missing_history}.')
+else:
+    ni_history_docs = {}
+    for name, p in ni_history_files.items():
+        text = p.read_text()
+        for pattern in NI_FORBIDDEN_TEXT_PATTERNS:
+            assert not pattern.search(text), f'forbidden field pattern found in {p}'
+        ni_history_docs[name] = json.loads(text)
+        ni_assert_public_safe(ni_history_docs[name], str(p.name))
+
+    capacity_points = ni_history_docs['capacity_history'].get('points', [])
+    REQUIRED_CAPACITY_KEYS = {
+        'timestamp', 'total_nodes', 'available_nodes', 'draining_nodes', 'down_nodes',
+        'cpu_pct', 'memory_pct', 'gpu_pct', 'running_jobs', 'pending_jobs',
+    }
+    for point in capacity_points:
+        assert REQUIRED_CAPACITY_KEYS.issubset(point.keys()), f'capacity_history point missing keys: {point}'
+
+    node_history_nodes = ni_history_docs['node_history'].get('nodes', [])
+    for node_entry in node_history_nodes:
+        assert 'node_name' in node_entry and 'points' in node_entry, f'node_history entry malformed: {node_entry}'
+        for point in node_entry['points']:
+            assert {'timestamp', 'state', 'cpu_pct', 'mem_pct', 'gpu_pct'}.issubset(point.keys()), (
+                f'node_history point missing keys: {point}')
+
+    print(f'Node Insights history export OK: {len(capacity_points)} capacity points, '
+          f'{len(node_history_nodes)} nodes, no forbidden fields')
