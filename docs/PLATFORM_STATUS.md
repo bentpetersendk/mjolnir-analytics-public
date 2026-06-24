@@ -18,7 +18,9 @@ decides a health color on its own.
 ## Timestamp and timezone handling
 
 - **Storage stays UTC, always.** `data/node_insights.sqlite`, every
-  `data/**/*.json` export, and every `site/data/*.json` export store
+  `data/**/*.json` export, and every Node Insights history export now
+  published to `dashboard-data/mjolnir/*.json` (see
+  [DASHBOARD_DATA_MIGRATION.md](DASHBOARD_DATA_MIGRATION.md)) store
   `generated_at` / `timestamp` as UTC ISO-8601 (`...Z`). Nothing in this
   document changes that - `js/status.js` only ever *reads* those values.
 - **Conversion to local time happens once, in the frontend.**

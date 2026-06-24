@@ -4,7 +4,11 @@
 #
 #   1. collect_node_insights.py - one Slurm snapshot into SQLite
 #   2. publish_dashboard.sh     - export_node_insights.py, then commit+push
-#                                 only the generated site/data/*.json files
+#                                 the generated JSON into the separate
+#                                 dashboard-data repo (mjolnir/ directory) -
+#                                 see docs/DASHBOARD_DATA_MIGRATION.md. This
+#                                 repo (mjolnir-efficiency-dashboard-public)
+#                                 is never committed to by this cycle.
 #
 # set -e means a failed collection never reaches the publish step, and a
 # failed export (see publish_dashboard.sh's own checks) never gets

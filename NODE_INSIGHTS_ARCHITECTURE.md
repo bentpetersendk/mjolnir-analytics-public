@@ -31,17 +31,21 @@ data/node_insights.sqlite            <- authoritative source of truth
 scripts/export_node_insights.py
         │  writes public JSON (last 90 days only)
         ▼
-site/data/node_insights.json
-site/data/capacity_history.json
-site/data/node_history.json
+mjolnir/node_insights.json
+mjolnir/capacity_history.json
+mjolnir/node_history.json
         │  git add + commit + push (scripts/publish_dashboard.sh)
         ▼
-GitHub Pages (this repo)             <- public, no raw data, no SQLite
-        │
+dashboard-data repo (bentpetersendk/dashboard-data)  <- public, separate
+        │                                                from this repo
         ▼
 js/data-loader.js  →  js/app.js  →  Apache ECharts on the
 Infrastructure / Capacity / Nodes pages
 ```
+
+The generated JSON is published to a separate repo, not this one - see
+[docs/DASHBOARD_DATA_MIGRATION.md](docs/DASHBOARD_DATA_MIGRATION.md) for
+the full rationale and the credential/clone setup.
 
 The live-snapshot views that already existed (`data/node_insights/*.json`,
 loaded via `loadNodeInsightsData()`) are unchanged. The history pipeline
@@ -138,8 +142,10 @@ Useful flags:
 
 ## 4. Export: `scripts/export_node_insights.py`
 
-Reads `data/node_insights.sqlite` and writes three files (default
-`site/data/`):
+Reads `data/node_insights.sqlite` and writes three files via `--out-dir`
+(default `site/data/` for standalone/local runs; the hourly cycle passes a
+`dashboard-data` clone's `mjolnir/` directory instead - see
+[docs/DASHBOARD_DATA_MIGRATION.md](docs/DASHBOARD_DATA_MIGRATION.md)):
 
 - **`node_insights.json`** - the latest snapshot, its pending reasons, and
   the latest per-node state list. A compact "what does the fleet look like
@@ -165,18 +171,18 @@ existing snapshot exports and the frontend's `pct()` formatter.
 - **SQLite (`data/node_insights.sqlite`)**: every hourly snapshot is kept
   forever. Nothing in this pipeline deletes rows. Disk usage is small: three
   narrow tables, one row (or one row per node/reason) per hour.
-- **Public JSON (`site/data/*.json`)**: only the most recent 90 days are
-  exported. Older history remains queryable directly against the SQLite
-  file on the headnode if ever needed, but never leaves it.
+- **Public JSON (`dashboard-data/mjolnir/*.json`)**: only the most recent 90
+  days are exported. Older history remains queryable directly against the
+  SQLite file on the headnode if ever needed, but never leaves it.
 
 ## 6. Frontend: Apache ECharts on existing pages
 
 `js/data-loader.js` exports `loadNodeInsightsHistory()`, which fetches
-`site/data/capacity_history.json` and `site/data/node_history.json` (both
-optional - a 404 simply yields `available: false` and the pages fall back
-to the existing "historical trend collection has not started yet"
-messaging). `js/app.js` loads it alongside the existing
-`loadNodeInsightsData()` call in `init()`.
+`capacity_history.json` and `node_history.json` from the `dashboard-data`
+repo over `raw.githubusercontent.com` (both optional - a 404 simply yields
+`available: false` and the pages fall back to the existing "historical
+trend collection has not started yet" messaging). `js/app.js` loads it
+alongside the existing `loadNodeInsightsData()` call in `init()`.
 
 Apache ECharts is loaded from a CDN `<script>` tag in `index.html` (before
 the `app.js` module script, so `window.echarts` is ready when the app
@@ -253,33 +259,44 @@ place:
 collect_node_insights.py  (one Slurm snapshot -> SQLite)
         ↓
 publish_dashboard.sh:
-  export_node_insights.py  (SQLite -> site/data/*.json)
+  sync dashboard-data clone (git fetch + reset --hard origin/main)
         ↓
-  detect changes           (git diff --cached, staged public files only)
+  export_node_insights.py  (SQLite -> <clone>/mjolnir/*.json)
+        ↓
+  detect changes           (git diff --cached, in the dashboard-data clone)
         ↓
   ┌─ unchanged → log "No dashboard data changes detected.
   │              Skipping commit and push." → exit 0
   └─ changed   → log "Dashboard data changed. Publishing update."
-                 → commit → push origin HEAD
+                 → commit → push origin HEAD (in the dashboard-data clone)
 ```
+
+This repo (`mjolnir-efficiency-dashboard-public`) is never committed to by
+this cycle - see
+[docs/DASHBOARD_DATA_MIGRATION.md](docs/DASHBOARD_DATA_MIGRATION.md) for why
+generated data moved to a separate repo and how the publishing clone and
+its dedicated deploy key are set up.
 
 `set -euo pipefail` in both scripts means a failed collection never reaches
 export/publish, and a failed export (missing file, forbidden field, invalid
 JSON - see the safety gate below) never gets committed. A failed `git push`
 is checked explicitly and returns a non-zero exit code with an error log
 line (`public JSON was committed locally but NOT published to GitHub`) -
-the commit still happens locally in that case, so the next cycle's `git
-diff` correctly sees no further changes to publish until something new is
-collected, rather than retrying the same stale commit forever.
+the commit still happens locally in the dashboard-data clone in that case,
+so the next cycle's `git diff` correctly sees no further changes to publish
+until something new is collected, rather than retrying the same stale
+commit forever.
 
 `publish_dashboard.sh` can also be run standalone (e.g. manually, or from a
-separate periodic job) - it always re-exports from the current database
-state before checking for changes, so it's safe to run anytime.
+separate periodic job) - it always re-syncs the clone and re-exports from
+the current database state before checking for changes, so it's safe to run
+anytime.
 
 Change detection is staged-diff based (`git diff --cached --quiet --
-"${PUBLIC_FILES[@]}"`), so a cycle where the collected snapshot doesn't
-move any exported percentage/count (rare, but possible) produces zero
-commits - only real data changes ever reach GitHub.
+"${STAGE_PATHS[@]}"`, run inside the dashboard-data clone), so a cycle where
+the collected snapshot doesn't move any exported percentage/count (rare,
+but possible) produces zero commits - only real data changes ever reach
+GitHub.
 
 It never stages `data/node_insights.sqlite`, logs, or any other generated
 artifact - the explicit `PUBLIC_FILES` list in the script is the
@@ -315,10 +332,13 @@ forecasting, efficiency reporting) can reuse it without rework:
   own systemd timer if a different cadence is needed.
 - **Export**: add a new `export_<module>.py` (or extend
   `export_node_insights.py`) that reads the new tables and writes its own
-  `site/data/<module>_*.json` files, following the same "aggregate-only,
-  90-day public window, indefinite raw retention" rules.
+  `<module>_*.json` files into the same dashboard-data `mjolnir/` directory,
+  following the same "aggregate-only, 90-day public window, indefinite raw
+  retention" rules.
 - **Deployment**: extend `scripts/publish_dashboard.sh`'s `PUBLIC_FILES`
-  list rather than writing a new publish script.
+  list rather than writing a new publish script - it already points at
+  `dashboard-data/mjolnir/`, so a new module's files land there
+  automatically.
 - **Frontend**: add chart sections to the relevant page using the same
   `[data-chart-kind]` + `mountCharts()` convention in `js/app.js`.
 

@@ -29,10 +29,13 @@ StandardError=journal
 SyslogIdentifier=mjolnir-node-collector
 
 # Hardening: no elevated privileges are required. This cycle does reach the
-# network now (publish_dashboard.sh pushes to GitHub over SSH using a
-# deploy key scoped to this one repo). ProtectSystem/PrivateTmp only touch
-# /usr,/boot,/etc and /tmp, not the NFS-mounted repo, so they don't trigger
-# the root_squash issue above.
+# network now (publish_dashboard.sh pulls/pushes a sibling clone of the
+# dashboard-data repo over SSH, using a deploy key scoped to that repo only
+# - see docs/DASHBOARD_DATA_MIGRATION.md; distinct from the
+# mjolnir_dashboard_deploy_key used to deploy this repo itself).
+# ProtectSystem/PrivateTmp only touch /usr,/boot,/etc and /tmp, not the
+# NFS-mounted repo or its dashboard-data sibling, so they don't trigger the
+# root_squash issue above.
 NoNewPrivileges=true
 ProtectSystem=full
 PrivateTmp=true

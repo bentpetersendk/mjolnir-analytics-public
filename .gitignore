@@ -46,6 +46,11 @@ __pycache__/
 #
 # data/node_insights.sqlite (matched by the *.sqlite rule above) is the
 # Node Insights raw database and must never be pushed to GitHub Pages.
-# site/data/*.json (scripts/export_node_insights.py output) is the only
-# Node Insights data this repo publishes - it is intentionally NOT
-# ignored here so scripts/publish_dashboard.sh can commit it.
+#
+# Generated Node Insights JSON (formerly site/data/*.json) now publishes to
+# the dashboard-data repo, not this one - see
+# docs/DASHBOARD_DATA_MIGRATION.md. scripts/export_node_insights.py still
+# defaults to writing site/data/ when run standalone without --out-dir (e.g.
+# for local debugging); ignore that output so it can never be committed here
+# by mistake.
+/site/

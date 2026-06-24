@@ -2,17 +2,19 @@
 """Export aggregate-only public JSON from the Node Insights SQLite database.
 
 Reads data/node_insights.sqlite (the authoritative source of truth) and
-writes:
-  - site/data/node_insights.json    latest snapshot + pending reasons + node states
-  - site/data/capacity_history.json cluster-level time series (CPU/memory/GPU
-                                     pressure, queue, draining nodes)
-  - site/data/node_history.json     per-node time series (state + utilization)
+writes, to --out-dir (default site/data/ for standalone/local runs; the
+hourly cycle passes a dashboard-data clone's mjolnir/ directory instead -
+see docs/DASHBOARD_DATA_MIGRATION.md):
+  - node_insights.json    latest snapshot + pending reasons + node states
+  - capacity_history.json cluster-level time series (CPU/memory/GPU
+                           pressure, queue, draining nodes)
+  - node_history.json     per-node time series (state + utilization)
 
 These three files are the only Node Insights artifacts this pipeline ever
-pushes to GitHub Pages (see scripts/publish_dashboard.sh). Raw snapshots
-stay in SQLite indefinitely; only the most recent --days (default 90) are
-included in the exported JSON. No usernames, job IDs, job names, or account
-names are ever read from this database - the schema doesn't carry them.
+publishes (see scripts/publish_dashboard.sh). Raw snapshots stay in SQLite
+indefinitely; only the most recent --days (default 90) are included in the
+exported JSON. No usernames, job IDs, job names, or account names are ever
+read from this database - the schema doesn't carry them.
 """
 import argparse
 import json

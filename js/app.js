@@ -308,9 +308,10 @@ function sortableTableFromRows(columns, rows, sortKey, sortDir) {
 // Node Insights history: hourly time series collected by
 // scripts/collect_node_insights.py into data/node_insights.sqlite and
 // exported as public-safe aggregate JSON by scripts/export_node_insights.py
-// (site/data/capacity_history.json, site/data/node_history.json). Charts
-// render with Apache ECharts (CDN <script> in index.html) after each
-// render() pass - see mountCharts() near the bottom of this file.
+// into the dashboard-data repo (capacity_history.json, node_history.json -
+// see docs/DASHBOARD_DATA_MIGRATION.md). Charts render with Apache ECharts
+// (CDN <script> in index.html) after each render() pass - see
+// mountCharts() near the bottom of this file.
 const HISTORY_RANGES = [
   { id: '24h', label: '24h', ms: 24 * 60 * 60 * 1000 },
   { id: '7d', label: '7d', ms: 7 * 24 * 60 * 60 * 1000 },

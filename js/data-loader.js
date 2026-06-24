@@ -2,7 +2,13 @@ const REAL_BASE = './data/efficiency_v3/site_data_90d_validation/';
 const SAMPLE_BASE = './sample-data/';
 const PERSONAL_DATA_BASE = window.MJOLNIR_PERSONAL_DATA_BASE || './private-user-data/';
 const NODE_INSIGHTS_BASE = './data/node_insights/';
-const NODE_INSIGHTS_HISTORY_BASE = './site/data/';
+// Generated Node Insights history JSON lives in the dashboard-data repo
+// (bentpetersendk/dashboard-data, mjolnir/ directory), not in this repo -
+// see docs/DASHBOARD_DATA_MIGRATION.md. Override with
+// window.MJOLNIR_DASHBOARD_DATA_BASE for private/internal deployments, the
+// same pattern PERSONAL_DATA_BASE already uses above.
+const NODE_INSIGHTS_HISTORY_BASE = window.MJOLNIR_DASHBOARD_DATA_BASE
+  || 'https://raw.githubusercontent.com/bentpetersendk/dashboard-data/main/mjolnir/';
 
 const VALIDATION_ROW_COUNTS = {
   jobs: 2364601,
