@@ -165,7 +165,7 @@ const PLANNED_MODULES = [
 // each module's data lives in - statusBar()/platformStatusPanel() below
 // just iterate the result, so adding a module here is the only frontend
 // change a future collector needs (see the file header).
-export function buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory }) {
+export function buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline }) {
   const meta = (data && data.datasetMeta) || {};
   const analyticsGeneratedAt = meta.exportDate || data?.generatedAt || null;
   const analyticsAvailable = Boolean(data) && data.source !== 'fallback';
@@ -198,11 +198,23 @@ export function buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory 
     planned: false,
   };
 
+  const pipelineModule = {
+    id: 'slurm-analytics-pipeline',
+    label: slurmAnalyticsPipeline?.platformModule || 'Slurm Analytics Pipeline',
+    kind: 'infrastructure',
+    collectorName: slurmAnalyticsPipeline?.collectorName || 'slurm_analytics_pipeline',
+    generatedAt: slurmAnalyticsPipeline?.generatedAt ?? null,
+    dataWindowDays: slurmAnalyticsPipeline?.dataWindowDays ?? null,
+    available: Boolean(slurmAnalyticsPipeline?.available),
+    status: slurmAnalyticsPipeline?.collectorStatus || (slurmAnalyticsPipeline?.available ? null : 'failed'),
+    planned: false,
+  };
+
   const planned = PLANNED_MODULES.map((m) => ({
     ...m, planned: true, available: true, generatedAt: null, dataWindowDays: null, status: null,
   }));
 
-  return [analyticsModule, nodeModule, ...planned];
+  return [analyticsModule, nodeModule, pipelineModule, ...planned];
 }
 
 export function findModule(registry, id) {

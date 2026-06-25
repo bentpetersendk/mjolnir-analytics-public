@@ -1,4 +1,4 @@
-import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory } from './data-loader.js';
+import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus } from './data-loader.js';
 import { requestDashboardRecovery } from './recovery-service.js';
 import {
   formatLocalDateTime, chartTimeLabel, chartTimeTooltipLabel,
@@ -81,6 +81,7 @@ const state = {
 let data = null;
 let nodeInsights = null;
 let nodeInsightsHistory = null;
+let slurmAnalyticsPipeline = null;
 let platformRegistry = [];
 
 // Data Freshness / Platform Status framework (docs/PLATFORM_STATUS.md):
@@ -1340,7 +1341,7 @@ function renderShell(content) {
 
 function render() {
   document.documentElement.dataset.theme = state.theme;
-  platformRegistry = buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory });
+  platformRegistry = buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline });
   const renderers = {
     landing: landingPage,
     cluster: clusterPage,
@@ -1505,10 +1506,11 @@ function handleRoute() {
 window.addEventListener('hashchange', handleRoute);
 
 async function init() {
-  [data, nodeInsights, nodeInsightsHistory] = await Promise.all([
+  [data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline] = await Promise.all([
     loadMjolnirData(),
     loadNodeInsightsData(),
     loadNodeInsightsHistory(),
+    loadSlurmAnalyticsPipelineStatus(),
   ]);
   render();
   if (isPersonalRoute(state.route)) await loadPersonalRoute(state.route);

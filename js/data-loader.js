@@ -9,6 +9,13 @@ const NODE_INSIGHTS_BASE = './data/node_insights/';
 // same pattern PERSONAL_DATA_BASE already uses above.
 const NODE_INSIGHTS_HISTORY_BASE = window.MJOLNIR_DASHBOARD_DATA_BASE
   || 'https://raw.githubusercontent.com/bentpetersendk/dashboard-data/main/mjolnir/';
+// Slurm Analytics pipeline status (private repo's
+// scripts/export_dashboard_data.py + publish_slurm_analytics.sh) - a single
+// small aggregate-only JSON proving the nightly warehouse import/validate/
+// materialize cycle is alive, not a dashboard export. Same dashboard-data
+// base as Node Insights history, one subdirectory over - see
+// NIGHTLY_PIPELINE.md in the private repo.
+const SLURM_ANALYTICS_BASE = `${NODE_INSIGHTS_HISTORY_BASE}slurm_analytics/`;
 
 const VALIDATION_ROW_COUNTS = {
   jobs: 2364601,
@@ -625,6 +632,43 @@ export async function loadNodeInsightsHistory() {
     };
   } catch (error) {
     return emptyNodeInsightsHistory(error);
+  }
+}
+
+// Slurm Analytics pipeline status: is the private repo's nightly warehouse
+// automation (collect -> import -> validate -> materialize -> export ->
+// publish) keeping data/mjolnir_analytics.sqlite up to date. Aggregate
+// counts only - no usernames, job IDs, or work directories ever leave the
+// private repo (see ANALYTICS_WAREHOUSE.md Section 7 and
+// export_dashboard_data.py's docstring).
+function emptySlurmAnalyticsStatus(error) {
+  return {
+    available: false,
+    error: error ? String(error) : null,
+    generatedAt: null,
+    collectorName: null,
+    collectorStatus: 'failed',
+    platformModule: null,
+    dataWindowDays: null,
+    warehouse: {},
+  };
+}
+
+export async function loadSlurmAnalyticsPipelineStatus() {
+  try {
+    const doc = await loadJson(`${SLURM_ANALYTICS_BASE}status.json`);
+    return {
+      available: true,
+      error: null,
+      generatedAt: doc.generated_at || null,
+      collectorName: doc.collector || 'slurm_analytics_pipeline',
+      collectorStatus: doc.collector_status || null,
+      platformModule: doc.platform_module || 'Slurm Analytics Pipeline',
+      dataWindowDays: doc.data_window_days ?? null,
+      warehouse: asObject(doc.warehouse),
+    };
+  } catch (error) {
+    return emptySlurmAnalyticsStatus(error);
   }
 }
 
