@@ -19,7 +19,7 @@
   - `percentiles.gpu_hours` -> GPU usage percentile widgets
   - `percentiles.underutilized_cost_dkk` -> savings percentile widgets
 - `users/<token>.json`
-  - `all_time_summary` -> user dashboard summary cards
+  - `all_time_summary` -> user Analytics summary cards
   - `daily_trends` -> per-user trend data
   - `rolling_summaries` -> derived rollup context
   - `recommendations` -> recommendation cards

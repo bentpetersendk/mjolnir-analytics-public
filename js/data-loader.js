@@ -12,7 +12,7 @@ const NODE_INSIGHTS_HISTORY_BASE = window.MJOLNIR_DASHBOARD_DATA_BASE
 // Slurm Analytics pipeline status (private repo's
 // scripts/export_dashboard_data.py + publish_slurm_analytics.sh) - a single
 // small aggregate-only JSON proving the nightly warehouse import/validate/
-// materialize cycle is alive, not a dashboard export. Same dashboard-data
+// materialize cycle is alive, not an analytics export. Same dashboard-data
 // base as Node Insights history, one subdirectory over - see
 // NIGHTLY_PIPELINE.md in the private repo.
 const SLURM_ANALYTICS_BASE = `${NODE_INSIGHTS_HISTORY_BASE}slurm_analytics/`;
@@ -526,8 +526,6 @@ export async function loadPersonalData(routeToken) {
     personalUser: normalizePersonalUserViewModel(personalBundle, token),
   };
 }
-
-export const loadPersonalDashboardData = loadPersonalData;
 
 // Node Insights: live Slurm fleet state (sinfo/scontrol/squeue), collected by
 // the private repo's scripts/collect_node_insights.py. Public-safe aggregate/

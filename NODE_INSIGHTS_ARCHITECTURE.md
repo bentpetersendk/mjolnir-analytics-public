@@ -1,6 +1,6 @@
 # Node Insights: Architecture
 
-Node Insights converts the public dashboard's Slurm fleet views from a
+Node Insights converts the public Analytics site's Slurm fleet views from a
 live-snapshot-only system into a persistent historical monitoring platform.
 It collects cluster statistics every hour on the Mjolnir headnode, stores
 every raw snapshot indefinitely in a local SQLite database, and publishes

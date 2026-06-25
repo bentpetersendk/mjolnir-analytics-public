@@ -6,10 +6,10 @@ flowchart LR
   C[sample-data/] --> B
   B --> D[Normalized app data]
   D --> E[Landing Page]
-  D --> F[Cluster Dashboard]
-  D --> G[User Dashboard]
-  D --> H[Benchmark Dashboard]
-  D --> I[Cost Dashboard]
+  D --> F[Cluster Analytics]
+  D --> G[User Analytics]
+  D --> H[Benchmark Analytics]
+  D --> I[Cost Analytics]
   D --> J[Methodology Page]
 ```
 

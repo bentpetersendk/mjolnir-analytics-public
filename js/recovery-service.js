@@ -4,7 +4,7 @@ function normalizeUsername(username) {
   return String(username || '').trim();
 }
 
-export async function requestDashboardRecovery(username) {
+export async function requestAnalyticsRecovery(username) {
   const normalizedUsername = normalizeUsername(username);
 
   if (!normalizedUsername) {

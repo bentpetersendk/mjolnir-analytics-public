@@ -1,4 +1,4 @@
-# Future PI Dashboard
+# Future PI Analytics View
 
 The current architecture is ready to grow into PI-level summaries without redesign.
 
@@ -13,15 +13,15 @@ The current architecture is ready to grow into PI-level summaries without redesi
 ## Architecture direction
 
 - Extend `js/data-loader.js` with a PI projection layer.
-- Normalize project and group aggregates into the same shape used by the existing dashboards.
+- Normalize project and group aggregates into the same shape used by the existing Analytics pages.
 - Keep views data-driven so new PI pages can reuse the same KPI, percentile, chart, and recommendation components.
 
 ## UI guidance
 
-- Prefer the same enterprise dashboard shell.
+- Prefer the same enterprise Analytics shell.
 - Add a project selector and a group selector.
 - Reuse cluster-style tables and recommendation cards rather than inventing a separate design language.
 
 ## Scalability rule
 
-The PI dashboard should consume the same data pipeline as the current app and switch only the view model, not the rendering architecture.
+The PI analytics view should consume the same data pipeline as the current app and switch only the view model, not the rendering architecture.
