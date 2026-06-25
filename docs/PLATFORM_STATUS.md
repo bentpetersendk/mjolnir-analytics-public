@@ -169,7 +169,7 @@ once a module is in the registry.
 Note: **Cost Insights already exists** as an active page (`costPage()` in
 `js/app.js`, nav id `cost`) backed by the same Slurm efficiency collector as
 Trends/Rankings - it is intentionally listed as Healthy/Degraded/etc. via
-the `mjolnir-analytics` registry entry, not as a Planned placeholder.
+the `analytics-warehouse` registry entry, not as a Planned placeholder.
 **Queue Insights**, **Slurm Insights**, and **Predictions** have no
 collector yet (`scripts/collect_node_insights.py`'s `collect_partitions()`
 parses partition data but doesn't persist it - that's reserved for Queue

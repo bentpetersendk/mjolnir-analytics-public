@@ -1,7 +1,8 @@
 // Data Freshness & Platform Status framework.
 //
-// Every collector (Node Insights, Mjolnir Analytics, and any future module)
-// is stored and exported in UTC. This module is the single place that
+// Every collector (Node Insights, Analytics Warehouse, Analytics Pipeline,
+// and any future module) is stored and exported in UTC. This module is the
+// single place that
 // converts those UTC instants to the viewer's browser timezone, judges
 // collector/platform health from them, and renders the standard "Last
 // Updated / Collector Status / Data Source" UI fragments. Pages should
@@ -165,19 +166,18 @@ const PLANNED_MODULES = [
 // each module's data lives in - statusBar()/platformStatusPanel() below
 // just iterate the result, so adding a module here is the only frontend
 // change a future collector needs (see the file header).
-export function buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline }) {
-  const meta = (data && data.datasetMeta) || {};
-  const analyticsGeneratedAt = meta.exportDate || data?.generatedAt || null;
-  const analyticsAvailable = Boolean(data) && data.source !== 'fallback';
-  const analyticsModule = {
-    id: 'mjolnir-analytics',
-    label: meta.platformModule || 'Mjolnir Analytics',
+export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline }) {
+  const warehouse = slurmAnalyticsPipeline?.warehouse || {};
+  const warehouseAvailable = Boolean(slurmAnalyticsPipeline?.available) && Boolean(warehouse.total_jobs);
+  const warehouseModule = {
+    id: 'analytics-warehouse',
+    label: 'Analytics Warehouse',
     kind: 'analytics',
-    collectorName: meta.collectorName || 'mjolnir_efficiency',
-    generatedAt: analyticsGeneratedAt,
-    dataWindowDays: meta.dataWindowDays ?? dataWindowDaysFromRange(meta.dateRange, 90),
-    available: analyticsAvailable,
-    status: meta.collectorStatus || (analyticsAvailable ? null : 'failed'),
+    collectorName: 'mjolnir_analytics_warehouse',
+    generatedAt: warehouse.last_import_at || warehouse.last_materialization_at || warehouse.last_success_at || null,
+    dataWindowDays: dataWindowDaysFromRange({ start: warehouse.earliest_date, end: warehouse.latest_date }, null),
+    available: warehouseAvailable,
+    status: warehouseAvailable ? null : 'failed',
     planned: false,
   };
 
@@ -199,8 +199,8 @@ export function buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory,
   };
 
   const pipelineModule = {
-    id: 'slurm-analytics-pipeline',
-    label: slurmAnalyticsPipeline?.platformModule || 'Slurm Analytics Pipeline',
+    id: 'analytics-pipeline',
+    label: slurmAnalyticsPipeline?.platformModule || 'Analytics Pipeline',
     kind: 'infrastructure',
     collectorName: slurmAnalyticsPipeline?.collectorName || 'slurm_analytics_pipeline',
     generatedAt: slurmAnalyticsPipeline?.generatedAt ?? null,
@@ -214,7 +214,7 @@ export function buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory,
     ...m, planned: true, available: true, generatedAt: null, dataWindowDays: null, status: null,
   }));
 
-  return [analyticsModule, nodeModule, pipelineModule, ...planned];
+  return [warehouseModule, nodeModule, pipelineModule, ...planned];
 }
 
 export function findModule(registry, id) {

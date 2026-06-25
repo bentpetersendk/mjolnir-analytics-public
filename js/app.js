@@ -1,5 +1,5 @@
 import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus } from './data-loader.js';
-import { requestDashboardRecovery } from './recovery-service.js';
+import { requestAnalyticsRecovery } from './recovery-service.js';
 import {
   formatLocalDateTime, chartTimeLabel, chartTimeTooltipLabel,
   buildPlatformRegistry, findModule, statusBar, platformStatusPanel, platformStatusBadge,
@@ -87,7 +87,7 @@ let platformRegistry = [];
 // Data Freshness / Platform Status framework (docs/PLATFORM_STATUS.md):
 // page renderers call analyticsStatusBar()/infraStatusBar() rather than
 // touching status.js directly, so every page stays on the same registry.
-function analyticsStatusBar() { return statusBar('analytics', findModule(platformRegistry, 'mjolnir-analytics')); }
+function analyticsStatusBar() { return statusBar('analytics', findModule(platformRegistry, 'analytics-warehouse')); }
 function infraStatusBar() { return statusBar('infrastructure', findModule(platformRegistry, 'node-insights')); }
 
 function icon(name) {
@@ -373,7 +373,7 @@ function chartTextColor() { return cssVar('--muted', '#90a2bc'); }
 function chartLineColor() { return cssVar('--border', 'rgba(147,166,194,0.16)'); }
 function chartPct(rawValue) { return rawValue === null || rawValue === undefined ? null : Math.round(Number(rawValue) * 1000) / 10; }
 
-// Shared mobile/desktop ECharts config. Every chart on the dashboard
+// Shared mobile/desktop ECharts config. Every chart on the site
 // (current and future - infrastructure, capacity, nodes, queue insights,
 // etc.) should build its option through baseChartOption() so it picks up
 // the responsive legend/grid/axis/tooltip/dataZoom behavior automatically
@@ -812,7 +812,7 @@ function landingPage() {
         ${lineChart('CPU efficiency trend', rows, [chartSeries(rows, 'avg_cpu_efficiency', 'Daily', '#3e8cff'), rollingSeries(rows, 'avg_cpu_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_cpu_efficiency', 30, '30-day', '#ffb84d')], pct, { zeroBase: true })}
       </div>
     </section>
-    <section class="dashboard-grid">
+    <section class="analytics-grid">
       <div class="stack">
         <section class="section"><div class="section-head"><h2>What needs action?</h2><span class="subtle">Recommendations from exported user bundles</span></div><div class="rec-list">${recommendationCards(3).join('')}</div></section>
         <section class="section"><div class="section-head"><h2>Optimization opportunities</h2><span class="subtle">Top public-safe job examples</span></div>${inefficientJobsTable(asArray(data?.inefficientJobs).slice(0, 8))}</section>
@@ -1144,7 +1144,7 @@ function recoveryPage() {
 }
 
 function prototypeBanner() {
-  return '<div class="prototype-banner"><strong>Prototype Personal Dashboard - Authentication Not Yet Enabled</strong><span>Decision support view. Peer comparisons remain pseudonymous.</span></div>';
+  return '<div class="prototype-banner"><strong>Prototype Personal Analytics - Authentication Not Yet Enabled</strong><span>Decision support view. Peer comparisons remain pseudonymous.</span></div>';
 }
 
 function percentileBand(value) {
@@ -1237,7 +1237,7 @@ function peerComparisonTable(rows) {
   return tableFromRows(['Pseudonymous peer', 'Comparison band', 'CPU efficiency', 'Memory efficiency', 'Savings opportunity'], tableRows);
 }
 
-function personalDashboardPage() {
+function personalAnalyticsPage() {
   if (state.personalLoading) {
     return `${prototypeBanner()}<section class="section"><div class="section-head"><h2>Loading My Analytics</h2><span class="subtle">${escapeHtml(state.personalToken || '')}</span></div><div class="empty-state">Loading private mock bundle for this route token.</div></section>`;
   }
@@ -1365,7 +1365,7 @@ function render() {
     'platform-status': platformStatusPage,
   };
   const content = isPersonalRoute(state.route)
-    ? personalDashboardPage()
+    ? personalAnalyticsPage()
     : isNodeDetailRoute(state.route)
       ? nodeDetailPage(nodeDetailRouteName(state.route))
       : isHierarchyDetailRoute(state.route)
@@ -1447,7 +1447,7 @@ function wireEvents() {
     state.recoveryStatus = { ok: false, message: 'Submitting recovery request...' };
     render();
     try {
-      state.recoveryStatus = await requestDashboardRecovery(username);
+      state.recoveryStatus = await requestAnalyticsRecovery(username);
     } catch (error) {
       state.recoveryStatus = { ok: false, message: 'The recovery service is unavailable. No email was sent.' };
     }
