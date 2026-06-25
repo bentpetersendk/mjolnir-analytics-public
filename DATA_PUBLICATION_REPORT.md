@@ -1,5 +1,10 @@
 # Data Publication Report
 
+> Note: `mjolnir-efficiency-dashboard` / `mjolnir-efficiency-dashboard-public`
+> below were renamed to `mjolnir-analytics` / `mjolnir-analytics-public` in
+> the Architecture Cleanup Phase. This report's paths and Pages URL reflect
+> what was in effect when it was written.
+
 ## Summary
 
 The public dashboard repository contains the complete approved 90-day Mjolnir validation export, including all exported user bundles. Source and public repo file inventories matched before publication checks. One non-metric metadata note in `global/cluster_summary.json` was sanitized in the public repo because it contained forbidden privacy-scan marker words while explaining that those fields were excluded.

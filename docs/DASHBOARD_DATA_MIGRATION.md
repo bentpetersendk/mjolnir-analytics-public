@@ -5,7 +5,7 @@
 The hourly Node Insights collector used to commit its generated JSON
 (`node_insights.json`, `capacity_history.json`, `node_history.json`)
 straight into this repo's `site/data/` directory, every time the data
-changed - often every hour. That meant `mjolnir-efficiency-dashboard-public`
+changed - often every hour. That meant `mjolnir-analytics-public`
 mixed two very different kinds of history: deliberate website source
 changes, and unattended hourly data updates. It also meant every other
 GitHub Pages-published site Bent runs had to invent its own version of the
@@ -19,7 +19,7 @@ under `mjolnir/`.
 
 ## What changed
 
-This repo (`mjolnir-efficiency-dashboard-public`) now contains only:
+This repo (`mjolnir-analytics-public`) now contains only:
 HTML/CSS/JS, documentation, the collector pipeline (`scripts/`,
 `systemd/`), and deployment scripts. It no longer contains, or commits,
 any generated Node Insights JSON.

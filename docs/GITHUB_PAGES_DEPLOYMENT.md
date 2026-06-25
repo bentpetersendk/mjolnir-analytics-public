@@ -12,7 +12,7 @@
 
 ## Final URL
 
-- Expected site URL: `https://bentpetersendk.github.io/mjolnir-efficiency-dashboard/`
+- Expected site URL: `https://bentpetersendk.github.io/mjolnir-analytics-public/`
 
 ## Updating the Site
 

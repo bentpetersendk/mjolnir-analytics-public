@@ -1,5 +1,10 @@
 # Hierarchy + Duplicate-Count Fix — Integration Report
 
+> Note: the Pages URL below used the pre-rename repo name
+> (`mjolnir-efficiency-dashboard-public`, since renamed to
+> `mjolnir-analytics-public`). This report reflects what was in effect when
+> it was written.
+
 **Branch:** `preview-hierarchy-deduplicated`
 **Date:** 2026-06-21
 **Purpose:** Combine the hierarchy-aware front-end with the duplicate-count

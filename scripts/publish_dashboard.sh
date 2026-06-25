@@ -8,7 +8,7 @@
 # docs/DASHBOARD_DATA_MIGRATION.md for the full description and rationale.
 #
 # This script NEVER adds the SQLite database, raw data, or logs to git, and
-# NEVER commits anything into this repo (mjolnir-efficiency-dashboard-public)
+# NEVER commits anything into this repo (mjolnir-analytics-public)
 # - it stages exactly the three generated files inside a separate clone of
 # dashboard-data. Run manually, or as the second half of
 # scripts/run_node_insights_cycle.sh (invoked hourly by

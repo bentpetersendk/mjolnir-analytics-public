@@ -1,5 +1,10 @@
 # Cost-Bearer Waste Model — Public Integration Report
 
+> Note: the Pages URL below used the pre-rename repo name
+> (`mjolnir-efficiency-dashboard-public`, since renamed to
+> `mjolnir-analytics-public`). This report reflects what was in effect when
+> it was written.
+
 **Branch:** `preview/cost-bearer-waste`
 **Date:** 2026-06-22
 **Purpose:** Bring the approved (APPROVE-FOR-MERGE) revised Cost-Bearer waste model

@@ -271,7 +271,7 @@ publish_dashboard.sh:
                  → commit → push origin HEAD (in the dashboard-data clone)
 ```
 
-This repo (`mjolnir-efficiency-dashboard-public`) is never committed to by
+This repo (`mjolnir-analytics-public`) is never committed to by
 this cycle - see
 [docs/DASHBOARD_DATA_MIGRATION.md](docs/DASHBOARD_DATA_MIGRATION.md) for why
 generated data moved to a separate repo and how the publishing clone and

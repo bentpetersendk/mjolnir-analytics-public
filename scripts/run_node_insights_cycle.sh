@@ -7,7 +7,7 @@
 #                                 the generated JSON into the separate
 #                                 dashboard-data repo (mjolnir/ directory) -
 #                                 see docs/DASHBOARD_DATA_MIGRATION.md. This
-#                                 repo (mjolnir-efficiency-dashboard-public)
+#                                 repo (mjolnir-analytics-public)
 #                                 is never committed to by this cycle.
 #
 # set -e means a failed collection never reaches the publish step, and a

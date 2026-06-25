@@ -1,5 +1,10 @@
 # Clean Public Repository Report
 
+> Note: `mjolnir-efficiency-dashboard` / `mjolnir-efficiency-dashboard-public`
+> below were renamed to `mjolnir-analytics` / `mjolnir-analytics-public` in
+> the Architecture Cleanup Phase. This report's repo names and Pages URL
+> reflect what was in effect when it was written.
+
 - Source repository: `mjolnir-efficiency-dashboard`
 - Source commit used: `8626bdaa7521d6d18d3699a8acddca68d49ec91e`
 - Public repository commit: `b3d5879`
