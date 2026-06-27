@@ -1,5 +1,5 @@
 from pathlib import Path
-import json, sys, re, subprocess
+import json, sys, re
 root = Path(__file__).resolve().parents[1]
 paths = [
     root / 'data' / 'efficiency_v3' / 'site_data_90d_validation' / 'index.json',
@@ -117,11 +117,15 @@ print(f'aggregate reconciliation OK: cluster waste {cluster_waste:,.2f} DKK '
 print('validated', len(paths), 'json files; cost-bearer invariants OK')
 
 # ---------------------------------------------------------------------------
-# Node Insights (Phase 1 public port). Public-safe Slurm-derived node/cluster
-# views. No Airtable, no usernames, no JobName/WorkDir/Account, no raw job
-# IDs anywhere in this export tree.
+# Node Insights. Public-safe Slurm-derived node/cluster views, generated
+# hourly from data/node_insights.sqlite by scripts/export_node_insights.py
+# and published to the dashboard-data repo (see
+# docs/DASHBOARD_DATA_MIGRATION.md) - node_insights.json is the single live
+# source of truth for Cluster Overview, Node Inventory, Hardware Inventory,
+# and Capacity Planning; this repo no longer ships any static node_insights
+# JSON of its own. No Airtable, no usernames, no JobName/WorkDir/Account, no
+# raw job IDs anywhere in this export tree.
 # ---------------------------------------------------------------------------
-NI_DIR = root / 'data' / 'node_insights'
 NI_FORBIDDEN_KEYS = ('User', 'JobName', 'WorkDir', 'Account', 'user_token', 'username')
 NI_FORBIDDEN_TEXT_PATTERNS = (
     re.compile(r'"(User|JobName|WorkDir|Account)"\s*:'),
@@ -138,60 +142,12 @@ def ni_assert_public_safe(obj, path='<root>'):
             ni_assert_public_safe(item, f'{path}[{i}]')
 
 
-ni_files = {
-    'index': NI_DIR / 'index.json',
-    'cluster_overview': NI_DIR / 'cluster_overview.json',
-    'node_inventory': NI_DIR / 'node_inventory.json',
-    'hardware_inventory': NI_DIR / 'hardware_inventory.json',
-    'capacity_planning': NI_DIR / 'capacity_planning.json',
-}
-
-missing = [name for name, p in ni_files.items() if not p.exists()]
-if missing:
-    print(f'SKIPPED Node Insights validation: missing {missing}.')
-else:
-    ni_docs = {}
-    for name, p in ni_files.items():
-        text = p.read_text()
-        for pattern in NI_FORBIDDEN_TEXT_PATTERNS:
-            assert not pattern.search(text), f'forbidden field pattern found in {p}'
-        ni_docs[name] = json.loads(text)
-        ni_assert_public_safe(ni_docs[name], str(p.name))
-
-    node_inventory = ni_docs['node_inventory']
-    nodes = node_inventory.get('nodes', [])
-    assert node_inventory.get('node_count') == len(nodes), 'node_inventory.node_count mismatch with nodes[] length'
-
-    cluster_overview = ni_docs['cluster_overview']
-    co_totals = cluster_overview.get('totals', {})
-    assert co_totals.get('nodes_total') == len(nodes), 'cluster_overview totals.nodes_total mismatch with node_inventory'
-
-    gpu_total_from_inventory = sum(n.get('gpu_total') or 0 for n in nodes)
-    gpu_alloc_from_inventory = sum(n.get('gpu_alloc') or 0 for n in nodes)
-    co_gpu = cluster_overview.get('gpu', {})
-    assert co_gpu.get('total') == gpu_total_from_inventory, 'cluster_overview GPU total mismatch with node_inventory'
-    assert co_gpu.get('alloc') == gpu_alloc_from_inventory, 'cluster_overview GPU alloc mismatch with node_inventory'
-
-    # Live Slurm cross-check is intentionally skipped here: this is a static
-    # snapshot ported into the public repo's branch, not a host with Slurm
-    # CLI access. Re-running scripts/collect_node_insights.py in the private
-    # repo before each deploy (per docs/NODE_INSIGHTS_PUBLIC_PORT_PACKAGE.md
-    # Sec 4) is what keeps this data fresh, not a live check here.
-    try:
-        subprocess.run(['sinfo'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-        print('NOTE: Slurm CLI detected on this host but live cross-check is out of scope for the public repo.')
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        pass
-
-    print(f'Node Insights export OK: {len(nodes)} nodes, no forbidden fields, '
-          f'GPU {gpu_alloc_from_inventory}/{gpu_total_from_inventory} from GresUsed')
-
 # ---------------------------------------------------------------------------
 # Node Insights history (Phase 2: persistent historical monitoring). Public
 # JSON generated from data/node_insights.sqlite by
 # scripts/export_node_insights.py. Aggregate-only - same forbidden-field
-# guardrails as the live snapshot above, plus structural checks on the
-# time-series shape.
+# guardrails as above, plus structural checks on the live snapshot's nested
+# sections and the time-series shape.
 # ---------------------------------------------------------------------------
 NI_HISTORY_DIR = root / 'site' / 'data'
 ni_history_files = {
@@ -226,5 +182,21 @@ else:
             assert {'timestamp', 'state', 'cpu_pct', 'mem_pct', 'gpu_pct'}.issubset(point.keys()), (
                 f'node_history point missing keys: {point}')
 
+    node_insights_doc = ni_history_docs['node_insights']
+    node_inventory = node_insights_doc.get('node_inventory', {})
+    nodes = node_inventory.get('nodes', [])
+    assert node_inventory.get('node_count') == len(nodes), 'node_inventory.node_count mismatch with nodes[] length'
+
+    cluster_overview = node_insights_doc.get('cluster_overview', {})
+    co_totals = cluster_overview.get('totals', {})
+    assert co_totals.get('nodes_total') == len(nodes), 'cluster_overview totals.nodes_total mismatch with node_inventory'
+
+    gpu_total_from_inventory = sum(n.get('gpu_total') or 0 for n in nodes)
+    gpu_alloc_from_inventory = sum(n.get('gpu_alloc') or 0 for n in nodes)
+    co_gpu = cluster_overview.get('gpu', {})
+    assert co_gpu.get('total') == gpu_total_from_inventory, 'cluster_overview GPU total mismatch with node_inventory'
+    assert co_gpu.get('alloc') == gpu_alloc_from_inventory, 'cluster_overview GPU alloc mismatch with node_inventory'
+
     print(f'Node Insights history export OK: {len(capacity_points)} capacity points, '
-          f'{len(node_history_nodes)} nodes, no forbidden fields')
+          f'{len(node_history_nodes)} nodes, no forbidden fields, '
+          f'GPU {gpu_alloc_from_inventory}/{gpu_total_from_inventory} from sinfo GresUsed')

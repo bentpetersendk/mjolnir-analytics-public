@@ -1,12 +1,11 @@
 const REAL_BASE = './data/efficiency_v3/site_data_90d_validation/';
 const SAMPLE_BASE = './sample-data/';
 const PERSONAL_DATA_BASE = window.MJOLNIR_PERSONAL_DATA_BASE || './private-user-data/';
-const NODE_INSIGHTS_BASE = './data/node_insights/';
-// Generated Node Insights history JSON lives in the dashboard-data repo
-// (bentpetersendk/dashboard-data, mjolnir/ directory), not in this repo -
-// see docs/DASHBOARD_DATA_MIGRATION.md. Override with
-// window.MJOLNIR_DASHBOARD_DATA_BASE for private/internal deployments, the
-// same pattern PERSONAL_DATA_BASE already uses above.
+// Generated Node Insights JSON (both the latest snapshot and history) lives
+// in the dashboard-data repo (bentpetersendk/dashboard-data, mjolnir/
+// directory), not in this repo - see docs/DASHBOARD_DATA_MIGRATION.md.
+// Override with window.MJOLNIR_DASHBOARD_DATA_BASE for private/internal
+// deployments, the same pattern PERSONAL_DATA_BASE already uses above.
 const NODE_INSIGHTS_HISTORY_BASE = window.MJOLNIR_DASHBOARD_DATA_BASE
   || 'https://raw.githubusercontent.com/bentpetersendk/dashboard-data/main/mjolnir/';
 // Slurm Analytics pipeline status (private repo's
@@ -552,32 +551,31 @@ function emptyNodeInsights(error) {
 
 export async function loadNodeInsightsData() {
   try {
-    const index = await loadJson(`${NODE_INSIGHTS_BASE}index.json`);
-    const files = asObject(index.files);
-    const [clusterOverview, nodeInventory, hardwareInventory, capacityPlanning] = await Promise.all([
-      loadJson(`${NODE_INSIGHTS_BASE}${files.cluster_overview || 'cluster_overview.json'}`),
-      loadJson(`${NODE_INSIGHTS_BASE}${files.node_inventory || 'node_inventory.json'}`),
-      loadJson(`${NODE_INSIGHTS_BASE}${files.hardware_inventory || 'hardware_inventory.json'}`),
-      loadJson(`${NODE_INSIGHTS_BASE}${files.capacity_planning || 'capacity_planning.json'}`),
-    ]);
+    // One combined document, generated hourly by export_node_insights.py
+    // from the live SQLite collector and published to dashboard-data (see
+    // docs/DASHBOARD_DATA_MIGRATION.md) - cluster_overview/node_inventory/
+    // hardware_inventory/capacity_planning are nested sections within it,
+    // not separate files.
+    const doc = await loadJson(`${NODE_INSIGHTS_HISTORY_BASE}node_insights.json`);
+    const nodeInventory = asObject(doc.node_inventory);
     return {
       available: true,
       error: null,
-      source: index.source || 'live-slurm',
-      generatedAt: index.generated_at || null,
-      schemaVersion: index.schema_version || null,
+      source: doc.source || 'live-slurm',
+      generatedAt: doc.generated_at || null,
+      schemaVersion: doc.schema_version || null,
       // Platform Status framework (docs/PLATFORM_STATUS.md).
-      collectorName: index.collector || 'node_insights',
-      collectorStatus: index.collector_status || null,
-      platformModule: index.platform_module || 'Node Insights',
-      dataWindowDays: index.data_window_days ?? null,
-      clusterOverview: asObject(clusterOverview),
+      collectorName: doc.collector || 'node_insights',
+      collectorStatus: doc.collector_status || null,
+      platformModule: doc.platform_module || 'Node Insights',
+      dataWindowDays: doc.data_window_days ?? null,
+      clusterOverview: asObject(doc.cluster_overview),
       nodeInventory: {
-        nodeCount: numberOrZero(nodeInventory && nodeInventory.node_count),
-        nodes: asArray(nodeInventory && nodeInventory.nodes),
+        nodeCount: numberOrZero(nodeInventory.node_count),
+        nodes: asArray(nodeInventory.nodes),
       },
-      hardwareInventory: asObject(hardwareInventory),
-      capacityPlanning: asObject(capacityPlanning),
+      hardwareInventory: asObject(doc.hardware_inventory),
+      capacityPlanning: asObject(doc.capacity_planning),
     };
   } catch (error) {
     return emptyNodeInsights(error);

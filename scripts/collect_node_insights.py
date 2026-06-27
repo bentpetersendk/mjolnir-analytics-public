@@ -30,6 +30,20 @@ logger = logging.getLogger("collect_node_insights")
 # Matches KEY=value or KEY="quoted value" tokens in scontrol -o output.
 KV_PATTERN = re.compile(r'(\w+)=("(?:[^"\\]|\\.)*"|\S*)')
 
+# Reason text is wrapped in admin-typed quote characters (straight or the
+# curly U+201C/U+201D this site's admin actually uses) rather than the plain
+# ASCII quotes KV_PATTERN expects, so it's parsed separately straight off the
+# raw line: `Reason=<quoted text> [user@2026-06-23T11:11:35]`.
+REASON_PATTERN = re.compile(r'Reason=(.*?)\s*\[([^\]@]+)@([^\]]+)\]')
+# OS's value is the one other unquoted KV_PATTERN can't handle: a
+# space-separated uname string ("Linux 4.18.0-... #1 SMP ... 2026") rather
+# than a single token, so KV_PATTERN's `\S*` branch only grabs "Linux". This
+# captures everything up to (not including) the next "<word>=" token instead.
+OS_PATTERN = re.compile(r'OS=(.*?)\s+(?=\w+=)')
+GRES_TYPE_PATTERN = re.compile(r'gpu:([^:,()]+):(\d+)')
+GRES_UNTYPED_PATTERN = re.compile(r'gpu:(\d+)')
+GRES_IDX_PATTERN = re.compile(r'IDX:([^)]*)')
+
 
 def run_command(args: List[str]) -> str:
     result = subprocess.run(
@@ -45,7 +59,7 @@ def parse_kv_line(line: str) -> dict:
 
 
 def parse_gres_count(value: Optional[str]) -> int:
-    """Sums GPU counts out of a Gres/GresUsed value like 'gpu:a100:4(IDX:0-3)'."""
+    """Sums GPU counts out of a Gres-style value like 'gpu:a100:4(IDX:0-3)'."""
     if not value or value in ("(null)", "N/A"):
         return 0
     total = 0
@@ -54,6 +68,29 @@ def parse_gres_count(value: Optional[str]) -> int:
         if match:
             total += int(match.group(1))
     return total
+
+
+def parse_gres_type(value: Optional[str]) -> Optional[str]:
+    """First GPU model named in a Gres-style value, e.g. 'a100' out of 'gpu:a100:4'."""
+    if not value or value in ("(null)", "N/A"):
+        return None
+    match = GRES_TYPE_PATTERN.search(value)
+    return match.group(1) if match else None
+
+
+def parse_drain_reason(line: str) -> Tuple[Optional[str], Optional[str]]:
+    """Extracts (reason_text, since_timestamp) from a raw scontrol node line.
+
+    Not handled by parse_kv_line/KV_PATTERN: Reason's free-text value is
+    quoted with whatever quote character the admin typed (straight or curly),
+    not the ASCII '"' KV_PATTERN matches, and is followed by a bracketed
+    `[user@timestamp]` suffix outside the KEY=value grammar entirely.
+    """
+    match = REASON_PATTERN.search(line)
+    if not match:
+        return None, None
+    reason_text = match.group(1).strip().strip('"\'“”‘’')
+    return (reason_text or None), match.group(3)
 
 
 def collect_nodes(scontrol_node_output: str) -> List[dict]:
@@ -67,19 +104,73 @@ def collect_nodes(scontrol_node_output: str) -> List[dict]:
         if not node_name:
             continue
         state = fields.get("State", "") or ""
+        drain_reason, drain_since = parse_drain_reason(line) if "DRAIN" in state else (None, None)
+        partitions_raw = fields.get("Partitions", "") or ""
+        os_match = OS_PATTERN.search(line)
+        os_value = os_match.group(1) if os_match else (fields.get("OS") or None)
         nodes.append({
             "node_name": node_name,
             "state": state,
+            # Slurm appends modifiers after '+' (e.g. "MIXED+DRAIN",
+            # "DOWN*+DRAIN") - the base state is everything before the first one.
+            "state_base": state.split("+")[0].rstrip("*") if state else state,
             "drain": "DRAIN" in state,
             "down": "DOWN" in state or "NOT_RESPONDING" in state or "FAIL" in state,
+            "drain_reason": drain_reason,
+            "drain_since": drain_since,
+            "arch": fields.get("Arch") or None,
             "cpu_total": int(fields.get("CPUTot", 0) or 0),
             "cpu_alloc": int(fields.get("CPUAlloc", 0) or 0),
+            "cpu_load": float(fields["CPULoad"]) if fields.get("CPULoad") not in (None, "", "N/A") else None,
+            "sockets": int(fields["Sockets"]) if fields.get("Sockets") not in (None, "") else None,
+            "cores_per_socket": int(fields["CoresPerSocket"]) if fields.get("CoresPerSocket") not in (None, "") else None,
+            "threads_per_core": int(fields["ThreadsPerCore"]) if fields.get("ThreadsPerCore") not in (None, "") else None,
             "real_memory_mib": int(fields.get("RealMemory", 0) or 0),
             "alloc_mem_mib": int(fields.get("AllocMem", 0) or 0),
+            "free_mem_mib": int(fields["FreeMem"]) if fields.get("FreeMem") not in (None, "") else None,
+            # GPU type/total come from Gres (configured hardware); per-node GPU
+            # *allocation* is filled in separately from sinfo's GresUsed below -
+            # this Slurm install's `scontrol show node -o` never reports
+            # GresUsed at all, only Gres.
+            "gpu_type": parse_gres_type(fields.get("Gres")),
             "gpu_total": parse_gres_count(fields.get("Gres")),
-            "gpu_alloc": parse_gres_count(fields.get("GresUsed")),
+            "gpu_alloc": 0,
+            "gpu_indexes_allocated": None,
+            "partitions": [p for p in partitions_raw.split(",") if p],
+            "weight": int(fields["Weight"]) if fields.get("Weight") not in (None, "") else None,
+            "boot_time": fields.get("BootTime") or None,
+            "slurmd_start_time": fields.get("SlurmdStartTime") or None,
+            "os": os_value,
+            "slurm_version": fields.get("Version") or None,
         })
     return nodes
+
+
+def apply_gpu_usage(nodes: List[dict], sinfo_gres_output: str) -> None:
+    """Fills in gpu_alloc/gpu_indexes_allocated from `sinfo --Format=NodeHost,Gres,GresUsed`.
+
+    Needed because GresUsed isn't available from `scontrol show node -o` on
+    this Slurm version (confirmed empty on every node) - sinfo is the only
+    live source for per-node GPU allocation. Each line is
+    "<node> <Gres> <GresUsed>"; GresUsed looks like
+    "gpu:a100:2(IDX:0-1)" or "(null)" on non-GPU nodes.
+    """
+    usage_by_node: Dict[str, dict] = {}
+    for line in sinfo_gres_output.splitlines():
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        node_name, _gres, gres_used = parts[0], parts[1], parts[2]
+        idx_match = GRES_IDX_PATTERN.search(gres_used)
+        usage_by_node[node_name] = {
+            "gpu_alloc": parse_gres_count(gres_used),
+            "gpu_indexes_allocated": idx_match.group(1) if idx_match and idx_match.group(1) not in ("N/A", "") else None,
+        }
+    for node in nodes:
+        usage = usage_by_node.get(node["node_name"])
+        if usage:
+            node["gpu_alloc"] = usage["gpu_alloc"]
+            node["gpu_indexes_allocated"] = usage["gpu_indexes_allocated"]
 
 
 def collect_partitions(scontrol_partition_output: str) -> List[dict]:
@@ -116,6 +207,35 @@ def collect_pending_reasons(squeue_reasons_output: str) -> Counter:
     return reasons
 
 
+def collect_running_jobs_per_node(scontrol_hostnames_output: str) -> Counter:
+    """Running-job count per node, from the expanded hostlist of every
+    running job's NodeList (one line per node occurrence - a multi-node job
+    contributes one occurrence per node it runs on).
+    """
+    counts: Counter = Counter()
+    for line in scontrol_hostnames_output.splitlines():
+        node_name = line.strip()
+        if node_name:
+            counts[node_name] += 1
+    return counts
+
+
+def collect_partition_queue(squeue_partition_state_output: str) -> Dict[str, Dict[str, int]]:
+    """Running/pending job counts per partition, from `squeue -h -o "%P %T"`."""
+    by_partition: Dict[str, Dict[str, int]] = {}
+    for line in squeue_partition_state_output.splitlines():
+        parts = line.strip().split()
+        if len(parts) != 2:
+            continue
+        partition, state = parts
+        bucket = by_partition.setdefault(partition, {"running": 0, "pending": 0})
+        if state == "RUNNING":
+            bucket["running"] += 1
+        elif state == "PENDING":
+            bucket["pending"] += 1
+    return by_partition
+
+
 def build_snapshot(nodes: List[dict], running_jobs: int, pending_jobs: int, timestamp: str) -> dict:
     total_nodes = len(nodes)
     draining_nodes = sum(1 for n in nodes if n["drain"])
@@ -138,13 +258,22 @@ def build_snapshot(nodes: List[dict], running_jobs: int, pending_jobs: int, time
     }
 
 
-def node_utilization_rows(nodes: List[dict], timestamp: str) -> List[tuple]:
+def node_detail_rows(nodes: List[dict], running_jobs_per_node: Dict[str, int], timestamp: str) -> List[tuple]:
     rows = []
     for n in nodes:
         cpu_pct = (n["cpu_alloc"] / n["cpu_total"] * 100) if n["cpu_total"] else None
         mem_pct = (n["alloc_mem_mib"] / n["real_memory_mib"] * 100) if n["real_memory_mib"] else None
         gpu_pct = (n["gpu_alloc"] / n["gpu_total"] * 100) if n["gpu_total"] else None
-        rows.append((timestamp, n["node_name"], n["state"], cpu_pct, mem_pct, gpu_pct))
+        rows.append((
+            timestamp, n["node_name"], n["state"], n["state_base"], cpu_pct, mem_pct, gpu_pct,
+            n["arch"], n["cpu_total"], n["cpu_alloc"], n["cpu_load"],
+            n["sockets"], n["cores_per_socket"], n["threads_per_core"],
+            n["real_memory_mib"], n["alloc_mem_mib"], n["free_mem_mib"],
+            n["gpu_type"], n["gpu_total"], n["gpu_alloc"], n["gpu_indexes_allocated"],
+            n["drain"], n["down"], n["drain_reason"], n["drain_since"],
+            ",".join(n["partitions"]), n["weight"], n["boot_time"], n["slurmd_start_time"],
+            n["os"], n["slurm_version"], running_jobs_per_node.get(n["node_name"], 0),
+        ))
     return rows
 
 
@@ -157,24 +286,48 @@ def gather(mock_dir: Optional[Path] = None) -> dict:
     sinfo_output = read(["sinfo", "-h"], "sinfo.txt")
     node_output = read(["scontrol", "show", "node", "-o"], "scontrol_show_node.txt")
     partition_output = read(["scontrol", "show", "partition", "-o"], "scontrol_show_partition.txt")
+    gres_output = read(["sinfo", "--Format=NodeHost:30,Gres:40,GresUsed:60", "-h"], "sinfo_gres.txt")
     squeue_states_output = read(["squeue", "-h", "-o", "%T"], "squeue_states.txt")
     squeue_reasons_output = read(["squeue", "-h", "-t", "PD", "-o", "%r"], "squeue_reasons.txt")
+    squeue_partition_state_output = read(["squeue", "-h", "-o", "%P %T"], "squeue_partition_states.txt")
+    squeue_running_nodelists_output = read(["squeue", "-h", "-t", "RUNNING", "-o", "%N"], "squeue_running_nodelists.txt")
 
     logger.debug("sinfo returned %d lines (cross-check only, not persisted)", len(sinfo_output.splitlines()))
     nodes = collect_nodes(node_output)
+    apply_gpu_usage(nodes, gres_output)
     partitions = collect_partitions(partition_output)
     logger.debug("collected %d partitions (reserved for future Queue Analytics)", len(partitions))
     running_jobs, pending_jobs = collect_job_counts(squeue_states_output)
     pending_reasons = collect_pending_reasons(squeue_reasons_output)
+    partition_queue = collect_partition_queue(squeue_partition_state_output)
+
+    # Per-node running-job counts: each running job's NodeList (e.g.
+    # "mjolnircomp[01-03]fl") is a Slurm hostlist expression, not a literal
+    # node name, and a job can span multiple nodes - `scontrol show
+    # hostnames` is the one call that expands every such expression (joined
+    # by commas) into one node name per line, one line per node *occurrence*,
+    # which is exactly the per-node count we want.
+    nodelists = [line.strip() for line in squeue_running_nodelists_output.splitlines() if line.strip()]
+    if nodelists:
+        hostnames_output = read(["scontrol", "show", "hostnames", ",".join(nodelists)], "scontrol_show_hostnames.txt")
+    else:
+        hostnames_output = ""
+    running_jobs_per_node = collect_running_jobs_per_node(hostnames_output)
+
     return {
         "nodes": nodes,
         "running_jobs": running_jobs,
         "pending_jobs": pending_jobs,
         "pending_reasons": pending_reasons,
+        "partition_queue": partition_queue,
+        "running_jobs_per_node": running_jobs_per_node,
     }
 
 
-def store_snapshot(conn, snapshot: dict, pending_reasons: Counter, node_rows: List[tuple]) -> None:
+def store_snapshot(
+    conn, snapshot: dict, pending_reasons: Counter, node_rows: List[tuple],
+    partition_queue: Dict[str, Dict[str, int]],
+) -> None:
     conn.execute(
         """
         INSERT OR REPLACE INTO snapshots (
@@ -195,13 +348,26 @@ def store_snapshot(conn, snapshot: dict, pending_reasons: Counter, node_rows: Li
         "INSERT INTO pending_reasons (timestamp, reason, count) VALUES (?, ?, ?)",
         [(snapshot["timestamp"], reason, count) for reason, count in pending_reasons.items()],
     )
+    conn.execute("DELETE FROM partition_queue WHERE timestamp = ?", (snapshot["timestamp"],))
+    conn.executemany(
+        "INSERT INTO partition_queue (timestamp, partition, running, pending) VALUES (?, ?, ?, ?)",
+        [(snapshot["timestamp"], partition, counts["running"], counts["pending"])
+         for partition, counts in partition_queue.items()],
+    )
     conn.execute("DELETE FROM node_snapshots WHERE timestamp = ?", (snapshot["timestamp"],))
     conn.executemany(
         """
         INSERT INTO node_snapshots (
-            timestamp, node_name, node_state, cpu_utilization_percent,
-            memory_utilization_percent, gpu_utilization_percent
-        ) VALUES (?, ?, ?, ?, ?, ?)
+            timestamp, node_name, node_state, state_base, cpu_utilization_percent,
+            memory_utilization_percent, gpu_utilization_percent,
+            arch, cpu_total, cpu_alloc, cpu_load,
+            sockets, cores_per_socket, threads_per_core,
+            real_memory_mib, alloc_mem_mib, free_mem_mib,
+            gpu_type, gpu_total, gpu_alloc, gpu_indexes_allocated,
+            drain, down, drain_reason, drain_since,
+            partitions, weight, boot_time, slurmd_start_time,
+            os, slurm_version, running_jobs_count
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         node_rows,
     )
@@ -242,7 +408,7 @@ def main() -> int:
         return 1
 
     snapshot = build_snapshot(collected["nodes"], collected["running_jobs"], collected["pending_jobs"], timestamp)
-    node_rows = node_utilization_rows(collected["nodes"], timestamp)
+    node_rows = node_detail_rows(collected["nodes"], collected["running_jobs_per_node"], timestamp)
 
     logger.info(
         "snapshot %s: %d nodes (%d available, %d draining, %d down), "
@@ -260,7 +426,7 @@ def main() -> int:
     conn = connect(Path(args.db))
     try:
         ensure_schema(conn)
-        store_snapshot(conn, snapshot, collected["pending_reasons"], node_rows)
+        store_snapshot(conn, snapshot, collected["pending_reasons"], node_rows, collected["partition_queue"])
         record_collector_run(conn, COLLECTOR_NAME, ok=True)
     finally:
         conn.close()

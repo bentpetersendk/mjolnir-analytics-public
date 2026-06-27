@@ -13,14 +13,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Union
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB_PATH = REPO_ROOT / "data" / "node_insights.sqlite"
 
-# Each statement is idempotent (CREATE TABLE/INDEX IF NOT EXISTS) so this can
-# run on every collector/export invocation with no migration step. New
-# tables for future modules belong in their own statements, not as columns
-# bolted onto these three.
+# Each CREATE statement is idempotent (CREATE TABLE/INDEX IF NOT EXISTS), so
+# this always covers a fresh database. Columns added to node_snapshots after
+# schema v2 are backfilled onto pre-existing databases by the ALTER TABLE
+# migration in ensure_schema() instead - SQLite's IF NOT EXISTS doesn't add
+# columns to a table that already exists with an older shape.
 SCHEMA_STATEMENTS = (
     """
     CREATE TABLE IF NOT EXISTS snapshots (
@@ -48,13 +49,48 @@ SCHEMA_STATEMENTS = (
     """,
     "CREATE INDEX IF NOT EXISTS idx_pending_reasons_timestamp ON pending_reasons(timestamp)",
     """
+    CREATE TABLE IF NOT EXISTS partition_queue (
+        timestamp TEXT NOT NULL REFERENCES snapshots(timestamp),
+        partition TEXT NOT NULL,
+        running INTEGER NOT NULL,
+        pending INTEGER NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_partition_queue_timestamp ON partition_queue(timestamp)",
+    """
     CREATE TABLE IF NOT EXISTS node_snapshots (
         timestamp TEXT NOT NULL REFERENCES snapshots(timestamp),
         node_name TEXT NOT NULL,
         node_state TEXT,
+        state_base TEXT,
         cpu_utilization_percent REAL,
         memory_utilization_percent REAL,
-        gpu_utilization_percent REAL
+        gpu_utilization_percent REAL,
+        arch TEXT,
+        cpu_total INTEGER,
+        cpu_alloc INTEGER,
+        cpu_load REAL,
+        sockets INTEGER,
+        cores_per_socket INTEGER,
+        threads_per_core INTEGER,
+        real_memory_mib INTEGER,
+        alloc_mem_mib INTEGER,
+        free_mem_mib INTEGER,
+        gpu_type TEXT,
+        gpu_total INTEGER,
+        gpu_alloc INTEGER,
+        gpu_indexes_allocated TEXT,
+        drain INTEGER,
+        down INTEGER,
+        drain_reason TEXT,
+        drain_since TEXT,
+        partitions TEXT,
+        weight INTEGER,
+        boot_time TEXT,
+        slurmd_start_time TEXT,
+        os TEXT,
+        slurm_version TEXT,
+        running_jobs_count INTEGER
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_node_snapshots_timestamp ON node_snapshots(timestamp)",
@@ -77,6 +113,50 @@ SCHEMA_STATEMENTS = (
     """,
 )
 
+# Columns added to node_snapshots in schema v3, with the type used for the
+# ALTER TABLE migration below. Order doesn't matter - each is added
+# independently and is a no-op if already present.
+NODE_SNAPSHOTS_V3_COLUMNS = (
+    ("state_base", "TEXT"),
+    ("arch", "TEXT"),
+    ("cpu_total", "INTEGER"),
+    ("cpu_alloc", "INTEGER"),
+    ("cpu_load", "REAL"),
+    ("sockets", "INTEGER"),
+    ("cores_per_socket", "INTEGER"),
+    ("threads_per_core", "INTEGER"),
+    ("real_memory_mib", "INTEGER"),
+    ("alloc_mem_mib", "INTEGER"),
+    ("free_mem_mib", "INTEGER"),
+    ("gpu_type", "TEXT"),
+    ("gpu_total", "INTEGER"),
+    ("gpu_alloc", "INTEGER"),
+    ("gpu_indexes_allocated", "TEXT"),
+    ("drain", "INTEGER"),
+    ("down", "INTEGER"),
+    ("drain_reason", "TEXT"),
+    ("drain_since", "TEXT"),
+    ("partitions", "TEXT"),
+    ("weight", "INTEGER"),
+    ("boot_time", "TEXT"),
+    ("slurmd_start_time", "TEXT"),
+    ("os", "TEXT"),
+    ("slurm_version", "TEXT"),
+    ("running_jobs_count", "INTEGER"),
+)
+
+
+def migrate_node_snapshots(conn: sqlite3.Connection) -> None:
+    """Adds schema-v3 columns to a node_snapshots table created under v2.
+
+    No-op on a fresh database (CREATE TABLE above already includes every
+    column) or on a database already migrated.
+    """
+    existing = {row["name"] for row in conn.execute("PRAGMA table_info(node_snapshots)")}
+    for column, sql_type in NODE_SNAPSHOTS_V3_COLUMNS:
+        if column not in existing:
+            conn.execute(f"ALTER TABLE node_snapshots ADD COLUMN {column} {sql_type}")
+
 
 def connect(db_path: Union[Path, str] = DEFAULT_DB_PATH) -> sqlite3.Connection:
     db_path = Path(db_path)
@@ -92,6 +172,7 @@ def connect(db_path: Union[Path, str] = DEFAULT_DB_PATH) -> sqlite3.Connection:
 def ensure_schema(conn: sqlite3.Connection) -> None:
     for statement in SCHEMA_STATEMENTS:
         conn.execute(statement)
+    migrate_node_snapshots(conn)
     conn.execute(
         "INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', ?)",
         (str(SCHEMA_VERSION),),

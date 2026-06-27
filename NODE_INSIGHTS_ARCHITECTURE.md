@@ -47,11 +47,13 @@ The generated JSON is published to a separate repo, not this one - see
 [docs/DASHBOARD_DATA_MIGRATION.md](docs/DASHBOARD_DATA_MIGRATION.md) for
 the full rationale and the credential/clone setup.
 
-The live-snapshot views that already existed (`data/node_insights/*.json`,
-loaded via `loadNodeInsightsData()`) are unchanged. The history pipeline
-described here is purely additive: it adds trend charts to the same pages
-without altering how the current-instant fleet state is collected or
-rendered.
+The live-snapshot views (Cluster Overview / Node Inventory / Hardware
+Inventory / Capacity Planning, loaded via `loadNodeInsightsData()`) read the
+`cluster_overview`/`node_inventory`/`hardware_inventory`/`capacity_planning`
+sections nested inside the same hourly-published `node_insights.json` this
+document describes - there is no separate static snapshot file. The history
+pipeline adds trend charts to the same pages without altering how the
+current-instant fleet state is collected.
 
 ## 2. Database schema (`data/node_insights.sqlite`)
 
