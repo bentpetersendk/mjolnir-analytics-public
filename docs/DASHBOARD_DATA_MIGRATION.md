@@ -84,6 +84,23 @@ checkout; override with `MJOLNIR_DASHBOARD_DATA_DIR`). Each run:
 
 This repo's own git history is untouched by the hourly cycle from now on.
 
+### Concurrent-push resilience (2026-06-27)
+
+This publisher and the private repo's nightly Slurm Analytics publisher
+(`publish_slurm_analytics.sh`) both push to `dashboard-data`'s `main` branch,
+from disjoint paths (`mjolnir/{node_insights,capacity_history,
+node_history}.json` here, `mjolnir/slurm_analytics/` there). A push rejected
+by GitHub for being non-fast-forward is therefore never a real content
+conflict - just a stale local base, because the other publisher's commit
+landed between this script's fetch and its push. Steps 2-5 above now run
+inside a bounded retry loop (`MJOLNIR_PUBLISH_MAX_ATTEMPTS`, default 5,
+randomized increasing backoff): on rejection, it resyncs to the new remote
+tip, regenerates the export fresh, and recommits+retries - never a force
+push, and never a real merge, since each retry's commit parent is always the
+current remote tip. Verified by forcing a real non-fast-forward rejection
+against a disposable test repo with two concurrent publisher runs; the
+delayed one resynced and succeeded on its next attempt.
+
 ## Credentials
 
 Pushing to `dashboard-data` uses a dedicated SSH deploy key
