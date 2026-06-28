@@ -1,9 +1,9 @@
 import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus, loadQueueInsightsData } from './data-loader.js';
 import { requestAnalyticsRecovery } from './recovery-service.js';
 import {
-  formatLocalDateTime, chartTimeLabel, chartTimeTooltipLabel, snapshotAgeLabel,
+  formatLocalDateTime, chartTimeLabel, chartTimeTooltipLabel, snapshotAgeLabel, snapshotAgeMs,
   buildPlatformRegistry, findModule, statusBar, platformStatusPanel, platformStatusBadge,
-  renderSystemHealthCard, buildWarehouseSummary, collectorHealth, statusPillHtml,
+  buildWarehouseSummary, collectorHealth, statusPillHtml, platformHealth,
 } from './status.js';
 
 const app = document.querySelector('#app');
@@ -288,9 +288,6 @@ function lineChart(title, rows, series, formatter = fmt, options = {}) {
     </article>`;
 }
 
-function metricCard(kpi) {
-  return `<article class="metric-card ${kpi.tone || ''}"><div class="metric-label">${kpi.label}</div><div class="metric-value">${kpi.value}</div><div class="metric-trend">${kpi.trend}</div></article>`;
-}
 
 // Live "Warehouse Summary" KPI tile - used on both the Overview hero and the
 // dedicated Warehouse page so the two never show different numbers for the
@@ -833,6 +830,15 @@ function queueDepthChart() {
   ], fmt, { zeroBase: true });
 }
 
+// Shared by queueOverviewPage() and the Executive Overview's Current Alerts
+// section, so "what counts as saturated" is defined exactly once.
+function partitionsUnderPressure(byPartition, threshold = 0.6) {
+  return asArray(byPartition)
+    .map((p) => ({ ...p, pressure: (num(p.running) + num(p.pending)) ? num(p.pending) / (num(p.running) + num(p.pending)) : 0 }))
+    .filter((p) => p.pressure >= threshold)
+    .sort((a, b) => b.pressure - a.pressure);
+}
+
 function queueOverviewPage() {
   if (!queueInsights || !queueInsights.available) return queueInsightsUnavailable('Queue Insights');
   const cp = asObject(queueInsights.currentPressure);
@@ -841,10 +847,7 @@ function queueOverviewPage() {
   const health = cp.queue_health || null;
   const clusterSeries = clusterWaitSeriesRows(asObject(queueInsights.waitTimeHistory).series);
   const latestWait = clusterSeries.length ? clusterSeries[clusterSeries.length - 1] : null;
-  const saturated = byPartition
-    .map((p) => ({ ...p, pressure: (num(p.running) + num(p.pending)) ? num(p.pending) / (num(p.running) + num(p.pending)) : 0 }))
-    .filter((p) => p.pressure >= 0.6)
-    .sort((a, b) => b.pressure - a.pressure);
+  const saturated = partitionsUnderPressure(byPartition);
 
   return `
     <div class="stack">
@@ -1235,78 +1238,330 @@ function recCard(level, title, detail, savings) {
   return `<article class="rec-card"><div class="rec-top"><span class="pill ${level.startsWith('High') ? 'warn' : 'info'}">${level}</span><strong>${savings}</strong></div><div>${escapeHtml(title)}</div><div class="subtle">${escapeHtml(detail)}</div></article>`;
 }
 
-// Live hero sentence - wording stays fixed but the figures are read straight
-// from buildWarehouseSummary() each render, so it ages naturally with the
-// warehouse instead of needing manual updates.
-function heroSentence(w) {
-  if (!w.available || !w.accountingRecords || !w.canonicalJobs) {
-    return 'Live production analytics platform for the Mjolnir HPC cluster.';
+// ============================================================================
+// Executive Overview (the landing page) - docs/EXECUTIVE_OVERVIEW.md.
+//
+// Every section below is presentation over data already loaded by the five
+// module loaders in data-loader.js (data, nodeInsights, nodeInsightsHistory,
+// platformRegistry/warehouseSummary, queueInsights) - no fetch() calls here,
+// and the only new "calculation" on this whole page is clusterHealthState()'s
+// max-of-two-already-computed-severities (Section 1). Everything else is a
+// reused helper, a sort, or a filter over fields other pages already render.
+// ============================================================================
+
+// --- Section 1: Cluster Health ---------------------------------------------
+// Combines platformHealth() (Analytics Pipeline + Analytics Warehouse + Node
+// Insights + Queue Insights collector freshness, status.js) with the live
+// Queue Health label (queueInsights.currentPressure.queue_health) and takes
+// whichever is worse, then re-expresses that as the three-word vocabulary
+// this hero promises. No new freshness threshold is introduced anywhere in
+// this function - it is a pure max() over two values every other page on
+// this site already computes and trusts.
+const CLUSTER_HEALTH_PLATFORM_SEVERITY = { healthy: 0, warning: 1, degraded: 2, critical: 2, unknown: 1 };
+const CLUSTER_HEALTH_QUEUE_SEVERITY = { Healthy: 0, Busy: 0, Congested: 1, 'Severely Congested': 2 };
+const CLUSTER_HEALTH_LABELS = ['Healthy', 'Warning', 'Critical'];
+const CLUSTER_HEALTH_COPY = [
+  { sub: 'All systems operational', tone: 'healthy' },
+  { sub: 'Some systems need attention', tone: 'warning' },
+  { sub: 'Action required', tone: 'failed' },
+];
+
+function clusterHealthState() {
+  const platformSeverity = CLUSTER_HEALTH_PLATFORM_SEVERITY[platformHealth(platformRegistry).status] ?? 1;
+  const queueLabel = queueInsights?.currentPressure?.queue_health?.label;
+  const queueSeverity = queueLabel != null ? (CLUSTER_HEALTH_QUEUE_SEVERITY[queueLabel] ?? 0) : 0;
+  const severity = Math.max(platformSeverity, queueSeverity);
+  return { severity, label: CLUSTER_HEALTH_LABELS[severity], ...CLUSTER_HEALTH_COPY[severity] };
+}
+
+function clusterHealthHero() {
+  const s = clusterHealthState();
+  return `<section class="cluster-health-hero cluster-health-${s.tone}">
+    <div class="cluster-health-label">Cluster Health</div>
+    <div class="cluster-health-value">${escapeHtml(s.label)}</div>
+    <div class="cluster-health-sub">${escapeHtml(s.sub)}</div>
+  </section>`;
+}
+
+// --- Section 2: Current Cluster Status (KPI cards) --------------------------
+// Queue figures come from Queue Insights (the authoritative live source for
+// queue state); fleet figures come from Node Insights' clusterOverview -
+// the exact fields infrastructureOverviewPage()/queueOverviewPage() already
+// render. "Users Active Today" is intentionally omitted: no collector
+// exposes a daily-active-user count anywhere today, and this page never
+// approximates a metric that doesn't exist (docs/EXECUTIVE_OVERVIEW.md).
+function executiveKpiSection() {
+  const cp = asObject(queueInsights?.currentPressure);
+  const queue = asObject(cp.queue);
+  const co = asObject(nodeInsights?.clusterOverview);
+  const totals = asObject(co.totals);
+  const cpu = asObject(co.cpu);
+  const mem = asObject(co.memory_mib);
+  const gpu = asObject(co.gpu);
+  const clusterSeries = clusterWaitSeriesRows(asObject(queueInsights?.waitTimeHistory).series);
+  const latestWait = clusterSeries.length ? clusterSeries[clusterSeries.length - 1] : null;
+  const cpuPct = num(cpu.total) ? num(cpu.alloc) / num(cpu.total) : null;
+  const memPct = num(mem.total) ? num(mem.alloc) / num(mem.total) : null;
+  const gpuPct = num(gpu.total) ? num(gpu.alloc) / num(gpu.total) : null;
+
+  const cards = [
+    statBlock('Running Jobs', fmt(queue.running), 'Across all partitions', 'good'),
+    statBlock('Pending Jobs', fmt(queue.pending), 'Waiting to start', num(queue.pending) ? 'info' : 'good'),
+    statBlock('Queue Health', cp.queue_health ? escapeHtml(cp.queue_health.label) : '-', cp.queue_health ? `Score ${fmt(cp.queue_health.score)}/100` : 'Unavailable'),
+    statBlock('Current Wait Time', durationLabel(latestWait && latestWait.median_wait_seconds), 'Median, cluster-wide'),
+    statBlock('Nodes Online', fmt(totals.nodes_available), 'Not draining, not down', 'good'),
+    statBlock('Nodes Draining', fmt(totals.nodes_draining), 'Scheduled for maintenance', totals.nodes_draining ? 'warn' : 'good'),
+    statBlock('GPUs Busy', gpuPct !== null ? `${fmt(gpu.alloc)} / ${fmt(gpu.total)}` : '-', gpuPct !== null ? pct(gpuPct) : 'Unavailable'),
+    statBlock('Cluster CPU Utilization', cpuPct !== null ? pct(cpuPct) : '-', `${fmt(cpu.alloc)} / ${fmt(cpu.total)} cores`),
+    statBlock('Cluster Memory Utilization', memPct !== null ? pct(memPct) : '-', `${gib(mem.alloc)} / ${gib(mem.total)}`),
+  ];
+  return `<section class="section"><div class="section-head"><h2>Current Cluster Status</h2></div><div class="cards-grid">${cards.join('')}</div></section>`;
+}
+
+// --- Section 3: Overnight Summary -------------------------------------------
+// Reads warehouseSummary.overnight (export_dashboard_data.py's real
+// import_files/job_metrics/daily_*_summary deltas - never inferred) plus
+// per-module snapshotAgeLabel() and the shared totalSnapshotCount() helper.
+// "New X" rows for users/projects/accounts/partitions are hidden when 0 to
+// avoid clutter; the three headline deltas always show, including 0, since
+// "nothing imported last night" is itself a signal worth surfacing.
+function overnightSummarySection() {
+  const w = warehouseSummary;
+  const o = w.overnight || {};
+  const headline = [
+    statBlock('New Accounting Records', o.new_accounting_records != null ? humanNumber(o.new_accounting_records) : 'N/A', o.report_date ? `Imported for ${dateLabel(o.report_date)}` : 'No import recorded yet'),
+    statBlock('New Job Steps', o.new_job_steps != null ? humanNumber(o.new_job_steps) : 'N/A', 'Step records within those imports'),
+    statBlock('New Canonical Jobs', o.new_canonical_jobs != null ? humanNumber(o.new_canonical_jobs) : 'N/A', 'Materialized into the warehouse'),
+  ];
+  const growthRows = [
+    ['New Users', o.new_users], ['New Projects', o.new_projects],
+    ['New Accounts', o.new_accounts], ['New Partitions', o.new_partitions],
+  ].filter(([, value]) => value != null && value > 0)
+    .map(([label, value]) => statBlock(label, humanNumber(value), 'First seen overnight'));
+  const freshness = platformRegistry.filter((m) => !m.planned)
+    .map((m) => statBlock(m.label, snapshotAgeLabel(m.generatedAt), 'Latest snapshot age'));
+  const durations = [
+    ['Import Duration', w.lastImportDurationSeconds],
+    ['Materialization Duration', w.lastMaterializationDurationSeconds],
+    ['Publication Duration', w.lastPublishDurationSeconds],
+  ].map(([label, seconds]) => statBlock(label, seconds != null ? durationLabel(seconds) : 'N/A', 'Last nightly run'));
+
+  return `<section class="section"><div class="section-head"><h2>Overnight Summary</h2><span class="subtle">${o.report_date ? `Since ${dateLabel(o.report_date)}` : 'Since the last import'}</span></div>
+    <div class="cards-grid">${headline.join('')}</div>
+    ${growthRows.length ? `<div class="cards-grid">${growthRows.join('')}</div>` : ''}
+    <div class="cards-grid">${durations.join('')}</div>
+    <div class="cards-grid">${[
+      statBlock('Node Snapshots Collected', fmt(totalSnapshotCount()), 'Total retained history'),
+      statBlock('Database Growth', 'N/A', 'No historical size snapshot tracked yet'),
+      statBlock('Coverage Change', 'N/A', 'No historical coverage snapshot tracked yet'),
+    ].join('')}</div>
+    <div class="cards-grid">${freshness.join('')}</div>
+  </section>`;
+}
+
+// --- Section 4: Warehouse Summary -------------------------------------------
+// warehouseStatusCard()/warehouseSummaryTiles() are the same functions the
+// dedicated Warehouse page renders - this section never recomputes a number
+// they already produce. reductionFunnel() is the one new presentational
+// piece (Accounting Records -> Canonical Jobs -> Ratio), built once and
+// reusable from the Warehouse page too if useful later.
+function reductionFunnel(w) {
+  const ratio = w.reductionRatio ? `${(1 / w.reductionRatio).toFixed(2)} : 1` : '-';
+  return `<div class="reduction-funnel">
+    <div class="reduction-funnel-step"><strong>${humanNumber(w.accountingRecords, { style: 'short' })}</strong><span>Accounting Records</span></div>
+    <div class="reduction-funnel-arrow">&darr;</div>
+    <div class="reduction-funnel-step"><strong>${humanNumber(w.canonicalJobs, { style: 'short' })}</strong><span>Canonical Jobs</span></div>
+    <div class="reduction-funnel-arrow">&darr;</div>
+    <div class="reduction-funnel-step reduction-funnel-result"><strong>${ratio}</strong><span>Reduction</span></div>
+  </div>`;
+}
+
+function executiveWarehouseSection() {
+  const w = warehouseSummary;
+  if (!w.available) {
+    return `<section class="section"><div class="section-head"><h2>Warehouse Summary</h2></div>${disclaimer('The Analytics Warehouse pipeline status has not been published yet, or the warehouse has no jobs recorded.')}</section>`;
   }
-  return `Mjolnir Analytics continuously transforms ${humanNumber(w.accountingRecords)} Slurm accounting records into ${humanNumber(w.canonicalJobs)} analyzed jobs, providing live operational and historical insights across the entire HPC cluster.`;
+  return `<div class="stack">
+    ${warehouseStatusCard(w)}
+    ${reductionFunnel(w)}
+    <section class="section"><div class="section-head"><h2>Scope &amp; Versions</h2><a class="btn" href="#/warehouse">Full warehouse detail</a></div>
+      <div class="cards-grid">${[
+        statBlock('Users', humanNumber(w.users), 'Distinct submitters, all time'),
+        statBlock('Projects', humanNumber(w.projects), 'Tracked in the project registry'),
+        statBlock('Accounts', humanNumber(w.accounts), 'Distinct Slurm accounts'),
+        statBlock('Partitions', humanNumber(w.partitions), 'Distinct Slurm partitions'),
+        statBlock('Database Size', bytesLabel(w.databaseSizeBytes), 'SQLite warehouse on disk'),
+        statBlock('Schema Version', w.schemaVersion ?? '-', 'mjolnir_analytics.sqlite schema'),
+        statBlock('Warehouse Version', w.warehouseVersion ?? '-', 'Warehouse metadata version'),
+        statBlock('Node Snapshot', snapshotAgeLabel(w.nodeSnapshotAt), formatLocalDateTime(w.nodeSnapshotAt)),
+      ].join('')}</div>
+    </section>
+  </div>`;
+}
+
+// --- Section 5: Queue Summary -----------------------------------------------
+// Pure presentation over queueInsights, reusing queueHealthBadge(),
+// clusterWaitSeriesRows(), durationLabel(), hourLabel() and WEEKDAY_NAMES -
+// the exact helpers the dedicated Queue Insights pages already use. Most/
+// least busy partition is a sort (not a calculation) of currentPressure.
+// by_partition by live load; best submission window is the same
+// lowest-wait sort queueAdvisorPage() performs.
+function executiveQueueSection() {
+  if (!queueInsights || !queueInsights.available) {
+    return `<section class="section"><div class="section-head"><h2>Queue Summary</h2></div>${disclaimer('Queue Insights data has not been collected yet.')}</section>`;
+  }
+  const cp = asObject(queueInsights.currentPressure);
+  const queue = asObject(cp.queue);
+  const byLoad = asArray(cp.by_partition)
+    .map((p) => ({ ...p, load: num(p.running) + num(p.pending) }))
+    .sort((a, b) => b.load - a.load);
+  const busiest = byLoad[0] || null;
+  const least = byLoad.length ? byLoad[byLoad.length - 1] : null;
+  const topReason = asArray(cp.pending_reasons)[0] || null;
+  const clusterSeries = clusterWaitSeriesRows(asObject(queueInsights.waitTimeHistory).series);
+  const latestWait = clusterSeries.length ? clusterSeries[clusterSeries.length - 1] : null;
+  const bestWindow = asArray(asObject(queueInsights.submissionPatterns).best_submission_windows).slice()
+    .sort((a, b) => num(a.median_wait_seconds) - num(b.median_wait_seconds))[0] || null;
+
+  return `<section class="section"><div class="section-head"><h2>Queue Summary</h2>${queueHealthBadge(cp.queue_health)}</div>
+    <div class="cards-grid">${[
+      statBlock('Running Jobs', fmt(queue.running), 'Across all partitions', 'good'),
+      statBlock('Pending Jobs', fmt(queue.pending), 'Waiting to start', num(queue.pending) ? 'info' : 'good'),
+      statBlock('Median Wait', durationLabel(latestWait && latestWait.median_wait_seconds), 'Cluster-wide, latest day'),
+      statBlock('P90 Wait', durationLabel(latestWait && latestWait.p90_wait_seconds), 'Cluster-wide, latest day'),
+      statBlock('Most Busy Partition', busiest ? escapeHtml(busiest.partition) : '-', busiest ? `${fmt(busiest.running)} running, ${fmt(busiest.pending)} pending` : 'No live data'),
+      statBlock('Least Busy Partition', least ? escapeHtml(least.partition) : '-', least ? `${fmt(least.running)} running, ${fmt(least.pending)} pending` : 'No live data'),
+      statBlock('Top Pending Reason', topReason ? escapeHtml(topReason.reason) : 'None', topReason ? `${fmt(topReason.count)} jobs` : 'No pending jobs'),
+      statBlock('Best Submission Window', bestWindow ? `${WEEKDAY_NAMES[bestWindow.weekday]} ${hourLabel(bestWindow.hour_of_day)}` : 'Not enough data', bestWindow ? `${escapeHtml(bestWindow.partition_name)}, typical wait ${durationLabel(bestWindow.median_wait_seconds)}` : 'Historical tendency only'),
+    ].join('')}</div>
+    <a class="btn" href="#/queue-overview">Full Queue Insights</a>
+  </section>`;
+}
+
+// --- Section 6: Current Alerts -----------------------------------------------
+// Derived only from health/threshold computations made elsewhere -
+// collectorHealth() per module, partitionsUnderPressure() (the same filter
+// queueOverviewPage() uses), and the maintenance node list
+// infrastructureOverviewPage() already lists. No new threshold anywhere.
+const ALERT_SEVERITY_TONE = { Critical: 'bad', Warning: 'warn', Information: 'info' };
+
+function currentAlerts() {
+  const alerts = [];
+  platformRegistry.filter((m) => !m.planned).forEach((m) => {
+    const health = collectorHealth(m);
+    if (health.status === 'failed') alerts.push({ severity: 'Critical', text: `${escapeHtml(m.label)} collector failed` });
+    else if (health.status === 'critical') alerts.push({ severity: 'Critical', text: `${escapeHtml(m.label)} update significantly overdue` });
+    else if (health.status === 'warning') alerts.push({ severity: 'Warning', text: `${escapeHtml(m.label)} update overdue` });
+  });
+  const queueLabel = queueInsights?.currentPressure?.queue_health?.label;
+  if (queueLabel === 'Severely Congested' || queueLabel === 'Congested') {
+    const worst = partitionsUnderPressure(asArray(queueInsights?.currentPressure?.by_partition))[0];
+    alerts.push({
+      severity: queueLabel === 'Severely Congested' ? 'Critical' : 'Warning',
+      text: worst ? `${escapeHtml(worst.partition)} queue saturated (${pct(worst.pressure)} pending)` : `Queue is ${queueLabel.toLowerCase()}`,
+    });
+  }
+  asArray(asObject(asObject(nodeInsights?.clusterOverview).maintenance).nodes).forEach((n) => {
+    alerts.push({ severity: 'Information', text: `Node ${escapeHtml(n.node)} in maintenance${n.reason ? ` (${escapeHtml(n.reason)})` : ''}` });
+  });
+  return alerts;
+}
+
+function currentAlertsSection() {
+  const alerts = currentAlerts();
+  return `<section class="section"><div class="section-head"><h2>Current Alerts</h2></div>
+    ${alerts.length
+      ? `<div class="stack">${alerts.map((a) => `<div class="alert-row"><span class="pill ${ALERT_SEVERITY_TONE[a.severity] || 'info'}">${a.severity}</span><span>${a.text}</span></div>`).join('')}</div>`
+      : '<div class="empty-state">No active alerts.</div>'}
+  </section>`;
+}
+
+// --- Section 7: Recommendations ----------------------------------------------
+// Decision rules (each reads fields already loaded for Sections 2-6 above;
+// a rule whose inputs are unavailable is simply omitted, never replaced
+// with a guess):
+//   1. Queue Congested/Severely Congested + a saturated partition exists
+//      -> "<partition or GPU> users should expect longer waits today."
+//   2. Queue health score improved over the last 7 history points
+//      -> "The queue is improving."
+//   3. A best submission window exists in submissionPatterns
+//      -> "Best submission window begins around <hour> (<partition>)."
+//   4. Warehouse imported new canonical jobs within the last 24h
+//      -> "Warehouse updated successfully overnight."
+//   5. Nodes are draining for maintenance
+//      -> "Node maintenance has reduced available capacity by <pct>."
+function executiveRecommendations() {
+  const recs = [];
+  const cp = asObject(queueInsights?.currentPressure);
+  const queueLabel = cp.queue_health?.label;
+  if (queueLabel === 'Congested' || queueLabel === 'Severely Congested') {
+    const worst = partitionsUnderPressure(asArray(cp.by_partition))[0];
+    if (worst) {
+      const subject = /gpu/i.test(worst.partition || '') ? 'GPU' : escapeHtml(worst.partition);
+      recs.push(`${subject} users should expect longer waits today.`);
+    }
+  }
+  const healthHistory = asArray(queueInsights?.queueHealthHistory).slice(-7);
+  if (healthHistory.length >= 2) {
+    const first = num(healthHistory[0].score);
+    const last = num(healthHistory[healthHistory.length - 1].score);
+    if (last < first - 5) recs.push('The queue is improving compared to the last week.');
+  }
+  const bestWindow = asArray(asObject(queueInsights?.submissionPatterns).best_submission_windows).slice()
+    .sort((a, b) => num(a.median_wait_seconds) - num(b.median_wait_seconds))[0];
+  if (bestWindow) {
+    recs.push(`Best submission window begins around ${hourLabel(bestWindow.hour_of_day)} (${escapeHtml(bestWindow.partition_name)}).`);
+  }
+  const w = warehouseSummary;
+  if (w.available && w.lastImportAt && num(w.overnight?.new_canonical_jobs) > 0 && snapshotAgeMs(w.lastImportAt) < 24 * 60 * 60 * 1000) {
+    recs.push('Warehouse updated successfully overnight.');
+  }
+  const maintenance = asObject(asObject(nodeInsights?.clusterOverview).maintenance);
+  const totals = asObject(asObject(nodeInsights?.clusterOverview).totals);
+  if (num(maintenance.nodes_draining) > 0 && num(totals.nodes_total)) {
+    recs.push(`Node maintenance has reduced available capacity by ${pct(num(maintenance.nodes_draining) / num(totals.nodes_total), 0)}.`);
+  }
+  return recs;
+}
+
+function recommendationsSection() {
+  const recs = executiveRecommendations();
+  return `<section class="section"><div class="section-head"><h2>Recommendations</h2></div>
+    ${recs.length ? `<ul class="rec-simple-list">${recs.map((r) => `<li>${r}</li>`).join('')}</ul>` : '<div class="empty-state">No recommendations right now - everything looks nominal.</div>'}
+  </section>`;
+}
+
+// --- Section 8: Platform Overview --------------------------------------------
+// Thin wrapper over platformRegistry/collectorHealth()/statusPillHtml() -
+// the same data platformStatusPanel() renders, condensed and linked out to
+// each module's existing detail page.
+const PLATFORM_OVERVIEW_LINKS = {
+  'analytics-warehouse': '#/warehouse',
+  'node-insights': '#/infrastructure',
+  'analytics-pipeline': '#/platform-status',
+  'queue-insights': '#/queue-overview',
+};
+
+function platformOverviewSection() {
+  return `<section class="section"><div class="section-head"><h2>Platform Overview</h2><a class="btn" href="#/platform-status">Platform Status detail</a></div>
+    <div class="platform-module-list">${platformRegistry.map((m) => (
+      `<div class="platform-module-row"><a href="${PLATFORM_OVERVIEW_LINKS[m.id] || '#/platform-status'}">${escapeHtml(m.label)}</a><span class="subtle">${m.planned ? 'Planned' : snapshotAgeLabel(m.generatedAt)}</span>${statusPillHtml(collectorHealth(m))}</div>`
+    )).join('')}</div>
+  </section>`;
 }
 
 function landingPage() {
-  const allTime = asObject(data?.clusterSummary?.allTime);
-  const meta = asObject(data?.datasetMeta);
-  const rows = asArray(data?.clusterSummary?.dailyTrends);
-  const failureRate = num(allTime.failed_jobs) / Math.max(1, num(allTime.jobs));
   return `
-    <div class="overview-top-grid">
-      <section class="intro-card">
-        <div class="intro-card-icon">${icon('cluster')}</div>
-        <div>
-          <h2>Mjolnir Analytics</h2>
-          <p>Mjolnir Analytics provides researchers and Principal Investigators with a clear view of how compute resources are being used across the Mjolnir platform.</p>
-          <p>It combines resource consumption, cost drivers, project-level trends, and optimization opportunities to help research groups make informed decisions about their use of shared HPC resources.</p>
-          <p class="subtle">Future versions will also include storage usage, storage growth, and sustainability metrics.</p>
-        </div>
-      </section>
-      ${renderSystemHealthCard(platformRegistry)}
-    </div>
-    <section class="hero-band">
-      <div class="hero-band-eyebrow">${dot('green')} Live production data</div>
-      <h1>Mjolnir Analytics</h1>
-      <p>${escapeHtml(heroSentence(warehouseSummary))}</p>
-    </section>
-    <section class="section"><div class="section-head"><h2>Warehouse Summary</h2><span class="subtle">Live from the Analytics Warehouse</span></div>
-      <div class="cards-grid one-col">${warehouseOverviewCard(warehouseSummary)}</div>
-      ${warehouseSummaryTiles(warehouseSummary)}
-      ${canonicalSelectionExplainer()}
-    </section>
-    ${analyticsPipelineDiagram()}
-    <section class="hero">
-      <div class="hero-copy">
-        <div class="eyebrow">${dot('green')} ${meta.dataWindowDays ? `${fmt(meta.dataWindowDays)}-day` : 'Recent'} operating picture</div>
-        <h2 style="font-size:clamp(1.6rem,3vw,2.4rem);letter-spacing:-0.02em;margin:0 0 12px">See how Mjolnir's resources are really being used.</h2>
-        <p>Helping researchers understand resource usage, cost drivers, and optimization opportunities across Mjolnir.</p>
-        <div class="hero-actions"><a class="btn btn-primary" href="#/cluster-health">View Cluster Resource Health</a><a class="btn" href="#/rankings">View rankings</a><a class="btn" href="#/recovery">View My Analytics</a></div>
-      </div>
-      <div class="hero-panel">
-        <div class="hero-panel-head"><div class="panel-title">Efficiency snapshot</div><div class="subtle">${meta.coverageWindow || 'Coverage unavailable'}</div></div>
-        <div class="mini-grid">
-          ${[
-            { label: 'CPU efficiency', value: pct(allTime.avg_cpu_efficiency), trend: `${humanNumber(allTime.jobs)} measured jobs`, tone: 'warn' },
-            { label: 'Memory efficiency', value: pct(allTime.avg_memory_efficiency), trend: `${humanNumber(allTime.jobs_with_measured_memory)} memory-measured jobs`, tone: 'warn' },
-            { label: 'Potential savings', value: money(allTime.underutilized_cost_dkk), trend: `${money(annualized(allTime.underutilized_cost_dkk))} annualized run-rate`, tone: 'info' },
-            { label: 'Failure rate', value: pct(failureRate, 1), trend: `${humanNumber(allTime.failed_jobs)} failed jobs`, tone: failureRate > 0.1 ? 'warn' : 'good' },
-          ].map(metricCard).join('')}
-        </div>
-        ${lineChart('CPU efficiency trend', rows, [chartSeries(rows, 'avg_cpu_efficiency', 'Daily', '#3e8cff'), rollingSeries(rows, 'avg_cpu_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_cpu_efficiency', 30, '30-day', '#ffb84d')], pct, { zeroBase: true })}
-      </div>
-    </section>
-    <section class="analytics-grid">
-      <div class="stack">
-        <section class="section"><div class="section-head"><h2>What needs action?</h2><span class="subtle">Recommendations from exported user bundles</span></div><div class="rec-list">${recommendationCards(3).join('')}</div></section>
-        <section class="section"><div class="section-head"><h2>Optimization opportunities</h2><span class="subtle">Top public-safe job examples</span></div>${inefficientJobsTable(asArray(data?.inefficientJobs).slice(0, 8))}</section>
-      </div>
-      <div class="stack">
-        <section class="section"><div class="section-head"><h2>Dataset coverage</h2><span class="subtle">Export provenance</span></div><div class="cards-grid one-col">${[
-          statBlock('Users', humanNumber(meta.userCount), 'Pseudonymous public bundles'),
-          statBlock('Recommendations', humanNumber(meta.recommendationCount), 'Generated from user summaries'),
-          statBlock('Top job examples', humanNumber(meta.inefficientJobCount), 'No job names or paths shown'),
-        ].join('')}</div></section>
-      </div>
-    </section>`;
+    <div class="stack">
+      ${clusterHealthHero()}
+      ${executiveKpiSection()}
+      ${overnightSummarySection()}
+      ${executiveWarehouseSection()}
+      ${executiveQueueSection()}
+      ${currentAlertsSection()}
+      ${recommendationsSection()}
+      ${platformOverviewSection()}
+    </div>`;
 }
 
 // Dedicated Warehouse page (sidebar: Infrastructure > Warehouse) - the
@@ -1352,9 +1607,16 @@ function warehousePage() {
 // buildPlatformRegistry() data the Overview page's System Health card
 // summarizes. Expand this page as dedicated module detail pages (Queue
 // Insights, Slurm Insights, ...) come online.
+// Shared by platformStatusPage() and the Executive Overview's Overnight
+// Summary - total historical snapshots retained (Node Insights hourly
+// history + daily cluster-summary rows), not a "last 24h" count, so both
+// pages always agree.
+function totalSnapshotCount() {
+  return asArray(nodeInsightsHistory?.capacity).length + asArray(data?.clusterSummary?.dailyTrends).length;
+}
+
 function platformStatusPage() {
-  const rows = asArray(data?.clusterSummary?.dailyTrends);
-  const snapshotCount = asArray(nodeInsightsHistory?.capacity).length + rows.length;
+  const snapshotCount = totalSnapshotCount();
   const activeModuleCount = platformRegistry.filter((m) => !m.planned && m.available).length;
   return `
     <div class="stack">
@@ -1862,7 +2124,7 @@ function renderShell(content) {
 
 function render() {
   document.documentElement.dataset.theme = state.theme;
-  platformRegistry = buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline });
+  platformRegistry = buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights });
   warehouseSummary = buildWarehouseSummary({ slurmAnalyticsPipeline, nodeInsights });
   const renderers = {
     landing: landingPage,

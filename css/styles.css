@@ -378,7 +378,9 @@ td:last-child, th:last-child { text-align: right; }
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 12px 14px; background: var(--surface-3); border-radius: var(--radius-sm);
 }
-.platform-module-row span:first-child { font-weight: 600; font-size: 13px; }
+.platform-module-row span:first-child,
+.platform-module-row a:first-child { font-weight: 600; font-size: 13px; color: var(--text); text-decoration: none; }
+.platform-module-row a:first-child:hover { text-decoration: underline; }
 .platform-status-meta {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
   margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--border);
@@ -388,50 +390,53 @@ td:last-child, th:last-child { text-align: right; }
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 
-/* Overview page: System Health card sits beside the Mjolnir Analytics
-   explainer card (desktop); below it on tablet/mobile. */
-.overview-top-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
-  gap: 18px;
-  align-items: stretch;
-  margin-bottom: 18px;
+/* Executive Overview (landing page) - Section 1's hero health card, Section
+   4's reduction funnel, and Section 6's alert rows. */
+.cluster-health-hero {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; text-align: center;
+  padding: 40px 24px; margin-bottom: 18px;
+  border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--surface); box-shadow: var(--shadow);
+  position: relative; overflow: hidden;
 }
-.overview-top-grid .intro-card { margin-bottom: 0; height: 100%; }
-
-.system-health-card { display: flex; flex-direction: column; }
-.system-health-main { display: flex; align-items: center; gap: 18px; margin: 6px 0 18px; }
-.system-health-text { min-width: 0; }
-.system-health-headline { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
-.system-health-sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
-
-.system-health-indicator {
-  flex: 0 0 auto;
-  width: 56px; height: 56px;
-  border-radius: 50%;
-  position: relative;
+.cluster-health-hero::before {
+  content: ''; position: absolute; inset: 0; opacity: 0.12; pointer-events: none;
 }
-.system-health-indicator.system-health-healthy { background: var(--green); box-shadow: 0 0 0 0 rgba(83, 216, 138, 0.55); animation: pulse-green 2.4s ease-out infinite; }
-.system-health-indicator.system-health-warning { background: var(--amber); box-shadow: 0 0 0 0 rgba(255, 184, 77, 0.55); animation: pulse-orange 2.4s ease-out infinite; }
-.system-health-indicator.system-health-critical { background: var(--orange); box-shadow: 0 0 0 0 rgba(255, 138, 61, 0.55); animation: pulse-deep-orange 2.4s ease-out infinite; }
-.system-health-indicator.system-health-failed { background: var(--red); box-shadow: 0 0 0 0 rgba(255, 107, 122, 0.55); animation: pulse-red 1.6s ease-out infinite; }
-.system-health-indicator.system-health-unknown { background: var(--muted); }
+.cluster-health-hero.cluster-health-healthy::before { background: radial-gradient(circle at 50% 0%, var(--green), transparent 60%); }
+.cluster-health-hero.cluster-health-warning::before { background: radial-gradient(circle at 50% 0%, var(--amber), transparent 60%); }
+.cluster-health-hero.cluster-health-failed::before { background: radial-gradient(circle at 50% 0%, var(--red), transparent 60%); }
+.cluster-health-label { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; }
+.cluster-health-value { font-size: clamp(2.2rem, 5vw, 3.2rem); font-weight: 800; line-height: 1.1; }
+.cluster-health-hero.cluster-health-healthy .cluster-health-value { color: var(--green); }
+.cluster-health-hero.cluster-health-warning .cluster-health-value { color: var(--amber); }
+.cluster-health-hero.cluster-health-failed .cluster-health-value { color: var(--red); }
+.cluster-health-sub { color: var(--muted); font-size: 14px; }
 
-@keyframes pulse-green { 70% { box-shadow: 0 0 0 16px rgba(83, 216, 138, 0); } 100% { box-shadow: 0 0 0 0 rgba(83, 216, 138, 0); } }
-@keyframes pulse-orange { 70% { box-shadow: 0 0 0 16px rgba(255, 184, 77, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 184, 77, 0); } }
-@keyframes pulse-deep-orange { 70% { box-shadow: 0 0 0 16px rgba(255, 138, 61, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 138, 61, 0); } }
-@keyframes pulse-red { 70% { box-shadow: 0 0 0 16px rgba(255, 107, 122, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 107, 122, 0); } }
-@media (prefers-reduced-motion: reduce) {
-  .system-health-indicator { animation: none !important; }
+.reduction-funnel {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 14px; padding: 18px; margin: 14px 0;
+  border-radius: var(--radius-sm); background: var(--surface-3);
 }
+.reduction-funnel-step { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 140px; text-align: center; }
+.reduction-funnel-step strong { font-size: 1.4rem; }
+.reduction-funnel-step span { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+.reduction-funnel-step.reduction-funnel-result strong { color: var(--green); }
+.reduction-funnel-arrow { color: var(--muted); font-size: 1.2rem; }
 
-.system-health-details { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border); }
-.system-health-detail-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.system-health-cta { margin-top: 16px; justify-content: center; width: 100%; }
+.alert-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: var(--radius-sm); background: var(--surface-3);
+  font-size: 13px;
+}
+.alert-row .pill { flex: none; }
+
+.rec-simple-list { display: grid; gap: 10px; margin: 0; padding-left: 20px; }
+.rec-simple-list li { font-size: 14px; line-height: 1.5; }
 
 @media (max-width: 1024px) {
-  .overview-top-grid { grid-template-columns: 1fr; }
-  .overview-top-grid .intro-card { height: auto; }
+  .cluster-health-hero { padding: 28px 18px; }
+  .reduction-funnel { flex-direction: column; }
 }
 .decision-hero,
 .personal-hero {

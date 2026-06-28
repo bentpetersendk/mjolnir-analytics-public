@@ -242,7 +242,6 @@ function dataWindowDaysFromRange(dateRange, fallbackDays) {
 }
 
 const PLANNED_MODULES = [
-  { id: 'queue-insights', label: 'Queue Insights', kind: 'analytics' },
   { id: 'slurm-insights', label: 'Slurm Insights', kind: 'analytics' },
   { id: 'predictions', label: 'Predictions', kind: 'analytics' },
 ];
@@ -252,7 +251,7 @@ const PLANNED_MODULES = [
 // each module's data lives in - statusBar()/platformStatusPanel() below
 // just iterate the result, so adding a module here is the only frontend
 // change a future collector needs (see the file header).
-export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline }) {
+export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights }) {
   const warehouse = slurmAnalyticsPipeline?.warehouse || {};
   const warehouseAvailable = Boolean(slurmAnalyticsPipeline?.available) && Boolean(warehouse.total_jobs);
   const warehouseModule = {
@@ -305,6 +304,28 @@ export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurm
     planned: false,
   };
 
+  // queueInsights.status is the raw queue_insights/status.json document
+  // (loadQueueInsightsData() doesn't normalize it to camelCase like the
+  // other loaders, since nothing read it until now) - same
+  // collector/collector_status/platform_module/cadence contract as every
+  // other module's status.json, per export_queue_insights.py.
+  const queueStatus = queueInsights?.status || {};
+  const queueAvailable = Boolean(queueInsights?.available) && Boolean(Object.keys(queueStatus).length);
+  const queueModule = {
+    id: 'queue-insights',
+    label: queueStatus.platform_module || 'Queue Insights',
+    kind: 'analytics',
+    collectorName: queueStatus.collector || 'queue_insights_export',
+    generatedAt: queueStatus.generated_at ?? null,
+    expectedRefreshSeconds: queueStatus.expected_refresh_seconds ?? null,
+    warningAfterIntervals: queueStatus.warning_after_intervals ?? null,
+    criticalAfterIntervals: queueStatus.critical_after_intervals ?? null,
+    dataWindowDays: queueInsights?.waitTimeHistory?.data_window_days ?? null,
+    available: queueAvailable,
+    status: queueStatus.collector_status || (queueAvailable ? null : 'failed'),
+    planned: false,
+  };
+
   const planned = PLANNED_MODULES.map((m) => ({
     ...m,
     planned: true,
@@ -317,7 +338,7 @@ export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurm
     status: null,
   }));
 
-  return [warehouseModule, nodeModule, pipelineModule, ...planned];
+  return [warehouseModule, nodeModule, pipelineModule, queueModule, ...planned];
 }
 
 export function findModule(registry, id) {
@@ -351,8 +372,11 @@ export function buildWarehouseSummary({ slurmAnalyticsPipeline, nodeInsights }) 
     earliestDate: w.earliest_date ?? null,
     latestDate: w.latest_date ?? null,
     lastImportAt: w.last_import_at ?? null,
+    lastImportDurationSeconds: w.last_import_duration_seconds ?? null,
     lastMaterializationAt: w.last_materialization_at ?? null,
+    lastMaterializationDurationSeconds: w.last_materialization_duration_seconds ?? null,
     lastPublishAt: w.last_publish_at ?? null,
+    lastPublishDurationSeconds: w.last_publish_duration_seconds ?? null,
     nodeSnapshotAt: nodeInsights?.generatedAt ?? null,
     expectedRefreshSeconds: slurmAnalyticsPipeline?.expectedRefreshSeconds ?? null,
     warningAfterIntervals: slurmAnalyticsPipeline?.warningAfterIntervals ?? null,
@@ -360,6 +384,9 @@ export function buildWarehouseSummary({ slurmAnalyticsPipeline, nodeInsights }) 
     schemaVersion: w.db_schema_version ?? null,
     warehouseVersion: w.warehouse_version ?? null,
     reductionRatio: accountingRecords && canonicalJobs ? canonicalJobs / accountingRecords : null,
+    // Real overnight deltas (export_dashboard_data.py's overnight_deltas()) -
+    // null fields mean no import has run yet, not zero activity.
+    overnight: w.overnight ? { ...w.overnight } : null,
   };
 }
 
@@ -410,60 +437,8 @@ export function platformStatusBadge(registry) {
   return `<div class="context-item platform-status-badge"><span>Platform Status</span>${statusPillHtml(overall)}</div>`;
 }
 
-// The module driving the platform's current status - whichever active
-// (non-planned) collector has the worst health, most-recent first on ties.
-// This is what the System Health card's rows describe, and it's why new
-// modules need no frontend change: a future Queue/Slurm/Cost collector that
-// goes stale simply becomes the new "worst" entry the next time this runs.
-const HEALTH_PRIORITY = { failed: 0, critical: 1, warning: 2, unknown: 3, healthy: 4, planned: 5 };
-function worstActiveModule(registry) {
-  const active = (registry || []).filter((m) => !m.planned);
-  if (!active.length) return null;
-  return active
-    .map((module) => ({ module, health: collectorHealth(module) }))
-    .sort((a, b) => (
-      (HEALTH_PRIORITY[a.health.status] ?? 9) - (HEALTH_PRIORITY[b.health.status] ?? 9)
-      || String(b.module.generatedAt || '').localeCompare(String(a.module.generatedAt || ''))
-    ))[0];
-}
-
-const SYSTEM_HEALTH_COPY = {
-  healthy: { headline: 'Healthy', sub: 'All systems operational' },
-  warning: { headline: 'Warning', sub: 'Update overdue' },
-  critical: { headline: 'Critical', sub: 'Update significantly overdue' },
-  failed: { headline: 'Failed', sub: 'Collector error detected' },
-  unknown: { headline: 'Unknown', sub: 'Status unavailable' },
-};
-
-// The prominent Overview-page card: a pulsating health indicator plus the
-// Last Update/Expected Refresh/Collector Status/Next Expected Update of
-// whichever module is currently driving that health. Pure presentation over
-// buildPlatformRegistry()'s output - registering a future module there is
-// still the only step needed for this card to reflect it.
-export function renderSystemHealthCard(registry) {
-  const overall = platformHealth(registry);
-  const copy = SYSTEM_HEALTH_COPY[overall.tone] || SYSTEM_HEALTH_COPY.unknown;
-  const worst = worstActiveModule(registry);
-  const meta = worst?.module || null;
-  const detailHealth = worst?.health || overall;
-  const rows = [
-    ['Last Update', formatLocalDateTime(meta?.generatedAt)],
-    ['Expected Refresh', expectedRefreshLabel(meta?.expectedRefreshSeconds)],
-    ['Collector Status', statusPillHtml(detailHealth)],
-    ['Next Expected Update', nextExpectedUpdateLabel(detailHealth)],
-  ];
-  return `<section class="section system-health-card">
-    <div class="section-head"><h2>System Health</h2>${statusPillHtml(overall)}</div>
-    <div class="system-health-main">
-      <span class="system-health-indicator system-health-${overall.tone}" role="img" aria-label="System health: ${copy.headline}"></span>
-      <div class="system-health-text">
-        <div class="system-health-headline">${copy.headline}</div>
-        <div class="system-health-sub">${copy.sub}</div>
-      </div>
-    </div>
-    <div class="system-health-details">${rows.map(([label, value]) => (
-      `<div class="system-health-detail-row"><span class="status-bar-label">${label}</span><span class="status-bar-value">${value}</span></div>`
-    )).join('')}</div>
-    <a class="btn system-health-cta" href="#/platform-status">View Platform Status</a>
-  </section>`;
-}
+// The old "System Health" overview card (whichever module is driving
+// platform health, with Last Update/Expected Refresh/etc.) has been
+// superseded by the Executive Overview page's Cluster Health hero and
+// Platform Overview section (js/app.js), which cover the same ground plus
+// Queue Health and per-module detail links.
