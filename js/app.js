@@ -1,5 +1,6 @@
 import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus, loadQueueInsightsData } from './data-loader.js';
 import { requestAnalyticsRecovery } from './recovery-service.js';
+import { startAutoRefresh, lastUpdatedLabel, isToastVisible } from './refresh-manager.js';
 import {
   formatLocalDateTime, chartTimeLabel, chartTimeTooltipLabel, snapshotAgeLabel, snapshotAgeMs,
   buildPlatformRegistry, findModule, statusBar, platformStatusPanel, platformStatusBadge,
@@ -2097,6 +2098,19 @@ function dot(tone) {
   return `<span style="display:inline-block;width:10px;height:10px;border-radius:999px;background:var(--${tone})"></span>`;
 }
 
+// Auto-Refresh status indicator (docs/EXECUTIVE_OVERVIEW.md, "Auto-Refresh").
+// Pure presentation - all state (lastUpdatedAt/toast-visible) lives in
+// refresh-manager.js so this stays a one-line read on every render() pass.
+// #refresh-last-updated keeps a stable id so the manager's 15s tick can
+// patch just this text node directly, without forcing a full page re-render.
+function refreshStatusHtml() {
+  return `<span class="refresh-status"><span class="refresh-status-dot" aria-hidden="true"></span>Live<span id="refresh-last-updated" class="refresh-status-updated">Last updated: ${lastUpdatedLabel()}</span></span>`;
+}
+
+function refreshToastHtml() {
+  return `<div id="refresh-toast" class="refresh-toast${isToastVisible() ? ' visible' : ''}" role="status" aria-live="polite">&check; Dashboard updated</div>`;
+}
+
 function renderShell(content) {
   const sourceText = data?.source === 'real-export' ? 'REAL MJOLNIR DATA' : 'Sample fallback active';
   return `
@@ -2116,9 +2130,10 @@ function renderShell(content) {
           <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Analytics</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Open navigation">${icon('menu')}</button></div>
           <div class="topbar"><div class="topbar-left"><div class="crumb">${icon('menu')} <span>${pageTitle(state.route)}</span></div></div><div class="topbar-right"><a class="btn" href="#/recovery">Who am I?</a><button class="toolbar-button" data-action="theme" aria-label="Toggle theme">${state.theme === 'dark' ? icon('sun') : icon('moon')}</button></div></div>
         </div>
-        ${data?.source === 'real-export' ? `<div class="load-banner real"><strong>${dot('green')} Live production data</strong><span>${coverageLabel(warehouseSummary)}</span></div>` : ''}
+        ${data?.source === 'real-export' ? `<div class="load-banner real"><strong>${dot('green')} Live production data</strong><span>${coverageLabel(warehouseSummary)}</span>${refreshStatusHtml()}</div>` : ''}
         <div class="page">${content}</div>
       </main>
+      ${refreshToastHtml()}
     </div>`;
 }
 
@@ -2165,6 +2180,71 @@ function render() {
   wireEvents();
   mountCharts();
   setupChartResize();
+}
+
+// --- Auto-Refresh glue (docs/EXECUTIVE_OVERVIEW.md, "Auto-Refresh") ---------
+// refresh-manager.js owns scheduling/fetching/merge-on-failure; everything
+// here is the small amount of app.js-specific glue it needs: read/write the
+// module-level data variables above, and re-render without disturbing what
+// the viewer is currently doing (route, scroll position, open <details>).
+function currentDataBundle() {
+  return { data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights };
+}
+
+function applyDataUpdate(next) {
+  data = next.data;
+  nodeInsights = next.nodeInsights;
+  nodeInsightsHistory = next.nodeInsightsHistory;
+  slurmAnalyticsPipeline = next.slurmAnalyticsPipeline;
+  queueInsights = next.queueInsights;
+}
+
+// <details> elements (the "Why are there fewer unique jobs..." /
+// "How does Mjolnir Analytics work?" disclosures) don't have their
+// open/closed state tracked in `state`, so a naive render() would reset
+// them to their hardcoded default every time. Identify each by its
+// <summary> text (stable across a refresh, since the page being refreshed
+// is still the same page) and restore whichever ones were open.
+function captureOpenDisclosures() {
+  return Array.from(document.querySelectorAll('.page details')).map((el) => ({
+    key: el.querySelector('summary')?.textContent?.trim() || '',
+    open: el.open,
+  }));
+}
+function restoreOpenDisclosures(saved) {
+  const elements = Array.from(document.querySelectorAll('.page details'));
+  saved.forEach((entry) => {
+    const match = elements.find((el) => (el.querySelector('summary')?.textContent?.trim() || '') === entry.key);
+    if (match) match.open = entry.open;
+  });
+}
+
+// The one render() wrapper a background refresh should ever use: same
+// route, same scroll position (window and the scrollable .main panel),
+// same open/closed disclosures - the viewer should not notice anything
+// happened beyond the numbers updating and the brief toast.
+function rerenderPreservingViewState() {
+  const scrollY = window.scrollY;
+  const mainEl = document.querySelector('.main');
+  const mainScrollTop = mainEl ? mainEl.scrollTop : null;
+  const savedDisclosures = captureOpenDisclosures();
+  render();
+  restoreOpenDisclosures(savedDisclosures);
+  window.scrollTo(0, scrollY);
+  const newMainEl = document.querySelector('.main');
+  if (newMainEl && mainScrollTop !== null) newMainEl.scrollTop = mainScrollTop;
+}
+
+// Cheap, render()-free DOM patches used for the 15s indicator tick and the
+// toast show/hide - neither needs to rebuild the page tree, so neither one
+// risks the scroll/disclosure state the full rerender above protects.
+function patchLastUpdatedIndicator() {
+  const el = document.getElementById('refresh-last-updated');
+  if (el) el.textContent = `Last updated: ${lastUpdatedLabel()}`;
+}
+function patchToastVisibility(visible) {
+  const el = document.getElementById('refresh-toast');
+  if (el) el.classList.toggle('visible', visible);
 }
 
 let stickyHeaderScrollAttached = false;
@@ -2305,6 +2385,13 @@ async function init() {
   ]);
   render();
   if (isPersonalRoute(state.route)) await loadPersonalRoute(state.route);
+  startAutoRefresh({
+    getCurrent: currentDataBundle,
+    applyUpdate: applyDataUpdate,
+    rerender: rerenderPreservingViewState,
+    updateIndicator: patchLastUpdatedIndicator,
+    setToastVisible: patchToastVisibility,
+  });
 }
 
 init();

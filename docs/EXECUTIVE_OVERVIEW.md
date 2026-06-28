@@ -126,3 +126,94 @@ Thin wrapper over `platformRegistry` / `collectorHealth()` /
 module's existing detail page. Registering a future module in
 `buildPlatformRegistry()` (`js/status.js`) is still the only step needed for
 both pages to pick it up.
+
+## Auto-Refresh (applies to every page, not just the landing page)
+
+[`js/refresh-manager.js`](../js/refresh-manager.js) keeps every page's data
+current without a manual reload. It is the one centralized place that
+schedules, fetches, and merges refreshes; every other page benefits
+automatically because it reads from the same module-level `data` /
+`nodeInsights` / `nodeInsightsHistory` / `slurmAnalyticsPipeline` /
+`queueInsights` variables in `js/app.js` that `render()` already reads on
+every route.
+
+### What it does
+
+- Every 5 minutes, re-runs the exact same five loaders `init()` calls once at
+  startup - `loadMjolnirData()`, `loadNodeInsightsData()`,
+  `loadNodeInsightsHistory()`, `loadSlurmAnalyticsPipelineStatus()`,
+  `loadQueueInsightsData()` (all from `js/data-loader.js`). No new fetch
+  logic, no new endpoints, no new collectors - this only re-requests JSON
+  the SPA already loads on every visit.
+- Compares the freshly-fetched bundle against what's currently on screen
+  (`JSON.stringify` equality). If nothing changed, it skips the re-render
+  entirely and only patches the "Last updated" text - no DOM churn for an
+  unchanged refresh.
+- If something changed, it hands the new data to `app.js`, which re-renders
+  the current page through the same `render()`/`renderShell()` path every
+  user interaction already uses, then shows the "&check; Dashboard updated"
+  toast for ~4 seconds.
+
+### Never losing data on a partial failure
+
+Each of the five loaders already returns an explicit
+`available`/`source` flag rather than throwing (this predates Auto-Refresh -
+see `js/data-loader.js`). `refresh-manager.js` reads that flag per module
+before accepting a refreshed value:
+
+- `loadMjolnirData()`'s result is only accepted when `source === 'real-export'`
+  (i.e. the live tree, not its own sample-data/empty fallback).
+- `loadNodeInsightsData()` / `loadNodeInsightsHistory()` /
+  `loadSlurmAnalyticsPipelineStatus()` results are only accepted when
+  `available === true`.
+- `loadQueueInsightsData()` fetches 7 independent JSON files
+  (`current_pressure.json`, `partition_pressure.json`,
+  `pending_reasons.json`, `queue_health_history.json`,
+  `wait_time_history.json`, `submission_patterns.json`, `status.json`) and
+  already tolerates any one of them being missing. `refresh-manager.js`
+  merges at that same per-file granularity: if one file comes back empty on
+  a given 5-minute cycle but was previously loaded successfully, the
+  previous value for *that file* is kept rather than blanked out.
+
+In every case, a failed or partial fetch keeps whatever was already
+rendered and retries on the next 5-minute tick - it never clears existing
+data and never spams the console (loaders already catch their own errors;
+`refresh-manager.js`'s own `try/catch` around the cycle is a second line of
+defense, not the expected path).
+
+### Not disturbing the viewer
+
+`app.js`'s `rerenderPreservingViewState()` is the only function Auto-Refresh
+ever calls to re-render. It wraps the normal `render()` call with:
+
+- Saving and restoring `window.scrollY` and the `.main` panel's `scrollTop`.
+- Saving and restoring which `<details>` disclosures (e.g. "Why are there
+  fewer unique jobs than accounting records?" on `#/warehouse`) were open,
+  matched by their `<summary>` text since the page being refreshed is still
+  the same page.
+- Never touching `location.hash` / `state.route` - a refresh re-renders
+  whatever route is already active, it never navigates.
+
+The "Last updated" label (15-second tick) and the toast show/hide are DOM
+patches (`textContent` / `classList.toggle`) done without calling `render()`
+at all, so the vast majority of refresh cycles - the 5-minute ones where
+nothing changed, and every 15-second clock tick - touch only one text node
+or one CSS class, never the page tree.
+
+### UI
+
+- A small `Live · Last updated: <relative time>` indicator lives inside the
+  existing green "Live production data" banner at the top of every page
+  (`refreshStatusHtml()` in `js/app.js`), so it's visible at every viewport
+  width without its own layout.
+- A "&check; Dashboard updated" toast (`refreshToastHtml()`) appears as a
+  fixed top-right overlay only when a refresh actually changed something,
+  and auto-hides after ~4 seconds.
+
+### Guarantees
+
+- `startAutoRefresh()` is idempotent (guarded by a module-level `started`
+  flag) - calling it more than once never creates a second pair of timers,
+  so there's no double-fetching and no leaked intervals.
+- The 5-minute refresh and 15-second indicator tick are the only two timers
+  Auto-Refresh ever creates, for the lifetime of the tab.

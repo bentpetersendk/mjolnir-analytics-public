@@ -661,6 +661,61 @@ td:last-child, th:last-child { text-align: right; }
   background: linear-gradient(180deg, rgba(83, 216, 138, 0.12), rgba(13, 20, 32, 0.9));
 }
 
+/* Auto-Refresh status indicator (docs/EXECUTIVE_OVERVIEW.md, "Auto-Refresh").
+   Lives inside .load-banner so it's visible on every page, at every
+   breakpoint, without a layout change of its own. */
+.refresh-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.refresh-status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--green);
+  box-shadow: 0 0 0 0 rgba(83, 216, 138, 0.6);
+  animation: refresh-status-pulse 2.4s ease-out infinite;
+}
+@keyframes refresh-status-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(83, 216, 138, 0.5); }
+  70% { box-shadow: 0 0 0 5px rgba(83, 216, 138, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(83, 216, 138, 0); }
+}
+.refresh-status-updated { color: var(--muted); }
+.refresh-status-updated::before { content: "\00b7"; margin: 0 6px; }
+
+/* "Dashboard updated" toast - fixed overlay so it never participates in the
+   page-content reflow that a refresh-triggered render() does, and never
+   gets clipped by .main's scroll container. */
+.refresh-toast {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 90;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(83, 216, 138, 0.35);
+  background: linear-gradient(180deg, rgba(83, 216, 138, 0.18), rgba(13, 20, 32, 0.96));
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.refresh-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .trend-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
