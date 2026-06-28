@@ -139,6 +139,27 @@ function bytesLabel(value) {
   }
   return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
+// Single reusable human-friendly number formatter for the whole app - scales
+// to thousand/million/billion/trillion so callers never hardcode a magnitude
+// word. style:'long' -> "55.1 million" (prose); style:'short' -> "55.1M"
+// (compact KPI tiles). Values under 1000 fall back to fmt() unchanged.
+const NUMBER_TIERS = [
+  { value: 1e12, long: 'trillion', short: 'T' },
+  { value: 1e9, long: 'billion', short: 'B' },
+  { value: 1e6, long: 'million', short: 'M' },
+  { value: 1e3, long: 'thousand', short: 'K' },
+];
+function humanNumber(value, { style = 'long', digits = 1 } = {}) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
+  const n = Number(value);
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  const tier = NUMBER_TIERS.find((t) => abs >= t.value);
+  if (!tier) return `${sign}${fmt(abs)}`;
+  const scaled = Number((abs / tier.value).toFixed(digits));
+  const suffix = style === 'short' ? tier.short : ` ${tier.long}`;
+  return `${sign}${scaled}${suffix}`;
+}
 function dateLabel(value) {
   if (!value) return '-';
   const date = new Date(`${String(value).slice(0, 10)}T00:00:00Z`);
@@ -264,8 +285,11 @@ function metricCard(kpi) {
 // dedicated Warehouse page so the two never show different numbers for the
 // same metric. `hint` renders as a native title tooltip (no new dependency).
 function warehouseTile(label, value, sub, hint) {
-  return `<article class="warehouse-tile"${hint ? ` title="${escapeHtml(hint)}"` : ''}>
-    <div class="warehouse-tile-label">${escapeHtml(label)}</div>
+  const infoTooltip = hint
+    ? `<span class="info-tooltip" tabindex="0" role="img" aria-label="${escapeHtml(hint)}" title="${escapeHtml(hint)}">${icon('info')}</span>`
+    : '';
+  return `<article class="warehouse-tile">
+    <div class="warehouse-tile-label">${escapeHtml(label)}${infoTooltip}</div>
     <div class="warehouse-tile-value">${value}</div>
     <div class="warehouse-tile-sub">${sub || ''}</div>
   </article>`;
@@ -278,14 +302,15 @@ function warehouseTile(label, value, sub, hint) {
 function warehouseSummaryTiles(w) {
   return `<div class="warehouse-grid">${[
     warehouseTile('Coverage', coverageLabel(w), 'Earliest to latest accounting record'),
-    warehouseTile('Accounting Records', fmt(w.accountingRecords), 'Raw Slurm accounting rows'),
-    warehouseTile('Job Steps', fmt(w.jobSteps), 'Step records within accounting rows'),
-    warehouseTile('Canonical Jobs', fmt(w.canonicalJobs), 'One deduplicated row per job', 'Multiple accounting records (job steps, retries, updates) are reduced to one canonical job per JobID.'),
-    warehouseTile('Unique Users', fmt(w.users), 'Distinct submitters, all time'),
-    warehouseTile('Projects', fmt(w.projects), 'Tracked in the project registry'),
-    warehouseTile('Accounts', fmt(w.accounts), 'Distinct Slurm accounts'),
-    warehouseTile('Partitions', fmt(w.partitions), 'Distinct Slurm partitions'),
-    warehouseTile('Compute Nodes', fmt(w.computeNodes), 'Live from Node Insights'),
+    warehouseTile('Accounting Records', humanNumber(w.accountingRecords), 'Raw Slurm accounting rows'),
+    warehouseTile('Job Steps', humanNumber(w.jobSteps), 'Step records within accounting rows'),
+    warehouseTile('Unique Jobs', humanNumber(w.canonicalJobs), 'One canonical record per completed job', 'Slurm generates multiple accounting records for many jobs (job steps, updates while running, retries, etc.). Mjolnir Analytics consolidates these into one canonical record per completed job for analysis.'),
+    warehouseTile('Reduction Ratio', `${humanNumber(w.accountingRecords, { style: 'short' })} → ${humanNumber(w.canonicalJobs, { style: 'short' })}`, w.reductionRatio !== null ? `${pct(w.reductionRatio, 1)} retained` : 'Retained share unavailable', 'How many raw accounting records collapse into one canonical job, and what share of records survive as unique jobs.'),
+    warehouseTile('Unique Users', humanNumber(w.users), 'Distinct submitters, all time'),
+    warehouseTile('Projects', humanNumber(w.projects), 'Tracked in the project registry'),
+    warehouseTile('Accounts', humanNumber(w.accounts), 'Distinct Slurm accounts'),
+    warehouseTile('Partitions', humanNumber(w.partitions), 'Distinct Slurm partitions'),
+    warehouseTile('Compute Nodes', humanNumber(w.computeNodes), 'Live from Node Insights'),
     warehouseTile('Last Accounting Import', snapshotAgeLabel(w.lastImportAt), 'ago', formatLocalDateTime(w.lastImportAt)),
     warehouseTile('Last Analytics Build', snapshotAgeLabel(w.lastMaterializationAt), 'ago', formatLocalDateTime(w.lastMaterializationAt)),
     warehouseTile('Node Snapshot', snapshotAgeLabel(w.nodeSnapshotAt), 'ago', formatLocalDateTime(w.nodeSnapshotAt)),
@@ -297,13 +322,13 @@ function warehouseSummaryTiles(w) {
 // <details> keeps this dependency-free and accessible (native disclosure).
 function canonicalSelectionExplainer() {
   return `<details class="disclosure">
-    <summary>Why are there fewer canonical jobs than accounting records?</summary>
+    <summary>Why are there fewer unique jobs than accounting records?</summary>
     <div class="flow-diagram flow-diagram-compact">
       <div class="flow-step"><strong>Accounting records</strong><span>Job steps, retries, updates</span></div>
       <div class="flow-arrow">&darr;</div>
       <div class="flow-step"><strong>Canonical selection</strong><span>Latest terminal state per JobID</span></div>
       <div class="flow-arrow">&darr;</div>
-      <div class="flow-step flow-step-result"><strong>One canonical job</strong><span>Deduplicated, analysis-ready</span></div>
+      <div class="flow-step flow-step-result"><strong>One unique job</strong><span>Deduplicated, analysis-ready</span></div>
     </div>
   </details>`;
 }
@@ -338,6 +363,17 @@ function analyticsPipelineDiagram() {
   </details>`;
 }
 
+// Richer "Analytics Warehouse" card - disk footprint, engine, schema version,
+// and freshness in one glance, in place of a bare "Warehouse Size" number.
+function warehouseOverviewCard(w) {
+  return `<article class="stat-card warehouse-overview-card">
+    <div class="label">Analytics Warehouse</div>
+    <div class="value">${bytesLabel(w.databaseSizeBytes)} <span class="unit-tag">SQLite</span></div>
+    <div class="subtle">${w.schemaVersion !== null && w.schemaVersion !== undefined ? `Schema v${escapeHtml(String(w.schemaVersion))}` : 'Schema unavailable'}</div>
+    <div class="subtle">Updated ${snapshotAgeLabel(w.lastMaterializationAt)} ago</div>
+  </article>`;
+}
+
 // Warehouse Status card - Health, Last Import/Materialization/Publish, size,
 // and the three headline counts. Reuses collectorHealth()/statusPillHtml()
 // from status.js so its health tone always agrees with Platform Status.
@@ -349,11 +385,11 @@ function warehouseStatusCard(w) {
       statBlock('Last Import', formatLocalDateTime(w.lastImportAt), `${snapshotAgeLabel(w.lastImportAt)} ago`),
       statBlock('Last Materialization', formatLocalDateTime(w.lastMaterializationAt), `${snapshotAgeLabel(w.lastMaterializationAt)} ago`),
       statBlock('Last Publication', formatLocalDateTime(w.lastPublishAt), `${snapshotAgeLabel(w.lastPublishAt)} ago`),
-      statBlock('Warehouse Size', bytesLabel(w.databaseSizeBytes), 'SQLite database on disk'),
-      statBlock('Accounting Records', fmt(w.accountingRecords), 'Raw Slurm accounting rows'),
-      statBlock('Canonical Jobs', fmt(w.canonicalJobs), 'Deduplicated jobs'),
-      statBlock('Job Steps', fmt(w.jobSteps), 'Step records'),
-      statBlock('Reduction Ratio', w.reductionRatio !== null ? pct(w.reductionRatio, 1) : '-', 'Canonical jobs / accounting records'),
+      warehouseOverviewCard(w),
+      statBlock('Accounting Records', humanNumber(w.accountingRecords), 'Raw Slurm accounting rows'),
+      statBlock('Unique Jobs', humanNumber(w.canonicalJobs), 'One canonical record per completed job'),
+      statBlock('Job Steps', humanNumber(w.jobSteps), 'Step records'),
+      statBlock('Reduction Ratio', `${humanNumber(w.accountingRecords, { style: 'short' })} → ${humanNumber(w.canonicalJobs, { style: 'short' })}`, w.reductionRatio !== null ? `${pct(w.reductionRatio, 1)} retained` : 'Retained share unavailable'),
     ].join('')}</div>
   </section>`;
 }
@@ -898,6 +934,16 @@ function recCard(level, title, detail, savings) {
   return `<article class="rec-card"><div class="rec-top"><span class="pill ${level.startsWith('High') ? 'warn' : 'info'}">${level}</span><strong>${savings}</strong></div><div>${escapeHtml(title)}</div><div class="subtle">${escapeHtml(detail)}</div></article>`;
 }
 
+// Live hero sentence - wording stays fixed but the figures are read straight
+// from buildWarehouseSummary() each render, so it ages naturally with the
+// warehouse instead of needing manual updates.
+function heroSentence(w) {
+  if (!w.available || !w.accountingRecords || !w.canonicalJobs) {
+    return 'Live production analytics platform for the Mjolnir HPC cluster.';
+  }
+  return `Mjolnir Analytics continuously transforms ${humanNumber(w.accountingRecords)} Slurm accounting records into ${humanNumber(w.canonicalJobs)} analyzed jobs, providing live operational and historical insights across the entire HPC cluster.`;
+}
+
 function landingPage() {
   const allTime = asObject(data?.clusterSummary?.allTime);
   const meta = asObject(data?.datasetMeta);
@@ -919,9 +965,10 @@ function landingPage() {
     <section class="hero-band">
       <div class="hero-band-eyebrow">${dot('green')} Live production data</div>
       <h1>Mjolnir Analytics</h1>
-      <p>Live production analytics platform for the Mjolnir HPC cluster.</p>
+      <p>${escapeHtml(heroSentence(warehouseSummary))}</p>
     </section>
     <section class="section"><div class="section-head"><h2>Warehouse Summary</h2><span class="subtle">Live from the Analytics Warehouse</span></div>
+      <div class="cards-grid one-col">${warehouseOverviewCard(warehouseSummary)}</div>
       ${warehouseSummaryTiles(warehouseSummary)}
       ${canonicalSelectionExplainer()}
     </section>
@@ -937,10 +984,10 @@ function landingPage() {
         <div class="hero-panel-head"><div class="panel-title">Efficiency snapshot</div><div class="subtle">${meta.coverageWindow || 'Coverage unavailable'}</div></div>
         <div class="mini-grid">
           ${[
-            { label: 'CPU efficiency', value: pct(allTime.avg_cpu_efficiency), trend: `${fmt(allTime.jobs)} measured jobs`, tone: 'warn' },
-            { label: 'Memory efficiency', value: pct(allTime.avg_memory_efficiency), trend: `${fmt(allTime.jobs_with_measured_memory)} memory-measured jobs`, tone: 'warn' },
+            { label: 'CPU efficiency', value: pct(allTime.avg_cpu_efficiency), trend: `${humanNumber(allTime.jobs)} measured jobs`, tone: 'warn' },
+            { label: 'Memory efficiency', value: pct(allTime.avg_memory_efficiency), trend: `${humanNumber(allTime.jobs_with_measured_memory)} memory-measured jobs`, tone: 'warn' },
             { label: 'Potential savings', value: money(allTime.underutilized_cost_dkk), trend: `${money(annualized(allTime.underutilized_cost_dkk))} annualized run-rate`, tone: 'info' },
-            { label: 'Failure rate', value: pct(failureRate, 1), trend: `${fmt(allTime.failed_jobs)} failed jobs`, tone: failureRate > 0.1 ? 'warn' : 'good' },
+            { label: 'Failure rate', value: pct(failureRate, 1), trend: `${humanNumber(allTime.failed_jobs)} failed jobs`, tone: failureRate > 0.1 ? 'warn' : 'good' },
           ].map(metricCard).join('')}
         </div>
         ${lineChart('CPU efficiency trend', rows, [chartSeries(rows, 'avg_cpu_efficiency', 'Daily', '#3e8cff'), rollingSeries(rows, 'avg_cpu_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_cpu_efficiency', 30, '30-day', '#ffb84d')], pct, { zeroBase: true })}
@@ -953,9 +1000,9 @@ function landingPage() {
       </div>
       <div class="stack">
         <section class="section"><div class="section-head"><h2>Dataset coverage</h2><span class="subtle">Export provenance</span></div><div class="cards-grid one-col">${[
-          statBlock('Users', fmt(meta.userCount), 'Pseudonymous public bundles'),
-          statBlock('Recommendations', fmt(meta.recommendationCount), 'Generated from user summaries'),
-          statBlock('Top job examples', fmt(meta.inefficientJobCount), 'No job names or paths shown'),
+          statBlock('Users', humanNumber(meta.userCount), 'Pseudonymous public bundles'),
+          statBlock('Recommendations', humanNumber(meta.recommendationCount), 'Generated from user summaries'),
+          statBlock('Top job examples', humanNumber(meta.inefficientJobCount), 'No job names or paths shown'),
         ].join('')}</div></section>
       </div>
     </section>`;
@@ -990,7 +1037,6 @@ function warehousePage() {
       <section class="section"><div class="section-head"><h2>Versions</h2><span class="subtle">Schema and pipeline</span></div><div class="cards-grid">${[
         statBlock('Schema version', w.schemaVersion ?? '-', 'mjolnir_analytics.sqlite schema'),
         statBlock('Pipeline version', w.warehouseVersion ?? '-', 'Warehouse metadata version'),
-        statBlock('Warehouse size', bytesLabel(w.databaseSizeBytes), 'SQLite database on disk'),
       ].join('')}</div></section>
       ${analyticsPipelineDiagram()}
       ${disclaimer('Daily imported job counts and historical warehouse-size growth are not yet exported by the pipeline. This page will gain a growth-over-time chart once that history is tracked.')}
