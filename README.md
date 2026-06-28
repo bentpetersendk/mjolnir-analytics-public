@@ -8,8 +8,8 @@ accounting data. Deployed via GitHub Pages at
 
 ## Architecture
 
-- `index.html`, `css/styles.css`, `js/{app.js,data-loader.js,recovery-service.js,status.js}`: the single-page app - Overview, Trends, Rankings, Infrastructure/Nodes/Hardware/Capacity (Node Insights), Platform Status, Projects/PIs hierarchy, personal analytics views, and Cost Insights.
-- `data/`: checked-in 90-day validation export (`data/efficiency_v3/`) and fallback `sample-data/`.
+- `index.html`, `css/styles.css`, `js/{app.js,data-loader.js,recovery-service.js,status.js}`: the single-page app - Overview, Trends, Rankings, Infrastructure/Nodes/Hardware/Capacity (Node Insights), Warehouse, Platform Status, Projects/PIs hierarchy, personal analytics views, and Cost Insights.
+- `data/`: checked-in efficiency export (`data/efficiency_v3/`) and fallback `sample-data/`. Live production Analytics Warehouse metadata (record/job counts, warehouse size, import/materialization timestamps) is fetched separately from the `dashboard-data` repo - see the Warehouse Summary section on Overview and the dedicated Warehouse page.
 - `private-user-data/`: mock personal-bundle fixture for local development.
 - `docs/`: architecture, deployment, and point-in-time reports.
 - `.github/workflows/`: linting, JSON validation, and GitHub Pages deployment.

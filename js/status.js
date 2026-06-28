@@ -221,6 +221,42 @@ export function findModule(registry, id) {
   return (registry || []).find((m) => m.id === id) || { id, label: id, planned: false, available: false };
 }
 
+// Normalized live Analytics Warehouse stats - the single source both the
+// Overview "Warehouse Summary" cards and the dedicated Warehouse page read
+// from, so the two never drift. Everything here comes straight out of
+// status.json's `warehouse` block (export_dashboard_data.py) plus the live
+// Node Insights snapshot for compute node count - no hardcoded numbers.
+export function buildWarehouseSummary({ slurmAnalyticsPipeline, nodeInsights }) {
+  const w = slurmAnalyticsPipeline?.warehouse || {};
+  const available = Boolean(slurmAnalyticsPipeline?.available) && Boolean(w.total_jobs);
+  const computeNodes = nodeInsights?.clusterOverview?.totals?.nodes_total
+    ?? nodeInsights?.nodeInventory?.nodeCount
+    ?? null;
+  const accountingRecords = w.total_accounting_records ?? null;
+  const canonicalJobs = w.total_jobs ?? null;
+  return {
+    available,
+    accountingRecords,
+    jobSteps: w.total_job_steps ?? null,
+    canonicalJobs,
+    users: w.total_users ?? null,
+    projects: w.total_projects ?? null,
+    accounts: w.total_accounts ?? null,
+    partitions: w.total_partitions ?? null,
+    computeNodes,
+    databaseSizeBytes: w.database_size_bytes ?? null,
+    earliestDate: w.earliest_date ?? null,
+    latestDate: w.latest_date ?? null,
+    lastImportAt: w.last_import_at ?? null,
+    lastMaterializationAt: w.last_materialization_at ?? null,
+    lastPublishAt: w.last_publish_at ?? null,
+    nodeSnapshotAt: nodeInsights?.generatedAt ?? null,
+    schemaVersion: w.db_schema_version ?? null,
+    warehouseVersion: w.warehouse_version ?? null,
+    reductionRatio: accountingRecords && canonicalJobs ? canonicalJobs / accountingRecords : null,
+  };
+}
+
 // Reusable per-page freshness strip. kind 'infrastructure' shows Snapshot
 // Age (a live fleet snapshot has no "window"); kind 'analytics' shows Data
 // Window (a historical rollup has no meaningful "age" beyond its export

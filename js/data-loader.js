@@ -16,7 +16,7 @@ const NODE_INSIGHTS_HISTORY_BASE = window.MJOLNIR_DASHBOARD_DATA_BASE
 // NIGHTLY_PIPELINE.md in the private repo.
 const SLURM_ANALYTICS_BASE = `${NODE_INSIGHTS_HISTORY_BASE}slurm_analytics/`;
 
-const VALIDATION_ROW_COUNTS = {
+const LEGACY_EXPORT_ROW_COUNTS = {
   jobs: 2364601,
   job_metrics: 1218881,
   daily_user_summary: 3411,
@@ -482,12 +482,12 @@ function buildDerivedData(tree) {
     sections: hierarchy.sections,
     hierarchyCoverage: hierarchy.coverage,
     datasetMeta: {
-      sourceDatabase: 'efficiency_v3/data/mjolnir_efficiency_90d_validation.sqlite',
-      validationWindow: reportDates.length ? `${reportDates[0]} to ${reportDates[reportDates.length - 1]}` : 'Unavailable',
+      sourceDatabase: 'efficiency_v3/data/mjolnir_efficiency.sqlite',
+      coverageWindow: reportDates.length ? `${reportDates[0]} to ${reportDates[reportDates.length - 1]}` : 'Unavailable',
       dateRange: reportDates.length ? { start: reportDates[0], end: reportDates[reportDates.length - 1] } : { start: null, end: null },
       exportDate: cluster.generated_at || tree.index.generated_at || null,
       importedRows: dailyTrends.length,
-      rowCounts: VALIDATION_ROW_COUNTS,
+      rowCounts: LEGACY_EXPORT_ROW_COUNTS,
       userCount: users.length,
       projectCount: projects.length,
       piCount: hierarchy.pis.length,
@@ -705,11 +705,11 @@ export async function loadMjolnirData() {
         hierarchyCoverage: {},
         datasetMeta: {
           sourceDatabase: 'Unavailable',
-          validationWindow: 'Unavailable',
+          coverageWindow: 'Unavailable',
           dateRange: { start: null, end: null },
           exportDate: null,
           importedRows: 0,
-          rowCounts: VALIDATION_ROW_COUNTS,
+          rowCounts: LEGACY_EXPORT_ROW_COUNTS,
           userCount: 0,
           projectCount: 0,
           piCount: 0,

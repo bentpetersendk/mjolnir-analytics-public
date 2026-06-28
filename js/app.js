@@ -1,9 +1,9 @@
 import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus } from './data-loader.js';
 import { requestAnalyticsRecovery } from './recovery-service.js';
 import {
-  formatLocalDateTime, chartTimeLabel, chartTimeTooltipLabel,
+  formatLocalDateTime, chartTimeLabel, chartTimeTooltipLabel, snapshotAgeLabel,
   buildPlatformRegistry, findModule, statusBar, platformStatusPanel, platformStatusBadge,
-  renderSystemHealthCard,
+  renderSystemHealthCard, buildWarehouseSummary, collectorHealth, statusPillHtml,
 } from './status.js';
 
 const app = document.querySelector('#app');
@@ -32,6 +32,7 @@ const navGroups = [
       { id: 'nodes', label: 'Nodes', icon: 'cluster' },
       { id: 'hardware', label: 'Hardware', icon: 'cpu' },
       { id: 'capacity', label: 'Capacity', icon: 'gauge' },
+      { id: 'warehouse', label: 'Warehouse', icon: 'server' },
       { id: 'platform-status', label: 'Platform Status', icon: 'gauge' },
     ],
   },
@@ -83,6 +84,7 @@ let nodeInsights = null;
 let nodeInsightsHistory = null;
 let slurmAnalyticsPipeline = null;
 let platformRegistry = [];
+let warehouseSummary = {};
 
 // Data Freshness / Platform Status framework (docs/PLATFORM_STATUS.md):
 // page renderers call analyticsStatusBar()/infraStatusBar() rather than
@@ -124,6 +126,51 @@ function pct(value, digits = 0) { return value === null || value === undefined |
 function money(value, digits = 0) { return value === null || value === undefined || Number.isNaN(Number(value)) ? '-' : `${Number(value).toLocaleString('en-US', { maximumFractionDigits: digits })} DKK`; }
 function fmt(value, digits = 0) { return value === null || value === undefined || Number.isNaN(Number(value)) ? '-' : Number(value).toLocaleString('en-US', { maximumFractionDigits: digits }); }
 function annualized(value) { return num(value) * (365 / 90); }
+function bytesLabel(value) {
+  if (value === null || value === undefined) return '-';
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return '-';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = n;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+// Single reusable human-friendly number formatter for the whole app - scales
+// to thousand/million/billion/trillion so callers never hardcode a magnitude
+// word. style:'long' -> "55.1 million" (prose); style:'short' -> "55.1M"
+// (compact KPI tiles). Values under 1000 fall back to fmt() unchanged.
+const NUMBER_TIERS = [
+  { value: 1e12, long: 'trillion', short: 'T' },
+  { value: 1e9, long: 'billion', short: 'B' },
+  { value: 1e6, long: 'million', short: 'M' },
+  { value: 1e3, long: 'thousand', short: 'K' },
+];
+function humanNumber(value, { style = 'long', digits = 1 } = {}) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
+  const n = Number(value);
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  const tier = NUMBER_TIERS.find((t) => abs >= t.value);
+  if (!tier) return `${sign}${fmt(abs)}`;
+  const scaled = Number((abs / tier.value).toFixed(digits));
+  const suffix = style === 'short' ? tier.short : ` ${tier.long}`;
+  return `${sign}${scaled}${suffix}`;
+}
+function dateLabel(value) {
+  if (!value) return '-';
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+function coverageLabel(warehouse) {
+  if (!warehouse?.earliestDate) return 'Coverage unavailable';
+  const end = warehouse.latestDate ? dateLabel(warehouse.latestDate) : 'Present';
+  return `${dateLabel(warehouse.earliestDate)} - ${end}`;
+}
 // Revised Cost-Bearer waste model (docs/COST_BEARER_RESOURCE_AUDIT.md).
 function bearerLabel(value) { return value === 'memory' ? 'Memory' : value === 'cpu' ? 'CPU' : '-'; }
 // Required display safeguards from the independent audit (APPROVE WITH CHANGES).
@@ -232,6 +279,119 @@ function lineChart(title, rows, series, formatter = fmt, options = {}) {
 
 function metricCard(kpi) {
   return `<article class="metric-card ${kpi.tone || ''}"><div class="metric-label">${kpi.label}</div><div class="metric-value">${kpi.value}</div><div class="metric-trend">${kpi.trend}</div></article>`;
+}
+
+// Live "Warehouse Summary" KPI tile - used on both the Overview hero and the
+// dedicated Warehouse page so the two never show different numbers for the
+// same metric. `hint` renders as a native title tooltip (no new dependency).
+function warehouseTile(label, value, sub, hint) {
+  const infoTooltip = hint
+    ? `<span class="info-tooltip" tabindex="0" role="img" aria-label="${escapeHtml(hint)}" title="${escapeHtml(hint)}">${icon('info')}</span>`
+    : '';
+  return `<article class="warehouse-tile">
+    <div class="warehouse-tile-label">${escapeHtml(label)}${infoTooltip}</div>
+    <div class="warehouse-tile-value">${value}</div>
+    <div class="warehouse-tile-sub">${sub || ''}</div>
+  </article>`;
+}
+
+// Shared by the Overview page's "Warehouse Summary" grid and the dedicated
+// Warehouse page - source data is buildWarehouseSummary() in status.js,
+// itself a thin read of status.json's `warehouse` block
+// (export_dashboard_data.py). No number here is computed in the browser.
+function warehouseSummaryTiles(w) {
+  return `<div class="warehouse-grid">${[
+    warehouseTile('Coverage', coverageLabel(w), 'Earliest to latest accounting record'),
+    warehouseTile('Accounting Records', humanNumber(w.accountingRecords), 'Raw Slurm accounting rows'),
+    warehouseTile('Job Steps', humanNumber(w.jobSteps), 'Step records within accounting rows'),
+    warehouseTile('Unique Jobs', humanNumber(w.canonicalJobs), 'One canonical record per completed job', 'Slurm generates multiple accounting records for many jobs (job steps, updates while running, retries, etc.). Mjolnir Analytics consolidates these into one canonical record per completed job for analysis.'),
+    warehouseTile('Reduction Ratio', `${humanNumber(w.accountingRecords, { style: 'short' })} → ${humanNumber(w.canonicalJobs, { style: 'short' })}`, w.reductionRatio !== null ? `${pct(w.reductionRatio, 1)} retained` : 'Retained share unavailable', 'How many raw accounting records collapse into one canonical job, and what share of records survive as unique jobs.'),
+    warehouseTile('Unique Users', humanNumber(w.users), 'Distinct submitters, all time'),
+    warehouseTile('Projects', humanNumber(w.projects), 'Tracked in the project registry'),
+    warehouseTile('Accounts', humanNumber(w.accounts), 'Distinct Slurm accounts'),
+    warehouseTile('Partitions', humanNumber(w.partitions), 'Distinct Slurm partitions'),
+    warehouseTile('Compute Nodes', humanNumber(w.computeNodes), 'Live from Node Insights'),
+    warehouseTile('Last Accounting Import', snapshotAgeLabel(w.lastImportAt), 'ago', formatLocalDateTime(w.lastImportAt)),
+    warehouseTile('Last Analytics Build', snapshotAgeLabel(w.lastMaterializationAt), 'ago', formatLocalDateTime(w.lastMaterializationAt)),
+    warehouseTile('Node Snapshot', snapshotAgeLabel(w.nodeSnapshotAt), 'ago', formatLocalDateTime(w.nodeSnapshotAt)),
+  ].join('')}</div>`;
+}
+
+// Canonical-selection explainer - one of the platform's actual technical
+// strengths, so it gets a real diagram, not a one-line caption. Plain
+// <details> keeps this dependency-free and accessible (native disclosure).
+function canonicalSelectionExplainer() {
+  return `<details class="disclosure">
+    <summary>Why are there fewer unique jobs than accounting records?</summary>
+    <div class="flow-diagram flow-diagram-compact">
+      <div class="flow-step"><strong>Accounting records</strong><span>Job steps, retries, updates</span></div>
+      <div class="flow-arrow">&darr;</div>
+      <div class="flow-step"><strong>Canonical selection</strong><span>Latest terminal state per JobID</span></div>
+      <div class="flow-arrow">&darr;</div>
+      <div class="flow-step flow-step-result"><strong>One unique job</strong><span>Deduplicated, analysis-ready</span></div>
+    </div>
+  </details>`;
+}
+
+// "How does Mjolnir Analytics work?" pipeline diagram - the full path from
+// raw Slurm accounting to the analytics modules built on top of it.
+function analyticsPipelineDiagram() {
+  return `<details class="disclosure" open>
+    <summary>How does Mjolnir Analytics work?</summary>
+    <div class="pipeline-diagram">
+      <div class="pipeline-stage"><span class="pipeline-node">Slurm Accounting</span></div>
+      <div class="pipeline-arrow">&darr;</div>
+      <div class="pipeline-stage"><span class="pipeline-node">Accounting Records</span></div>
+      <div class="pipeline-arrow">&darr;</div>
+      <div class="pipeline-stage"><span class="pipeline-node">Canonical Selection</span></div>
+      <div class="pipeline-arrow">&darr;</div>
+      <div class="pipeline-stage"><span class="pipeline-node pipeline-node-highlight">Analytics Warehouse</span></div>
+      <div class="pipeline-arrow">&darr;</div>
+      <div class="pipeline-stage"><span class="pipeline-node">Daily Summaries</span></div>
+      <div class="pipeline-arrow">&darr;</div>
+      <div class="pipeline-stage pipeline-stage-branch">
+        <span class="pipeline-node">User Analytics</span>
+        <span class="pipeline-node">Queue Analytics</span>
+        <span class="pipeline-node">Project Analytics</span>
+        <span class="pipeline-node">PI Analytics</span>
+        <span class="pipeline-node">Cost Analytics</span>
+      </div>
+      <div class="pipeline-arrow">&darr;</div>
+      <div class="pipeline-stage"><span class="pipeline-node pipeline-node-highlight">Mjolnir Analytics</span></div>
+    </div>
+    <p class="subtle" style="margin-top:12px">Node Insights runs alongside this pipeline as a separate, live collector (sinfo/scontrol/squeue), feeding compute-node counts and fleet health directly into the same dashboards.</p>
+  </details>`;
+}
+
+// Richer "Analytics Warehouse" card - disk footprint, engine, schema version,
+// and freshness in one glance, in place of a bare "Warehouse Size" number.
+function warehouseOverviewCard(w) {
+  return `<article class="stat-card warehouse-overview-card">
+    <div class="label">Analytics Warehouse</div>
+    <div class="value">${bytesLabel(w.databaseSizeBytes)} <span class="unit-tag">SQLite</span></div>
+    <div class="subtle">${w.schemaVersion !== null && w.schemaVersion !== undefined ? `Schema v${escapeHtml(String(w.schemaVersion))}` : 'Schema unavailable'}</div>
+    <div class="subtle">Updated ${snapshotAgeLabel(w.lastMaterializationAt)} ago</div>
+  </article>`;
+}
+
+// Warehouse Status card - Health, Last Import/Materialization/Publish, size,
+// and the three headline counts. Reuses collectorHealth()/statusPillHtml()
+// from status.js so its health tone always agrees with Platform Status.
+function warehouseStatusCard(w) {
+  const health = collectorHealth({ generatedAt: w.lastImportAt || w.lastMaterializationAt, available: w.available, status: w.available ? null : 'failed' });
+  return `<section class="section warehouse-status-card">
+    <div class="section-head"><h2>Warehouse Status</h2>${statusPillHtml(health)}</div>
+    <div class="cards-grid">${[
+      statBlock('Last Import', formatLocalDateTime(w.lastImportAt), `${snapshotAgeLabel(w.lastImportAt)} ago`),
+      statBlock('Last Materialization', formatLocalDateTime(w.lastMaterializationAt), `${snapshotAgeLabel(w.lastMaterializationAt)} ago`),
+      statBlock('Last Publication', formatLocalDateTime(w.lastPublishAt), `${snapshotAgeLabel(w.lastPublishAt)} ago`),
+      warehouseOverviewCard(w),
+      statBlock('Accounting Records', humanNumber(w.accountingRecords), 'Raw Slurm accounting rows'),
+      statBlock('Unique Jobs', humanNumber(w.canonicalJobs), 'One canonical record per completed job'),
+      statBlock('Job Steps', humanNumber(w.jobSteps), 'Step records'),
+      statBlock('Reduction Ratio', `${humanNumber(w.accountingRecords, { style: 'short' })} → ${humanNumber(w.canonicalJobs, { style: 'short' })}`, w.reductionRatio !== null ? `${pct(w.reductionRatio, 1)} retained` : 'Retained share unavailable'),
+    ].join('')}</div>
+  </section>`;
 }
 
 function statBlock(label, value, trend, tone = '') {
@@ -774,6 +934,16 @@ function recCard(level, title, detail, savings) {
   return `<article class="rec-card"><div class="rec-top"><span class="pill ${level.startsWith('High') ? 'warn' : 'info'}">${level}</span><strong>${savings}</strong></div><div>${escapeHtml(title)}</div><div class="subtle">${escapeHtml(detail)}</div></article>`;
 }
 
+// Live hero sentence - wording stays fixed but the figures are read straight
+// from buildWarehouseSummary() each render, so it ages naturally with the
+// warehouse instead of needing manual updates.
+function heroSentence(w) {
+  if (!w.available || !w.accountingRecords || !w.canonicalJobs) {
+    return 'Live production analytics platform for the Mjolnir HPC cluster.';
+  }
+  return `Mjolnir Analytics continuously transforms ${humanNumber(w.accountingRecords)} Slurm accounting records into ${humanNumber(w.canonicalJobs)} analyzed jobs, providing live operational and historical insights across the entire HPC cluster.`;
+}
+
 function landingPage() {
   const allTime = asObject(data?.clusterSummary?.allTime);
   const meta = asObject(data?.datasetMeta);
@@ -792,21 +962,32 @@ function landingPage() {
       </section>
       ${renderSystemHealthCard(platformRegistry)}
     </div>
+    <section class="hero-band">
+      <div class="hero-band-eyebrow">${dot('green')} Live production data</div>
+      <h1>Mjolnir Analytics</h1>
+      <p>${escapeHtml(heroSentence(warehouseSummary))}</p>
+    </section>
+    <section class="section"><div class="section-head"><h2>Warehouse Summary</h2><span class="subtle">Live from the Analytics Warehouse</span></div>
+      <div class="cards-grid one-col">${warehouseOverviewCard(warehouseSummary)}</div>
+      ${warehouseSummaryTiles(warehouseSummary)}
+      ${canonicalSelectionExplainer()}
+    </section>
+    ${analyticsPipelineDiagram()}
     <section class="hero">
       <div class="hero-copy">
-        <div class="eyebrow">${dot('green')} REAL MJOLNIR DATA - 90-day validation dataset</div>
-        <h1>See how Mjolnir's resources are really being used.</h1>
+        <div class="eyebrow">${dot('green')} ${meta.dataWindowDays ? `${fmt(meta.dataWindowDays)}-day` : 'Recent'} operating picture</div>
+        <h2 style="font-size:clamp(1.6rem,3vw,2.4rem);letter-spacing:-0.02em;margin:0 0 12px">See how Mjolnir's resources are really being used.</h2>
         <p>Helping researchers understand resource usage, cost drivers, and optimization opportunities across Mjolnir.</p>
         <div class="hero-actions"><a class="btn btn-primary" href="#/cluster-health">View Cluster Resource Health</a><a class="btn" href="#/rankings">View rankings</a><a class="btn" href="#/recovery">View My Analytics</a></div>
       </div>
       <div class="hero-panel">
-        <div class="hero-panel-head"><div class="panel-title">90-day operating picture</div><div class="subtle">${meta.validationWindow || 'Validation window unavailable'}</div></div>
+        <div class="hero-panel-head"><div class="panel-title">Efficiency snapshot</div><div class="subtle">${meta.coverageWindow || 'Coverage unavailable'}</div></div>
         <div class="mini-grid">
           ${[
-            { label: 'CPU efficiency', value: pct(allTime.avg_cpu_efficiency), trend: `${fmt(allTime.jobs)} measured jobs`, tone: 'warn' },
-            { label: 'Memory efficiency', value: pct(allTime.avg_memory_efficiency), trend: `${fmt(allTime.jobs_with_measured_memory)} memory-measured jobs`, tone: 'warn' },
+            { label: 'CPU efficiency', value: pct(allTime.avg_cpu_efficiency), trend: `${humanNumber(allTime.jobs)} measured jobs`, tone: 'warn' },
+            { label: 'Memory efficiency', value: pct(allTime.avg_memory_efficiency), trend: `${humanNumber(allTime.jobs_with_measured_memory)} memory-measured jobs`, tone: 'warn' },
             { label: 'Potential savings', value: money(allTime.underutilized_cost_dkk), trend: `${money(annualized(allTime.underutilized_cost_dkk))} annualized run-rate`, tone: 'info' },
-            { label: 'Failure rate', value: pct(failureRate, 1), trend: `${fmt(allTime.failed_jobs)} failed jobs`, tone: failureRate > 0.1 ? 'warn' : 'good' },
+            { label: 'Failure rate', value: pct(failureRate, 1), trend: `${humanNumber(allTime.failed_jobs)} failed jobs`, tone: failureRate > 0.1 ? 'warn' : 'good' },
           ].map(metricCard).join('')}
         </div>
         ${lineChart('CPU efficiency trend', rows, [chartSeries(rows, 'avg_cpu_efficiency', 'Daily', '#3e8cff'), rollingSeries(rows, 'avg_cpu_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_cpu_efficiency', 30, '30-day', '#ffb84d')], pct, { zeroBase: true })}
@@ -819,12 +1000,47 @@ function landingPage() {
       </div>
       <div class="stack">
         <section class="section"><div class="section-head"><h2>Dataset coverage</h2><span class="subtle">Export provenance</span></div><div class="cards-grid one-col">${[
-          statBlock('Users', fmt(meta.userCount), 'Pseudonymous public bundles'),
-          statBlock('Recommendations', fmt(meta.recommendationCount), 'Generated from user summaries'),
-          statBlock('Top job examples', fmt(meta.inefficientJobCount), 'No job names or paths shown'),
+          statBlock('Users', humanNumber(meta.userCount), 'Pseudonymous public bundles'),
+          statBlock('Recommendations', humanNumber(meta.recommendationCount), 'Generated from user summaries'),
+          statBlock('Top job examples', humanNumber(meta.inefficientJobCount), 'No job names or paths shown'),
         ].join('')}</div></section>
       </div>
     </section>`;
+}
+
+// Dedicated Warehouse page (sidebar: Infrastructure > Warehouse) - the
+// operational overview for administrators: warehouse health, the three
+// headline counts (accounting records / job steps / canonical jobs) and how
+// they relate, organizational scope (users/projects/accounts/partitions),
+// compute fleet size, and pipeline/version metadata. Every value comes from
+// buildWarehouseSummary() (status.json's `warehouse` block) - nothing here
+// is computed client-side or hardcoded.
+function warehousePage() {
+  const w = warehouseSummary;
+  if (!w.available) {
+    return `<div class="stack">${disclaimer('The Analytics Warehouse pipeline status has not been published yet, or the warehouse has no jobs recorded. This page will populate automatically once status.json is available.')}</div>`;
+  }
+  return `
+    <div class="stack">
+      ${warehouseStatusCard(w)}
+      <section class="section"><div class="section-head"><h2>Warehouse Summary</h2><span class="subtle">Live scale and freshness</span></div>
+        ${warehouseSummaryTiles(w)}
+        ${canonicalSelectionExplainer()}
+      </section>
+      <section class="section"><div class="section-head"><h2>Organizational scope</h2><span class="subtle">Who and what the warehouse covers</span></div><div class="cards-grid">${[
+        statBlock('Unique users', fmt(w.users), 'Distinct submitters, all time'),
+        statBlock('Projects', fmt(w.projects), 'Tracked in the project registry'),
+        statBlock('Accounts', fmt(w.accounts), 'Distinct Slurm accounts'),
+        statBlock('Partitions', fmt(w.partitions), 'Distinct Slurm partitions'),
+        statBlock('Compute nodes', fmt(w.computeNodes), 'Live from Node Insights'),
+      ].join('')}</div></section>
+      <section class="section"><div class="section-head"><h2>Versions</h2><span class="subtle">Schema and pipeline</span></div><div class="cards-grid">${[
+        statBlock('Schema version', w.schemaVersion ?? '-', 'mjolnir_analytics.sqlite schema'),
+        statBlock('Pipeline version', w.warehouseVersion ?? '-', 'Warehouse metadata version'),
+      ].join('')}</div></section>
+      ${analyticsPipelineDiagram()}
+      ${disclaimer('Daily imported job counts and historical warehouse-size growth are not yet exported by the pipeline. This page will gain a growth-over-time chart once that history is tracked.')}
+    </div>`;
 }
 
 // Dedicated Platform Status page (sidebar: Infrastructure > Platform
@@ -873,15 +1089,17 @@ function clusterHealthPage() {
   const cpuTrend = trendDirection(rolling7.avg_cpu_efficiency, rolling30.avg_cpu_efficiency);
   const memoryTrend = trendDirection(rolling7.avg_memory_efficiency, rolling30.avg_memory_efficiency);
   const savingsTrend = trendDirection(rolling7.underutilized_cost_dkk, rolling30.underutilized_cost_dkk, true);
+  const windowDays = data?.datasetMeta?.dataWindowDays;
+  const windowLabel = windowDays ? `${fmt(windowDays)}-day` : 'recent';
   return `
     <div class="stack">
-      <section class="section"><div class="section-head"><h2>Cluster Resource Health</h2><span class="subtle">All metrics from the 90-day validation export</span></div><div class="cards-grid">${[
+      <section class="section"><div class="section-head"><h2>Cluster Resource Health</h2><span class="subtle">All metrics from the live analytics export (${windowLabel} window)</span></div><div class="cards-grid">${[
         statBlock('Total jobs', fmt(allTime.jobs), 'Measured job metrics rows'),
         statBlock('Completed jobs', fmt(allTime.completed_jobs), 'Successful workload volume', 'good'),
         statBlock('Failed jobs', fmt(allTime.failed_jobs), `${pct(failureRate, 1)} failure rate`, failureRate > 0.1 ? 'warn' : 'good'),
         statBlock('Average CPU efficiency', pct(allTime.avg_cpu_efficiency), cpuTrend.text, cpuTrend.tone),
         statBlock('Average memory efficiency', pct(allTime.avg_memory_efficiency), memoryTrend.text, memoryTrend.tone),
-        statBlock('Estimated cost', money(allTime.estimated_cost_dkk), '90-day estimated spend'),
+        statBlock('Estimated cost', money(allTime.estimated_cost_dkk), `${windowLabel} estimated spend`),
         statBlock('Potential savings', money(allTime.underutilized_cost_dkk), savingsTrend.text, savingsTrend.tone),
         statBlock('GPU hours', fmt(allTime.gpu_hours, 1), 'Measured GPU allocation time'),
         statBlock('GPU spend', money(allTime.gpu_cost_dkk), 'Estimated GPU cost'),
@@ -895,7 +1113,7 @@ function clusterHealthPage() {
       <section class="section"><div class="section-head"><h2>Immediate operational reading</h2><span class="subtle">Actionable interpretation</span></div><div class="insight-grid">${[
         insight('CPU requests', `Average CPU efficiency is ${pct(allTime.avg_cpu_efficiency)}. Focus first on users with high savings opportunity and low measured CPU use.`),
         insight('Memory requests', `Average memory efficiency is ${pct(allTime.avg_memory_efficiency)}. Many jobs likely request much more memory than they use.`),
-        insight('Cost control', `${money(allTime.underutilized_cost_dkk)} of 90-day cost is marked as underutilized. Treat this as the main optimization queue.`),
+        insight('Cost control', `${money(allTime.underutilized_cost_dkk)} of ${windowLabel} cost is marked as underutilized. Treat this as the main optimization queue.`),
       ].join('')}</div></section>
       </div>`;
 }
@@ -1105,12 +1323,14 @@ function userPage() {
 function costPage() {
   const allTime = asObject(data?.clusterSummary?.allTime);
   const rows = asArray(data?.clusterSummary?.dailyTrends);
+  const windowDays = data?.datasetMeta?.dataWindowDays;
+  const windowLabel = windowDays ? `${fmt(windowDays)}-day` : 'recent';
   return `
     <div class="stack">
       ${analyticsStatusBar()}
       ${infoPanel('What drives cost on Mjolnir?', 'Jobs are billed by whichever resource is larger relative to demand: reserved CPU cores or reserved memory. Memory often ends up driving cost because it is easy to over-request "just in case." The Cost-Bearer model looks at each job, decides whether CPU or memory is the dominant cost driver, and estimates the optimization opportunity only on that resource - a conservative, defensible savings number. GPU optimization opportunity is not shown below because GPU utilization is not yet measured on Mjolnir. Future versions of Analytics may also include storage usage and sustainability metrics.')}
       <section class="section"><div class="section-head"><h2>Resource Cost Insights</h2><span class="subtle">Spend, cost drivers, and optimization opportunities</span></div><div class="cards-grid">${[
-        statBlock('Estimated cost', money(allTime.estimated_cost_dkk), '90-day observed cost'),
+        statBlock('Estimated cost', money(allTime.estimated_cost_dkk), `${windowLabel} observed cost`),
         statBlock('Potential savings', money(allTime.underutilized_cost_dkk), `${money(annualized(allTime.underutilized_cost_dkk))} annualized run-rate`, 'warn'),
         statBlock('Optimization opportunity share', pct(num(allTime.underutilized_cost_dkk) / Math.max(1, num(allTime.estimated_cost_dkk)), 1), 'Share of cost with potential savings'),
         statBlock('GPU spend', money(allTime.gpu_cost_dkk), 'Estimated GPU cost'),
@@ -1288,8 +1508,8 @@ function methodologyPage() {
   return `
     <div class="stack">
       <section class="section"><div class="section-head"><h2>Data provenance</h2><span class="subtle">Raw jobs to Analytics widgets</span></div><div class="cards-grid">${[
-        statBlock('Source database', '90-day validation', meta.sourceDatabase || 'Unavailable'),
-        statBlock('Validation window', meta.validationWindow || 'Unavailable', 'Daily cluster summary range'),
+        statBlock('Source database', meta.sourceDatabase || 'Unavailable', 'Analytics export backing this view'),
+        statBlock('Coverage window', meta.coverageWindow || 'Unavailable', 'Daily cluster summary range'),
         statBlock('Export date', formatLocalDateTime(meta.exportDate, '-'), 'JSON generation timestamp'),
         statBlock('Users', fmt(meta.userCount), 'Pseudonymous user bundles'),
         statBlock('Projects', meta.accountExportAvailable ? fmt(meta.projectCount) : 'Not exported', 'Public-safe project data status'),
@@ -1333,7 +1553,7 @@ function renderShell(content) {
           <div class="mobile-topbar"><div class="brand"><div class="brand-mark">${icon('cluster')}</div><div><div class="brand-name">Mjolnir</div><div class="brand-sub">Analytics</div></div></div><button class="toolbar-button" data-action="menu" aria-label="Open navigation">${icon('menu')}</button></div>
           <div class="topbar"><div class="topbar-left"><div class="crumb">${icon('menu')} <span>${pageTitle(state.route)}</span></div></div><div class="topbar-right"><a class="btn" href="#/recovery">Who am I?</a><button class="toolbar-button" data-action="theme" aria-label="Toggle theme">${state.theme === 'dark' ? icon('sun') : icon('moon')}</button></div></div>
         </div>
-        ${data?.source === 'real-export' ? '<div class="load-banner real"><strong>REAL MJOLNIR DATA</strong><span>90-day validation dataset</span></div>' : ''}
+        ${data?.source === 'real-export' ? `<div class="load-banner real"><strong>${dot('green')} Live production data</strong><span>${coverageLabel(warehouseSummary)}</span></div>` : ''}
         <div class="page">${content}</div>
       </main>
     </div>`;
@@ -1342,6 +1562,7 @@ function renderShell(content) {
 function render() {
   document.documentElement.dataset.theme = state.theme;
   platformRegistry = buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline });
+  warehouseSummary = buildWarehouseSummary({ slurmAnalyticsPipeline, nodeInsights });
   const renderers = {
     landing: landingPage,
     cluster: clusterPage,
@@ -1354,6 +1575,7 @@ function render() {
     nodes: nodeInventoryPage,
     hardware: hardwareInventoryPage,
     capacity: capacityPlanningPage,
+    warehouse: warehousePage,
     projects: projectsPage,
     pis: pisPage,
     groups: groupsPage,
