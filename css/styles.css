@@ -203,6 +203,11 @@ button, input, select { font: inherit; }
 .metric-label { color: var(--muted); font-size: 12px; }
 .metric-value { margin-top: 8px; font-size: 1.8rem; font-weight: 800; }
 .metric-trend { margin-top: 6px; font-size: 12px; color: var(--green); }
+/* Queue Insights' Overview page links to its 4 sibling pages as
+   .metric-card anchors - strip default link styling so they read as cards. */
+a.metric-card { display: block; text-decoration: none; color: inherit; }
+a.metric-card .metric-trend { color: var(--muted); }
+a.metric-card:hover { border-color: var(--accent, #3e8cff); }
 
 .analytics-grid {
   margin-top: 18px;

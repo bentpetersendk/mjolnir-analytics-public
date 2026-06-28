@@ -33,4 +33,18 @@ assert "loadNodeInsightsHistory" in loader
 assert "mountCharts" in app
 for fn in ("capacityHistorySection", "drainingHistorySection", "nodeHistorySection"):
     assert fn in app, f"missing Node Insights history renderer: {fn}"
+
+# Queue Insights (docs/architecture/QUEUE_INSIGHTS_ARCHITECTURE.md): one
+# shared module, five pages, fed by a single loader rather than each page
+# fetching its own data.
+assert "loadQueueInsightsData" in app
+assert "loadQueueInsightsData" in loader
+for fn in (
+    "queueOverviewPage", "queueLivePage", "queueWaitTimesPage",
+    "queueAdvisorPage", "queueTrendsPage", "queueHealthBadge",
+):
+    assert fn in app, f"missing Queue Insights page renderer: {fn}"
+for route_id in ("queue-overview", "queue-live", "queue-wait-times", "queue-advisor", "queue-trends"):
+    assert f"id: '{route_id}'" in app, f"missing Queue Insights nav route: {route_id}"
+assert "JobName" not in app and "JobName" not in loader
 print('ui checks passed')

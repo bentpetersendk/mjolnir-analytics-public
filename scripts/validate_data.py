@@ -200,3 +200,64 @@ else:
     print(f'Node Insights history export OK: {len(capacity_points)} capacity points, '
           f'{len(node_history_nodes)} nodes, no forbidden fields, '
           f'GPU {gpu_alloc_from_inventory}/{gpu_total_from_inventory} from sinfo GresUsed')
+
+# ---------------------------------------------------------------------------
+# Queue Insights, live half (docs/architecture/QUEUE_INSIGHTS_ARCHITECTURE.md).
+# Generated hourly from data/node_insights.sqlite by export_node_insights.py,
+# alongside the Node Insights exports above - same forbidden-field
+# guardrails, plus structural checks on the queue_health scoring output and
+# the full-history (not latest-only) shape of partition/pending-reason data.
+# ---------------------------------------------------------------------------
+QI_DIR = NI_HISTORY_DIR / 'queue_insights'
+qi_files = {
+    'current_pressure': QI_DIR / 'current_pressure.json',
+    'partition_pressure': QI_DIR / 'partition_pressure.json',
+    'pending_reasons': QI_DIR / 'pending_reasons.json',
+    'queue_health_history': QI_DIR / 'queue_health_history.json',
+}
+missing_qi = [name for name, p in qi_files.items() if not p.exists()]
+if missing_qi:
+    print(f'SKIPPED Queue Insights validation: missing {missing_qi}.')
+else:
+    qi_docs = {}
+    for name, p in qi_files.items():
+        text = p.read_text()
+        for pattern in NI_FORBIDDEN_TEXT_PATTERNS:
+            assert not pattern.search(text), f'forbidden field pattern found in {p}'
+        qi_docs[name] = json.loads(text)
+        ni_assert_public_safe(qi_docs[name], str(p.name))
+
+    QUEUE_HEALTH_LABELS = {'Healthy', 'Busy', 'Congested', 'Severely Congested'}
+    current_pressure = qi_docs['current_pressure']
+    health = current_pressure.get('queue_health')
+    if health is not None:
+        assert health['label'] in QUEUE_HEALTH_LABELS, f'unknown Queue Health label: {health["label"]}'
+        assert 0 <= health['score'] <= 100, f'Queue Health score out of range: {health["score"]}'
+
+    partition_pressure_points = qi_docs['partition_pressure'].get('points', [])
+    for point in partition_pressure_points:
+        assert {'timestamp', 'partition', 'running', 'pending'}.issubset(point.keys()), (
+            f'partition_pressure point missing keys: {point}')
+    # Diagnostic, not a hard failure (a brand-new collector may legitimately
+    # have only one hour of history yet): full-history exports should have
+    # more than one distinct timestamp once more than an hour has elapsed.
+    distinct_pp_timestamps = {p['timestamp'] for p in partition_pressure_points}
+    if len(partition_pressure_points) > 0 and len(distinct_pp_timestamps) == 1:
+        print('NOTE: partition_pressure.json currently has only one distinct timestamp '
+              '(expected once more than one hourly collection has run)')
+
+    pending_reasons_points = qi_docs['pending_reasons'].get('points', [])
+    for point in pending_reasons_points:
+        assert {'timestamp', 'reason', 'count'}.issubset(point.keys()), (
+            f'pending_reasons point missing keys: {point}')
+
+    queue_health_points = qi_docs['queue_health_history'].get('points', [])
+    for point in queue_health_points:
+        assert {'timestamp', 'score', 'label', 'components'}.issubset(point.keys()), (
+            f'queue_health_history point missing keys: {point}')
+        assert point['label'] in QUEUE_HEALTH_LABELS, f'unknown Queue Health label: {point["label"]}'
+        assert 0 <= point['score'] <= 100, f'Queue Health score out of range: {point["score"]}'
+
+    print(f'Queue Insights export OK: {len(partition_pressure_points)} partition-pressure points, '
+          f'{len(pending_reasons_points)} pending-reason points, {len(queue_health_points)} queue-health points, '
+          f'no forbidden fields')

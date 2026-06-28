@@ -15,6 +15,14 @@ const NODE_INSIGHTS_HISTORY_BASE = window.MJOLNIR_DASHBOARD_DATA_BASE
 // base as Node Insights history, one subdirectory over - see
 // NIGHTLY_PIPELINE.md in the private repo.
 const SLURM_ANALYTICS_BASE = `${NODE_INSIGHTS_HISTORY_BASE}slurm_analytics/`;
+// Queue Insights (docs/architecture/QUEUE_INSIGHTS_ARCHITECTURE.md): one
+// shared directory fed by two pipelines with disjoint filenames - the
+// public repo's hourly Node Insights cycle publishes current_pressure.json,
+// partition_pressure.json, pending_reasons.json, queue_health_history.json;
+// the private repo's nightly Slurm Analytics cycle publishes status.json,
+// wait_time_history.json, submission_patterns.json. Same base as Node
+// Insights/Slurm Analytics above, just one more subdirectory over.
+const QUEUE_INSIGHTS_BASE = `${NODE_INSIGHTS_HISTORY_BASE}queue_insights/`;
 
 const LEGACY_EXPORT_ROW_COUNTS = {
   jobs: 2364601,
@@ -665,6 +673,55 @@ export async function loadSlurmAnalyticsPipelineStatus() {
     };
   } catch (error) {
     return emptySlurmAnalyticsStatus(error);
+  }
+}
+
+// Queue Insights (docs/architecture/QUEUE_INSIGHTS_ARCHITECTURE.md). Each of
+// the 7 files is loaded independently via tryOptionalJson() rather than one
+// Promise.all(), so a module that's only half-published yet (e.g. the
+// historical half hasn't run its first nightly cycle) still renders whatever
+// already exists instead of failing the whole page - same graceful-
+// degradation shape as loadMjolnirData()'s optional global-index files.
+function emptyQueueInsights(error) {
+  return {
+    available: false,
+    error: error ? String(error) : null,
+    currentPressure: {},
+    partitionPressureHistory: [],
+    pendingReasonsHistory: [],
+    queueHealthHistory: [],
+    waitTimeHistory: {},
+    submissionPatterns: {},
+    status: {},
+  };
+}
+
+export async function loadQueueInsightsData() {
+  try {
+    const [currentPressure, partitionPressure, pendingReasons, queueHealthHistory, waitTimeHistory, submissionPatterns, status] = await Promise.all([
+      tryOptionalJson(`${QUEUE_INSIGHTS_BASE}current_pressure.json`),
+      tryOptionalJson(`${QUEUE_INSIGHTS_BASE}partition_pressure.json`),
+      tryOptionalJson(`${QUEUE_INSIGHTS_BASE}pending_reasons.json`),
+      tryOptionalJson(`${QUEUE_INSIGHTS_BASE}queue_health_history.json`),
+      tryOptionalJson(`${QUEUE_INSIGHTS_BASE}wait_time_history.json`),
+      tryOptionalJson(`${QUEUE_INSIGHTS_BASE}submission_patterns.json`),
+      tryOptionalJson(`${QUEUE_INSIGHTS_BASE}status.json`),
+    ]);
+    const anyLoaded = [currentPressure, partitionPressure, pendingReasons, queueHealthHistory, waitTimeHistory, submissionPatterns, status]
+      .some((doc) => doc !== null);
+    return {
+      available: anyLoaded,
+      error: null,
+      currentPressure: asObject(currentPressure),
+      partitionPressureHistory: asArray(partitionPressure && partitionPressure.points),
+      pendingReasonsHistory: asArray(pendingReasons && pendingReasons.points),
+      queueHealthHistory: asArray(queueHealthHistory && queueHealthHistory.points),
+      waitTimeHistory: asObject(waitTimeHistory),
+      submissionPatterns: asObject(submissionPatterns),
+      status: asObject(status),
+    };
+  } catch (error) {
+    return emptyQueueInsights(error);
   }
 }
 

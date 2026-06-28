@@ -46,6 +46,10 @@ PUBLIC_FILES=(
   "node_insights.json"
   "capacity_history.json"
   "node_history.json"
+  "queue_insights/current_pressure.json"
+  "queue_insights/partition_pressure.json"
+  "queue_insights/pending_reasons.json"
+  "queue_insights/queue_health_history.json"
 )
 
 if [ ! -d "$DASHBOARD_DATA_DIR/.git" ]; then

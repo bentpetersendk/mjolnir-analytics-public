@@ -30,8 +30,10 @@ from node_insights_db import DEFAULT_DB_PATH, REPO_ROOT, connect, ensure_schema,
 DEFAULT_OUT_DIR = REPO_ROOT / "site" / "data"
 HISTORY_SCHEMA_VERSION = "node-insights-history-v1"
 SNAPSHOT_SCHEMA_VERSION = "node-insights-v1"
+QUEUE_INSIGHTS_SCHEMA_VERSION = "queue-insights-live-v1"
 COLLECTOR_NAME = "node_insights"
 PLATFORM_MODULE = "Node Insights"
+QUEUE_INSIGHTS_SUBDIR = "queue_insights"
 
 # Pressure reading thresholds shared by Cluster Overview's allocation gauges
 # and Capacity Planning's pressure cards.
@@ -128,6 +130,111 @@ def fetch_latest_partition_queue(conn, latest_timestamp: Optional[str]) -> List[
         (latest_timestamp,),
     ).fetchall()
     return [{"partition": r["partition"], "running": r["running"], "pending": r["pending"]} for r in rows]
+
+
+def fetch_pending_reasons_history(conn, cutoff_iso: str) -> List[dict]:
+    """Full hourly history (Queue Insights amendment - see
+    QUEUE_INSIGHTS_ARCHITECTURE.md Section 1.5): every hourly row, not just
+    the latest, using the same flat-array/no-downsampling convention as
+    fetch_capacity_points()."""
+    rows = conn.execute(
+        "SELECT timestamp, reason, count FROM pending_reasons WHERE timestamp >= ? ORDER BY timestamp ASC, count DESC",
+        (cutoff_iso,),
+    ).fetchall()
+    return [{"timestamp": r["timestamp"], "reason": r["reason"], "count": r["count"]} for r in rows]
+
+
+def fetch_partition_queue_history(conn, cutoff_iso: str) -> List[dict]:
+    """Full hourly history - see fetch_pending_reasons_history()'s docstring."""
+    rows = conn.execute(
+        "SELECT timestamp, partition, running, pending FROM partition_queue WHERE timestamp >= ? ORDER BY timestamp ASC, partition ASC",
+        (cutoff_iso,),
+    ).fetchall()
+    return [{"timestamp": r["timestamp"], "partition": r["partition"], "running": r["running"], "pending": r["pending"]}
+            for r in rows]
+
+
+# Queue Health (QUEUE_INSIGHTS_ARCHITECTURE.md Section 5a). v1: built only
+# from signals already in node_insights.sqlite (pending/running ratio, CPU
+# allocation pressure while jobs are queued, worst-single-partition pending
+# concentration) - all three components are clamped before summing so no
+# single metric alone can push the label past "Busy" (the "100 tiny jobs vs
+# 100 large jobs" distortion the architecture doc flags). The doc's full
+# algorithm also folds in self-relative wait-time severity from the nightly
+# Analytics Warehouse; that requires reading the other repo's already-
+# published wait_time_history.json from the shared dashboard-data clone and
+# is deferred to whichever cycle builds overview.json (Section 4's note on
+# the two-pipeline seam) rather than this exporter, which only ever touches
+# node_insights.sqlite.
+QUEUE_HEALTH_BANDS = (
+    (25, "Healthy"),
+    (50, "Busy"),
+    (75, "Congested"),
+    (None, "Severely Congested"),
+)
+
+
+def _clamp(value: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, value))
+
+
+def compute_queue_health(snapshot: Optional[dict], partition_queue: List[dict]) -> Optional[dict]:
+    if snapshot is None:
+        return None
+    running = snapshot["running_jobs"] or 0
+    pending = snapshot["pending_jobs"] or 0
+
+    pending_ratio_component = _clamp(pending / max(1, running), 0, 5) / 5 * 40
+
+    cpu_total = snapshot["cpu_total"] or 0
+    cpu_allocated = snapshot["cpu_allocated"] or 0
+    cpu_alloc_pct = (cpu_allocated / cpu_total) if cpu_total else 0
+    cpu_pressure_component = (cpu_alloc_pct * 35) if pending > 0 else 0
+
+    total_partition_pending = sum(p["pending"] or 0 for p in partition_queue)
+    worst_partition_share = (
+        max((p["pending"] or 0) for p in partition_queue) / total_partition_pending
+        if partition_queue and total_partition_pending > 0 else 0
+    )
+    worst_partition_component = worst_partition_share * 25
+
+    score = round(pending_ratio_component + cpu_pressure_component + worst_partition_component, 1)
+    score = _clamp(score, 0, 100)
+    label = next(name for threshold, name in QUEUE_HEALTH_BANDS if threshold is None or score < threshold)
+
+    return {
+        "score": score,
+        "label": label,
+        "components": {
+            "pending_ratio": round(pending_ratio_component, 1),
+            "cpu_pressure": round(cpu_pressure_component, 1),
+            "worst_partition_concentration": round(worst_partition_component, 1),
+        },
+    }
+
+
+def fetch_queue_health_history(conn, cutoff_iso: str) -> List[dict]:
+    """Recomputes Queue Health for every retained hourly snapshot (not just
+    the latest), so Historical Trends can chart it - same flat 90-day-array
+    convention as the other history exports (Section 1.5)."""
+    snapshot_rows = conn.execute(
+        "SELECT * FROM snapshots WHERE timestamp >= ? ORDER BY timestamp ASC", (cutoff_iso,)
+    ).fetchall()
+    partition_rows = conn.execute(
+        "SELECT timestamp, partition, running, pending FROM partition_queue WHERE timestamp >= ?", (cutoff_iso,)
+    ).fetchall()
+    partitions_by_timestamp: Dict[str, List[dict]] = {}
+    for row in partition_rows:
+        partitions_by_timestamp.setdefault(row["timestamp"], []).append(dict(row))
+
+    points = []
+    for row in snapshot_rows:
+        snapshot = dict(row)
+        health = compute_queue_health(snapshot, partitions_by_timestamp.get(snapshot["timestamp"], []))
+        if health is None:
+            continue
+        points.append({"timestamp": snapshot["timestamp"], **health})
+    return points
 
 
 def classify_node(node: dict, mode_profile: Optional[tuple]) -> tuple:
@@ -440,13 +547,79 @@ def main() -> int:
         write_json(out_dir / "node_insights.json", node_insights_doc)
         write_json(out_dir / "capacity_history.json", capacity_history_doc)
         write_json(out_dir / "node_history.json", node_history_doc)
+
+        # Queue Insights live half (QUEUE_INSIGHTS_ARCHITECTURE.md Sections 4
+        # and 5a) - owned by this hourly cycle, not the nightly Slurm
+        # Analytics cycle, since it's all squeue/sinfo-derived live state
+        # already collected here. Written under a queue_insights/ subdir so
+        # it never collides with the existing flat node_insights.json et al.
+        queue_health = compute_queue_health(latest, partition_queue)
+        current_pressure_doc = {
+            "schema_version": QUEUE_INSIGHTS_SCHEMA_VERSION,
+            "generated_at": generated_at,
+            "source": "sqlite:node_insights",
+            "collector": COLLECTOR_NAME,
+            "collector_status": collector_status,
+            "platform_module": "Queue Insights",
+            "queue": {
+                "running": latest["running_jobs"] if latest else None,
+                "pending": latest["pending_jobs"] if latest else None,
+            },
+            "by_partition": partition_queue,
+            "pending_reasons": pending_reasons,
+            "queue_health": queue_health,
+        }
+        partition_pressure_points = fetch_partition_queue_history(conn, cutoff_iso)
+        partition_pressure_doc = {
+            "schema_version": QUEUE_INSIGHTS_SCHEMA_VERSION,
+            "generated_at": generated_at,
+            "source": "sqlite:node_insights",
+            "collector": COLLECTOR_NAME,
+            "collector_status": collector_status,
+            "platform_module": "Queue Insights",
+            "data_window_days": args.days,
+            "retention_days": args.days,
+            "points": partition_pressure_points,
+        }
+        pending_reasons_points = fetch_pending_reasons_history(conn, cutoff_iso)
+        pending_reasons_doc = {
+            "schema_version": QUEUE_INSIGHTS_SCHEMA_VERSION,
+            "generated_at": generated_at,
+            "source": "sqlite:node_insights",
+            "collector": COLLECTOR_NAME,
+            "collector_status": collector_status,
+            "platform_module": "Queue Insights",
+            "data_window_days": args.days,
+            "retention_days": args.days,
+            "points": pending_reasons_points,
+        }
+        queue_health_points = fetch_queue_health_history(conn, cutoff_iso)
+        queue_health_history_doc = {
+            "schema_version": QUEUE_INSIGHTS_SCHEMA_VERSION,
+            "generated_at": generated_at,
+            "source": "sqlite:node_insights",
+            "collector": COLLECTOR_NAME,
+            "collector_status": collector_status,
+            "platform_module": "Queue Insights",
+            "data_window_days": args.days,
+            "retention_days": args.days,
+            "points": queue_health_points,
+        }
+
+        qi_dir = out_dir / QUEUE_INSIGHTS_SUBDIR
+        write_json(qi_dir / "current_pressure.json", current_pressure_doc)
+        write_json(qi_dir / "partition_pressure.json", partition_pressure_doc)
+        write_json(qi_dir / "pending_reasons.json", pending_reasons_doc)
+        write_json(qi_dir / "queue_health_history.json", queue_health_history_doc)
     finally:
         conn.close()
 
     print(
         f"Exported Node Insights history to {out_dir} "
         f"({len(capacity_points)} capacity points, {len(node_history_nodes)} nodes, "
-        f"retention {args.days}d)"
+        f"retention {args.days}d); Queue Insights live data to {out_dir / QUEUE_INSIGHTS_SUBDIR} "
+        f"({len(partition_pressure_points)} partition-pressure points, {len(pending_reasons_points)} pending-reason points, "
+        f"{len(queue_health_points)} queue-health points)"
     )
     return 0
 

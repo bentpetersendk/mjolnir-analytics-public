@@ -1,4 +1,4 @@
-import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus } from './data-loader.js';
+import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus, loadQueueInsightsData } from './data-loader.js';
 import { requestAnalyticsRecovery } from './recovery-service.js';
 import {
   formatLocalDateTime, chartTimeLabel, chartTimeTooltipLabel, snapshotAgeLabel,
@@ -23,6 +23,16 @@ const navGroups = [
       { id: 'benchmarks', label: 'Percentiles', icon: 'gauge' },
       { id: 'recommendations', label: 'Recommendations', icon: 'spark' },
       { id: 'inefficient-jobs', label: 'Optimization Opportunities', icon: 'alert' },
+    ],
+  },
+  {
+    heading: 'Queue Insights',
+    items: [
+      { id: 'queue-overview', label: 'Queue Overview', icon: 'gauge' },
+      { id: 'queue-live', label: 'Live Queue', icon: 'bell' },
+      { id: 'queue-wait-times', label: 'Wait Time Analysis', icon: 'chart' },
+      { id: 'queue-advisor', label: 'Submission Advisor', icon: 'spark' },
+      { id: 'queue-trends', label: 'Historical Trends', icon: 'cluster' },
     ],
   },
   {
@@ -83,6 +93,7 @@ let data = null;
 let nodeInsights = null;
 let nodeInsightsHistory = null;
 let slurmAnalyticsPipeline = null;
+let queueInsights = null;
 let platformRegistry = [];
 let warehouseSummary = {};
 
@@ -703,6 +714,289 @@ function setupChartResize() {
     }
     activeCharts.forEach((chart) => chart.resize());
   });
+}
+
+// ---------------------------------------------------------------------------
+// Queue Insights (docs/architecture/QUEUE_INSIGHTS_ARCHITECTURE.md). One
+// shared in-memory model (the `queueInsights` global, loaded once by
+// loadQueueInsightsData() in init()) feeds all five pages below - Queue
+// Overview, Live Queue, Wait Time Analysis, Submission Advisor, Historical
+// Trends - rather than each page fetching its own data, per the "not
+// disconnected pages" requirement. Live fields (current pressure, partition
+// pressure, pending reasons, Queue Health) come from the hourly Node
+// Insights cycle; historical fields (wait-time series, distribution,
+// submission patterns) come from the nightly Slurm Analytics cycle - see
+// the architecture doc's "two-pipeline seam" note for why these stay two
+// exports instead of one. No usernames, job IDs, job names, accounts,
+// work directories, or node lists anywhere in this data - aggregate counts,
+// percentiles, and reason-text buckets only.
+// ---------------------------------------------------------------------------
+const QUEUE_HEALTH_TONE = { Healthy: 'good', Busy: 'info', Congested: 'warn', 'Severely Congested': 'bad' };
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function queueInsightsUnavailable(pageLabel) {
+  return `<div class="empty-state">${escapeHtml(pageLabel)} data has not been collected yet.</div>`;
+}
+
+function queueHealthBadge(health) {
+  if (!health) return '<span class="pill info">Unknown</span>';
+  const tone = QUEUE_HEALTH_TONE[health.label] || 'info';
+  return `<span class="pill ${tone}">${escapeHtml(health.label)}</span> <span class="subtle">score ${fmt(health.score)}/100</span>`;
+}
+
+function hourLabel(hour) { return `${String(hour).padStart(2, '0')}:00`; }
+
+function durationLabel(seconds) {
+  if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) return '-';
+  const s = Number(seconds);
+  if (s < 60) return `${Math.round(s)}s`;
+  if (s < 3600) return `${Math.round(s / 60)}m`;
+  if (s < 86400) return `${(s / 3600).toFixed(1)}h`;
+  return `${(s / 86400).toFixed(1)}d`;
+}
+
+// Cluster-wide rollup of queue_statistics (per-partition, per-day - see
+// QUEUE_INSIGHTS_ARCHITECTURE.md Section 1.1: there is no cluster-wide row
+// in that table) into one row per report_date, weighted by
+// jobs_with_wait_time so a thin partition can't skew the cluster figure.
+function clusterWaitSeriesRows(series) {
+  const byDate = new Map();
+  asArray(series).forEach((row) => {
+    const n = num(row.jobs_with_wait_time);
+    if (!n) return;
+    const bucket = byDate.get(row.report_date) || { report_date: row.report_date, weighted_median: 0, weighted_p90: 0, weighted_avg: 0, jobs: 0 };
+    bucket.weighted_median += (row.median_wait_seconds || 0) * n;
+    bucket.weighted_p90 += (row.p90_wait_seconds || 0) * n;
+    bucket.weighted_avg += (row.avg_wait_seconds || 0) * n;
+    bucket.jobs += n;
+    byDate.set(row.report_date, bucket);
+  });
+  return Array.from(byDate.values())
+    .sort((a, b) => a.report_date.localeCompare(b.report_date))
+    .map((b) => ({
+      report_date: b.report_date,
+      median_wait_seconds: b.jobs ? b.weighted_median / b.jobs : null,
+      p90_wait_seconds: b.jobs ? b.weighted_p90 / b.jobs : null,
+      avg_wait_seconds: b.jobs ? b.weighted_avg / b.jobs : null,
+      jobs: b.jobs,
+    }));
+}
+
+// Per-partition rollup of queue_statistics over the whole exported window,
+// for the Wait Time Analysis page's partition comparison table.
+function waitByPartitionRows(series) {
+  const byPartition = new Map();
+  asArray(series).forEach((row) => {
+    const n = num(row.jobs_with_wait_time);
+    if (!n) return;
+    const bucket = byPartition.get(row.partition_name) || { partition: row.partition_name, weighted_median: 0, weighted_p90: 0, jobs: 0 };
+    bucket.weighted_median += (row.median_wait_seconds || 0) * n;
+    bucket.weighted_p90 += (row.p90_wait_seconds || 0) * n;
+    bucket.jobs += n;
+    byPartition.set(row.partition_name, bucket);
+  });
+  return Array.from(byPartition.values())
+    .map((b) => ({
+      partition: b.partition,
+      median_wait_seconds: b.jobs ? b.weighted_median / b.jobs : null,
+      p90_wait_seconds: b.jobs ? b.weighted_p90 / b.jobs : null,
+      jobs: b.jobs,
+    }))
+    .sort((a, b) => b.jobs - a.jobs);
+}
+
+// Queue depth over time reuses Node Insights' already-exported
+// capacity_history.json (running_jobs/pending_jobs) rather than collecting
+// it again - see QUEUE_INSIGHTS_ARCHITECTURE.md Section 5's "no duplicate
+// collection" principle. Same state.historyRange/filterPointsByRange()
+// selector the Infrastructure pages already use.
+function queueDepthHistoryRows() {
+  if (!nodeInsightsHistory || !nodeInsightsHistory.available) return [];
+  return filterPointsByRange(nodeInsightsHistory.capacity).map((p) => ({
+    report_date: p.timestamp, running_jobs: p.running_jobs, pending_jobs: p.pending_jobs,
+  }));
+}
+
+function queueDepthChart() {
+  const rows = queueDepthHistoryRows();
+  if (!rows.length) return historyUnavailableNote();
+  return lineChart('Running / pending jobs', rows, [
+    chartSeries(rows, 'running_jobs', 'Running', '#30d5d0'),
+    chartSeries(rows, 'pending_jobs', 'Pending', '#ff8a65'),
+  ], fmt, { zeroBase: true });
+}
+
+function queueOverviewPage() {
+  if (!queueInsights || !queueInsights.available) return queueInsightsUnavailable('Queue Insights');
+  const cp = asObject(queueInsights.currentPressure);
+  const queue = asObject(cp.queue);
+  const byPartition = asArray(cp.by_partition);
+  const health = cp.queue_health || null;
+  const clusterSeries = clusterWaitSeriesRows(asObject(queueInsights.waitTimeHistory).series);
+  const latestWait = clusterSeries.length ? clusterSeries[clusterSeries.length - 1] : null;
+  const saturated = byPartition
+    .map((p) => ({ ...p, pressure: (num(p.running) + num(p.pending)) ? num(p.pending) / (num(p.running) + num(p.pending)) : 0 }))
+    .filter((p) => p.pressure >= 0.6)
+    .sort((a, b) => b.pressure - a.pressure);
+
+  return `
+    <div class="stack">
+      <section class="section"><div class="section-head"><h2>Queue Overview</h2>${queueHealthBadge(health)}</div>
+        <div class="cards-grid">${[
+          statBlock('Running', fmt(queue.running), 'Jobs currently executing', 'good'),
+          statBlock('Pending', fmt(queue.pending), 'Jobs waiting to start', num(queue.pending) ? 'info' : 'good'),
+          statBlock('Median wait (latest day)', durationLabel(latestWait && latestWait.median_wait_seconds), 'Cluster-wide, weighted by partition'),
+          statBlock('P90 wait (latest day)', durationLabel(latestWait && latestWait.p90_wait_seconds), 'Cluster-wide, weighted by partition'),
+        ].join('')}</div>
+      </section>
+      <section class="section"><div class="section-head"><h2>Partitions under pressure</h2><span class="subtle">Pending share of partition's own queue &ge; 60%</span></div>
+        ${saturated.length
+          ? tableFromRows(['Partition', 'Running', 'Pending', 'Pending share'], saturated.map((p) => [escapeHtml(p.partition), fmt(p.running), fmt(p.pending), pct(p.pressure)]))
+          : '<div class="empty-state">No partition is currently under elevated pressure.</div>'}
+      </section>
+      <div class="cards-grid">
+        <a class="metric-card" href="#/queue-live"><div class="metric-label">Live Queue</div><div class="metric-trend">Current depth, pending reasons, by-partition pressure</div></a>
+        <a class="metric-card" href="#/queue-wait-times"><div class="metric-label">Wait Time Analysis</div><div class="metric-trend">Percentiles, distribution, partition/size comparisons</div></a>
+        <a class="metric-card" href="#/queue-advisor"><div class="metric-label">Submission Advisor</div><div class="metric-trend">Historically lower-wait windows, never a guarantee</div></a>
+        <a class="metric-card" href="#/queue-trends"><div class="metric-label">Historical Trends</div><div class="metric-trend">Queue depth, health, and wait time over time</div></a>
+      </div>
+      ${disclaimer('Queue Health is a composite score from the live pending/running ratio, CPU allocation pressure, and worst-partition concentration (docs/architecture/QUEUE_INSIGHTS_ARCHITECTURE.md Section 5a) - a summary signal, not a guarantee for any individual job.')}
+    </div>`;
+}
+
+function queueLivePage() {
+  if (!queueInsights || !queueInsights.available) return queueInsightsUnavailable('Live Queue');
+  const cp = asObject(queueInsights.currentPressure);
+  const queue = asObject(cp.queue);
+  const byPartition = asArray(cp.by_partition);
+  const pendingReasons = asArray(cp.pending_reasons);
+  const health = cp.queue_health || null;
+
+  return `
+    <div class="stack">
+      <section class="section"><div class="section-head"><h2>Live Queue</h2>${queueHealthBadge(health)}</div>
+        <div class="cards-grid">${[
+          statBlock('Running', fmt(queue.running), 'Across all partitions', 'good'),
+          statBlock('Pending', fmt(queue.pending), 'Waiting to start', num(queue.pending) ? 'info' : 'good'),
+          statBlock('Partitions reporting', fmt(byPartition.length), 'Live squeue/sinfo snapshot'),
+        ].join('')}</div>
+      </section>
+      <div class="trend-grid">
+        <section class="section"><div class="section-head"><h2>By partition</h2></div>${tableFromRows(['Partition', 'Running', 'Pending'], byPartition.map((p) => [escapeHtml(p.partition), fmt(p.running), fmt(p.pending)]))}</section>
+        <section class="section"><div class="section-head"><h2>Pending reasons</h2></div>${tableFromRows(['Reason', 'Jobs'], pendingReasons.map((r) => [escapeHtml(r.reason), fmt(r.count)]))}</section>
+      </div>
+      <section class="section"><div class="section-head"><h2>Trend</h2>${rangeButtons()}</div>${queueDepthChart()}</section>
+      ${disclaimer('Refreshed hourly from live squeue/sinfo polling, not a real-time stream. No job IDs, usernames, or job names - aggregate counts and reason-text buckets only.')}
+    </div>`;
+}
+
+function queueWaitTimesPage() {
+  if (!queueInsights || !queueInsights.available) return queueInsightsUnavailable('Wait Time Analysis');
+  const wth = asObject(queueInsights.waitTimeHistory);
+  const series = asArray(wth.series);
+  const clusterRows = clusterWaitSeriesRows(series);
+  const latest = clusterRows.length ? clusterRows[clusterRows.length - 1] : null;
+  const byPartition = waitByPartitionRows(series);
+  const histogram = asArray(wth.wait_time_histogram);
+  const bySize = asArray(wth.wait_time_by_size);
+  const cpuBuckets = bySize.filter((r) => r.bucket_type === 'cpu');
+  const memoryBuckets = bySize.filter((r) => r.bucket_type === 'memory');
+
+  return `
+    <div class="stack">
+      <section class="section"><div class="section-head"><h2>Wait Time Analysis</h2><span class="subtle">${wth.histogram_date ? `Distribution as of ${escapeHtml(wth.histogram_date)}` : ''}</span></div>
+        <div class="cards-grid">${[
+          statBlock('Median wait', durationLabel(latest && latest.median_wait_seconds), 'Cluster-wide, latest day'),
+          statBlock('Average wait', durationLabel(latest && latest.avg_wait_seconds), 'Cluster-wide, latest day'),
+          statBlock('P90 wait', durationLabel(latest && latest.p90_wait_seconds), 'Cluster-wide, latest day'),
+          statBlock('Jobs measured', fmt(latest && latest.jobs), 'With a measurable wait time'),
+        ].join('')}</div>
+      </section>
+      <section class="section"><div class="section-head"><h2>Wait time trend</h2><span class="subtle">${wth.data_window_days || 90}-day window, daily</span></div>
+        ${clusterRows.length ? lineChart('Median / P90 wait (seconds)', clusterRows, [
+          chartSeries(clusterRows, 'median_wait_seconds', 'Median', '#3e8cff'),
+          chartSeries(clusterRows, 'p90_wait_seconds', 'P90', '#ff8a65'),
+        ], fmt) : '<div class="empty-state">No wait-time history yet.</div>'}
+      </section>
+      <div class="trend-grid">
+        <section class="section"><div class="section-head"><h2>By partition</h2></div>${tableFromRows(['Partition', 'Median wait', 'P90 wait', 'Jobs'], byPartition.map((p) => [escapeHtml(p.partition), durationLabel(p.median_wait_seconds), durationLabel(p.p90_wait_seconds), fmt(p.jobs)]))}</section>
+        <section class="section"><div class="section-head"><h2>Wait time distribution (latest day)</h2></div>
+          ${histogram.length ? tableFromRows(['Partition', 'Bucket', 'Jobs'], histogram.map((h) => [escapeHtml(h.partition_name), escapeHtml(h.bucket), fmt(h.jobs)])) : '<div class="empty-state">No distribution data yet.</div>'}
+        </section>
+      </div>
+      <div class="trend-grid">
+        <section class="section"><div class="section-head"><h2>By requested CPUs</h2></div>${tableFromRows(['Partition', 'Bucket', 'Jobs', 'Median wait'], cpuBuckets.map((r) => [escapeHtml(r.partition_name), escapeHtml(r.bucket), fmt(r.jobs), durationLabel(r.median_wait_seconds)]))}</section>
+        <section class="section"><div class="section-head"><h2>By requested memory</h2></div>${tableFromRows(['Partition', 'Bucket', 'Jobs', 'Median wait'], memoryBuckets.map((r) => [escapeHtml(r.partition_name), escapeHtml(r.bucket), fmt(r.jobs), durationLabel(r.median_wait_seconds)]))}</section>
+      </div>
+      ${disclaimer('Wait time is measured from job submission to job start (sacct-derived), not a live queue position. Size buckets use allocated CPUs/memory as a proxy for the original request.')}
+    </div>`;
+}
+
+function queueAdvisorPage() {
+  if (!queueInsights || !queueInsights.available) return queueInsightsUnavailable('Submission Advisor');
+  const sp = asObject(queueInsights.submissionPatterns);
+  const bestWindows = asArray(sp.best_submission_windows).slice()
+    .sort((a, b) => num(a.median_wait_seconds) - num(b.median_wait_seconds));
+
+  return `
+    <div class="stack">
+      <section class="section"><div class="section-head"><h2>Submission Advisor</h2><span class="subtle">${sp.window_days || 90}-day trailing window</span></div>
+        <p class="subtle">Historical tendencies only - never a guarantee for any individual job. Windows with fewer than ${fmt(sp.min_cell_sample)} sampled jobs are flagged low-confidence.</p>
+        ${bestWindows.length
+          ? tableFromRows(['Partition', 'Best day', 'Best hour', 'Typical wait', 'Sample', 'Confidence'], bestWindows.map((w) => [
+              escapeHtml(w.partition_name),
+              escapeHtml(WEEKDAY_NAMES[w.weekday] || String(w.weekday)),
+              hourLabel(w.hour_of_day),
+              durationLabel(w.median_wait_seconds),
+              fmt(w.sample_jobs),
+              `<span class="pill ${w.confidence === 'low' ? 'warn' : 'good'}">${escapeHtml(w.confidence)}</span>`,
+            ]))
+          : '<div class="empty-state">Not enough submission history yet to recommend a window.</div>'}
+      </section>
+      ${disclaimer(sp.guidance || 'Recommendations are historical tendencies, not guarantees for any individual job.')}
+    </div>`;
+}
+
+function queueTrendsPage() {
+  if (!queueInsights || !queueInsights.available) return queueInsightsUnavailable('Historical Trends');
+  const healthRows = filterPointsByRange(queueInsights.queueHealthHistory).map((p) => ({ report_date: p.timestamp, score: p.score }));
+  const depthRows = queueDepthHistoryRows();
+  const clusterWaitRows = clusterWaitSeriesRows(asObject(queueInsights.waitTimeHistory).series);
+
+  const reasonHistory = filterPointsByRange(queueInsights.pendingReasonsHistory);
+  const reasonTotals = new Map();
+  reasonHistory.forEach((p) => reasonTotals.set(p.reason, (reasonTotals.get(p.reason) || 0) + num(p.count)));
+  const topReasons = Array.from(reasonTotals.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([reason]) => reason);
+  const reasonTimestamps = Array.from(new Set(reasonHistory.map((p) => p.timestamp))).sort();
+  const reasonRows = reasonTimestamps.map((ts) => {
+    const row = { report_date: ts };
+    topReasons.forEach((reason) => { row[reason] = 0; });
+    reasonHistory.filter((p) => p.timestamp === ts && topReasons.includes(p.reason)).forEach((p) => { row[p.reason] = num(p.count); });
+    return row;
+  });
+  const reasonColors = ['#3e8cff', '#ff8a65', '#30d5d0'];
+
+  return `
+    <div class="stack">
+      <section class="section"><div class="section-head"><h2>Historical Trends</h2>${rangeButtons()}</div></section>
+      <div class="trend-grid">
+        <section class="section"><div class="section-head"><h2>Queue depth</h2></div>${depthRows.length ? lineChart('Running / pending jobs', depthRows, [
+          chartSeries(depthRows, 'running_jobs', 'Running', '#30d5d0'),
+          chartSeries(depthRows, 'pending_jobs', 'Pending', '#ff8a65'),
+        ], fmt, { zeroBase: true }) : historyUnavailableNote()}</section>
+        <section class="section"><div class="section-head"><h2>Queue Health score</h2></div>${healthRows.length ? lineChart('Queue Health score (0-100)', healthRows, [
+          chartSeries(healthRows, 'score', 'Score', '#ffb74d'),
+        ], fmt, { zeroBase: true }) : historyUnavailableNote()}</section>
+      </div>
+      <div class="trend-grid">
+        <section class="section"><div class="section-head"><h2>Top pending reasons</h2></div>${reasonRows.length ? lineChart('Pending jobs by reason', reasonRows, topReasons.map((reason, i) => chartSeries(reasonRows, reason, reason, reasonColors[i % reasonColors.length])), fmt, { zeroBase: true }) : historyUnavailableNote()}</section>
+        <section class="section"><div class="section-head"><h2>Wait time</h2><span class="subtle">Daily, cluster-wide</span></div>${clusterWaitRows.length ? lineChart('Median / P90 wait (seconds)', clusterWaitRows, [
+          chartSeries(clusterWaitRows, 'median_wait_seconds', 'Median', '#3e8cff'),
+          chartSeries(clusterWaitRows, 'p90_wait_seconds', 'P90', '#ff8a65'),
+        ], fmt) : '<div class="empty-state">No wait-time history yet.</div>'}</section>
+      </div>
+      ${disclaimer('Queue depth, Queue Health, and pending reasons are hourly (filterable above, up to 90 days); wait time is daily (sacct-derived). Different cadences are expected - see docs/architecture/QUEUE_INSIGHTS_ARCHITECTURE.md Section 1.5.')}
+    </div>`;
 }
 
 function infrastructureOverviewPage() {
@@ -1571,6 +1865,11 @@ function render() {
     benchmarks: benchmarkPage,
     recommendations: recommendationsPage,
     'inefficient-jobs': inefficientJobsPage,
+    'queue-overview': queueOverviewPage,
+    'queue-live': queueLivePage,
+    'queue-wait-times': queueWaitTimesPage,
+    'queue-advisor': queueAdvisorPage,
+    'queue-trends': queueTrendsPage,
     infrastructure: infrastructureOverviewPage,
     nodes: nodeInventoryPage,
     hardware: hardwareInventoryPage,
@@ -1728,11 +2027,12 @@ function handleRoute() {
 window.addEventListener('hashchange', handleRoute);
 
 async function init() {
-  [data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline] = await Promise.all([
+  [data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights] = await Promise.all([
     loadMjolnirData(),
     loadNodeInsightsData(),
     loadNodeInsightsHistory(),
     loadSlurmAnalyticsPipelineStatus(),
+    loadQueueInsightsData(),
   ]);
   render();
   if (isPersonalRoute(state.route)) await loadPersonalRoute(state.route);
