@@ -17,9 +17,13 @@
 
 ## Chart architecture
 
-- Charts are code-native SVG components.
-- The same chart primitives are reused across pages.
-- Future chart expansion should add helpers, not page-local one-offs.
+- Every chart on the site renders through Apache ECharts via the shared
+  framework in `js/charts.js` - no page builds a chart by hand.
+- See [CHART_FRAMEWORK.md](CHART_FRAMEWORK.md) for the factory reference,
+  the registry/mount lifecycle, export/drill-down/annotation conventions,
+  and accessibility requirements.
+- Future chart expansion should add a factory or extend an existing one in
+  `js/charts.js`, not a page-local one-off.
 
 ## Future expansion strategy
 

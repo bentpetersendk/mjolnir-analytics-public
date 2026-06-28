@@ -68,6 +68,38 @@ function mergeQueueInsights(current, next) {
   };
 }
 
+// "Last updated" must reflect when the displayed data was actually
+// generated server-side, not when the browser happened to fetch it - the
+// JSON is the source of truth, never an in-memory fetch-time stamp (a fresh
+// page load and a background refresh that finds nothing new should report
+// the same age). This picks the newest generatedAt across every loaded
+// module so the label always reflects the most-recently-published dataset.
+function parseDate(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+function latestGeneratedAt(bundle) {
+  const b = bundle || {};
+  const candidates = [
+    b.data?.generatedAt,
+    b.nodeInsights?.generatedAt,
+    b.nodeInsightsHistory?.generatedAt,
+    b.slurmAnalyticsPipeline?.generatedAt,
+    b.queueInsights?.status?.generated_at,
+    b.queueInsights?.currentPressure?.generated_at,
+  ].map(parseDate).filter(Boolean);
+  if (!candidates.length) return null;
+  return new Date(Math.max(...candidates.map((d) => d.getTime())));
+}
+
+// Exposed so app.js can set the real timestamp the moment data lands (i.e.
+// before the first render()), instead of waiting for startAutoRefresh().
+export function setLastUpdatedFromBundle(bundle) {
+  const found = latestGeneratedAt(bundle);
+  if (found) lastUpdatedAt = found;
+}
+
 function safeStringify(value) {
   try { return JSON.stringify(value); } catch (error) { return null; }
 }
@@ -144,7 +176,7 @@ async function runRefreshCycle(hooks) {
       queueInsights: mergeQueueInsights(current.queueInsights, fetched.queueResult),
     };
     const changed = !deepEqual(current, next);
-    lastUpdatedAt = new Date();
+    setLastUpdatedFromBundle(next);
     if (changed) {
       hooks.applyUpdate(next);
       hooks.rerender();
@@ -172,7 +204,6 @@ async function runRefreshCycle(hooks) {
 export function startAutoRefresh(hooks) {
   if (started) return;
   started = true;
-  lastUpdatedAt = new Date();
 
   tickIntervalHandle = window.setInterval(() => {
     hooks.updateIndicator?.();

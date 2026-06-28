@@ -63,6 +63,16 @@ export function formatLocalDateTime(value, fallback = 'Unavailable') {
   return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+// Compact sortable "YYYY-MM-DD HH:mm" form (local time) - used where a
+// timestamp needs to sit next to its own relative-age label, e.g. the
+// refresh indicator's "Last updated: 2026-06-28 21:17 (2 minutes ago)".
+export function formatLocalTimestamp(value, fallback = 'Unavailable') {
+  const date = parseUtc(value);
+  if (!date) return fallback;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 // Compact "MM-DD HH:mm" form used for ECharts axis ticks.
 export function chartTimeLabel(value) {
   const date = parseUtc(value);

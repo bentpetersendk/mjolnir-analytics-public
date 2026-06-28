@@ -1,11 +1,18 @@
 import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus, loadQueueInsightsData } from './data-loader.js';
 import { requestAnalyticsRecovery } from './recovery-service.js';
-import { startAutoRefresh, lastUpdatedLabel, isToastVisible } from './refresh-manager.js';
+import { startAutoRefresh, setLastUpdatedFromBundle, lastUpdatedLabel, getLastUpdatedAt, isToastVisible } from './refresh-manager.js';
 import {
-  formatLocalDateTime, chartTimeLabel, chartTimeTooltipLabel, snapshotAgeLabel, snapshotAgeMs,
+  formatLocalDateTime, formatLocalTimestamp, snapshotAgeLabel, snapshotAgeMs,
   buildPlatformRegistry, findModule, statusBar, platformStatusPanel, platformStatusBadge,
   buildWarehouseSummary, collectorHealth, statusPillHtml, platformHealth,
 } from './status.js';
+import {
+  resetChartRegistry, registerChart, mountCharts, setupChartResize,
+  createLineChart, createGauge, createDistribution, createFunnel, createBarChart,
+  capacityHistoryChartOption, drainingHistoryChartOption, nodeHistoryChartOption,
+  annotateTimeline,
+} from './charts.js';
+import { OPERATIONAL_EVENTS } from './events.js';
 
 const app = document.querySelector('#app');
 
@@ -151,24 +158,33 @@ function bytesLabel(value) {
   }
   return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
-// Single reusable human-friendly number formatter for the whole app - scales
-// to thousand/million/billion/trillion so callers never hardcode a magnitude
-// word. style:'long' -> "55.1 million" (prose); style:'short' -> "55.1M"
-// (compact KPI tiles). Values under 1000 fall back to fmt() unchanged.
+// Single reusable human-friendly number formatter for the whole app.
+// Below 1,000,000 there is no abbreviation - fmt() already renders "523" and
+// "6,016" exactly as an HPC dashboard should (no "6 thousand"-style wording).
+// At 1,000,000 and above, scales to million/billion/trillion: style:'long'
+// -> "55.1 million" (prose); style:'short' -> "55.1M" (compact KPI tiles).
+// One decimal place by default; if that would round to a deceptively exact
+// "X.0" (hiding that the real value isn't a round number), a second decimal
+// is used instead - so 1,018,000 reads "1.02M", not the misleading "1.0M",
+// while 55,108,521 still reads the cleaner "55.1M".
 const NUMBER_TIERS = [
   { value: 1e12, long: 'trillion', short: 'T' },
   { value: 1e9, long: 'billion', short: 'B' },
   { value: 1e6, long: 'million', short: 'M' },
-  { value: 1e3, long: 'thousand', short: 'K' },
 ];
-function humanNumber(value, { style = 'long', digits = 1 } = {}) {
+function tierScaledLabel(scaledAbs) {
+  const oneDecimal = scaledAbs.toFixed(1);
+  if (!oneDecimal.endsWith('.0')) return oneDecimal;
+  return scaledAbs.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+function humanNumber(value, { style = 'long' } = {}) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
   const n = Number(value);
   const sign = n < 0 ? '-' : '';
   const abs = Math.abs(n);
   const tier = NUMBER_TIERS.find((t) => abs >= t.value);
   if (!tier) return `${sign}${fmt(abs)}`;
-  const scaled = Number((abs / tier.value).toFixed(digits));
+  const scaled = tierScaledLabel(abs / tier.value);
   const suffix = style === 'short' ? tier.short : ` ${tier.long}`;
   return `${sign}${scaled}${suffix}`;
 }
@@ -252,41 +268,11 @@ function rollingSeries(rows, key, windowSize, label, color) {
   return { label, color, values: rollingAverage(rows, key, windowSize), dashed: true };
 }
 
+// Thin compatibility shim: every call site below still calls lineChart()
+// with the same signature it always has, now rendering through the shared
+// ECharts framework (js/charts.js) instead of hand-rolled inline SVG.
 function lineChart(title, rows, series, formatter = fmt, options = {}) {
-  const width = 680;
-  const height = 230;
-  const pad = { left: 42, right: 16, top: 18, bottom: 34 };
-  const allValues = series.flatMap((item) => item.values).filter((value) => Number.isFinite(Number(value)));
-  if (!allValues.length) return `<div class="empty-state">No data available for ${escapeHtml(title)}.</div>`;
-  const minValue = options.zeroBase === false ? Math.min(...allValues) : Math.min(0, ...allValues);
-  const maxValue = Math.max(...allValues);
-  const yMin = minValue === maxValue ? minValue - 1 : minValue;
-  const yMax = minValue === maxValue ? maxValue + 1 : maxValue;
-  const xFor = (index, count) => pad.left + ((width - pad.left - pad.right) * (count <= 1 ? 0 : index / (count - 1)));
-  const yFor = (value) => pad.top + ((height - pad.top - pad.bottom) * (1 - ((value - yMin) / (yMax - yMin))));
-  const paths = series.map((item) => {
-    const points = item.values
-      .map((value, index) => Number.isFinite(Number(value)) ? [xFor(index, item.values.length), yFor(Number(value))] : null)
-      .filter(Boolean);
-    if (!points.length) return '';
-    const path = points.map(([x, y], index) => `${index ? 'L' : 'M'} ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
-    return `<path d="${path}" fill="none" stroke="${item.color}" stroke-width="2.3" stroke-linecap="round" ${item.dashed ? 'stroke-dasharray="5 5"' : ''}/>`;
-  }).join('');
-  const latest = allValues[allValues.length - 1];
-  return `
-    <article class="chart-card">
-      <div class="chart-head"><div><h3>${title}</h3><span class="subtle">${asArray(rows).length} daily points</span></div><strong>${formatter(latest)}</strong></div>
-      <svg class="chart trend-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(title)}">
-        ${[0, 0.25, 0.5, 0.75, 1].map((tick) => {
-          const y = pad.top + ((height - pad.top - pad.bottom) * tick);
-          return `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" stroke="rgba(147,166,194,.16)"/>`;
-        }).join('')}
-        ${paths}
-        <text x="${pad.left}" y="${height - 10}" fill="currentColor" opacity=".55" font-size="11">${escapeHtml(asArray(rows)[0]?.report_date || '')}</text>
-        <text x="${width - pad.right}" y="${height - 10}" fill="currentColor" opacity=".55" font-size="11" text-anchor="end">${escapeHtml(asArray(rows).at(-1)?.report_date || '')}</text>
-      </svg>
-      <div class="legend">${series.map((item) => `<span><i style="background:${item.color}"></i>${item.label}</span>`).join('')}</div>
-    </article>`;
+  return createLineChart(title, rows, series, formatter, options);
 }
 
 
@@ -444,14 +430,19 @@ function nodeInsightsUnavailable(pageLabel) {
   return `<div class="empty-state">${escapeHtml(pageLabel)} data has not been collected yet.</div>`;
 }
 
-function allocationGauge(label, alloc, total, formatter, note) {
+function allocationGauge(label, alloc, total, formatter, note, updatedLabel) {
   const pctValue = total ? Number(alloc) / Number(total) : null;
   const tone = allocationReading(pctValue);
-  const widthPct = pctValue === null ? 0 : Math.max(2, Math.min(100, pctValue * 100));
+  const { html } = createGauge(pctValue, tone, {
+    label,
+    allocLabel: `${formatter(alloc)} / ${formatter(total)} allocated`,
+    healthyRange: [0, Math.round(ALLOCATION_THRESHOLDS.warn * 100)],
+    updatedLabel,
+  });
   return `<article class="stat-card gauge-card ${tone}">
     <div class="label">${escapeHtml(label)}</div>
     <div class="value">${formatter(alloc)} / ${formatter(total)}</div>
-    <div class="breakdown-track"><i style="width:${widthPct.toFixed(1)}%"></i></div>
+    ${html}
     <div class="subtle">${pct(pctValue)} allocated${note ? ` &middot; ${escapeHtml(note)}` : ''}</div>
   </article>`;
 }
@@ -514,211 +505,45 @@ function historyUnavailableNote() {
   return disclaimer('Historical trend collection has not started yet. Once the hourly collector (scripts/collect_node_insights.py) has been running for a while, pressure and queue trends will appear here.');
 }
 
-function capacityHistorySection(chartId, title, subtitle) {
+// onClick: '#/nodes' - drilling from the fleet-wide pressure trend into the
+// per-node inventory is the one concrete "aggregate -> detail" hop this
+// chart can make without inventing a route that doesn't exist.
+function capacityHistorySection(title, subtitle) {
   if (!hasCapacityHistory()) return historyUnavailableNote();
+  const points = filterPointsByRange(nodeInsightsHistory.capacity);
+  const option = capacityHistoryChartOption(points);
+  annotateTimeline(option.series[0], points.map((p) => p.timestamp), OPERATIONAL_EVENTS);
+  const { html } = registerChart(option, { label: title, onClick: '#/nodes', csv: true });
   return `<section class="section">
     <div class="section-head"><h2>${escapeHtml(title)}</h2>${rangeButtons()}</div>
     ${subtitle ? `<p class="subtle">${escapeHtml(subtitle)}</p>` : ''}
-    <div id="${chartId}" class="chart-container" data-chart-kind="capacity-history"></div>
+    <p class="subtle chart-drilldown-hint">Click the chart to view the Node Inventory.</p>
+    ${html}
   </section>`;
 }
 
-function drainingHistorySection(chartId) {
+function drainingHistorySection() {
   if (!hasCapacityHistory()) return historyUnavailableNote();
+  const { html } = registerChart(drainingHistoryChartOption(filterPointsByRange(nodeInsightsHistory.capacity)), {
+    label: 'Node availability trend', csv: true,
+  });
   return `<section class="section">
     <div class="section-head"><h2>Node availability trend</h2>${rangeButtons()}</div>
     <p class="subtle">Available, draining, and down node counts over time.</p>
-    <div id="${chartId}" class="chart-container" data-chart-kind="draining-history"></div>
+    ${html}
   </section>`;
 }
 
-function nodeHistorySection(chartId, nodeName, title) {
+function nodeHistorySection(nodeName, title) {
   const points = nodeInsightsHistory && nodeInsightsHistory.available ? nodeInsightsHistory.nodes[nodeName] : null;
   if (!points || !points.length) return historyUnavailableNote();
+  const { html } = registerChart(nodeHistoryChartOption(filterPointsByRange(points)), {
+    className: 'chart-container--tall', label: title, csv: true,
+  });
   return `<section class="section">
     <div class="section-head"><h2>${escapeHtml(title)}</h2>${rangeButtons()}</div>
-    <div id="${chartId}" class="chart-container" data-chart-kind="node-history" data-chart-node="${escapeHtml(nodeName)}"></div>
+    ${html}
   </section>`;
-}
-
-function cssVar(name, fallback) {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return value || fallback;
-}
-function chartTextColor() { return cssVar('--muted', '#90a2bc'); }
-function chartLineColor() { return cssVar('--border', 'rgba(147,166,194,0.16)'); }
-function chartPct(rawValue) { return rawValue === null || rawValue === undefined ? null : Math.round(Number(rawValue) * 1000) / 10; }
-
-// Shared mobile/desktop ECharts config. Every chart on the site
-// (current and future - infrastructure, capacity, nodes, queue insights,
-// etc.) should build its option through baseChartOption() so it picks up
-// the responsive legend/grid/axis/tooltip/dataZoom behavior automatically
-// instead of needing page-specific mobile fixes.
-const CHART_MOBILE_BREAKPOINT = 768;
-function isMobileChartViewport() {
-  return window.matchMedia(`(max-width: ${CHART_MOBILE_BREAKPOINT - 1}px)`).matches;
-}
-
-function baseChartOption(categories, extraGrid) {
-  const mobile = isMobileChartViewport();
-  const grid = mobile
-    ? Object.assign({ left: 44, right: 12, top: 136, bottom: 56 }, extraGrid)
-    : Object.assign({ left: 48, right: 16, top: 44, bottom: 64 }, extraGrid);
-  // Mobile: vertical, scrollable legend pinned above the plot area (grid.top
-  // is pushed down to make room for it) instead of the desktop horizontal
-  // row, which wraps awkwardly once there are more than a couple of series.
-  const legend = mobile
-    ? {
-        type: 'scroll',
-        orient: 'vertical',
-        top: 4,
-        left: 'center',
-        align: 'left',
-        itemGap: 14,
-        height: 110,
-        textStyle: { color: chartTextColor(), fontSize: 12 },
-        pageIconColor: chartTextColor(),
-        pageIconInactiveColor: chartLineColor(),
-        pageTextStyle: { color: chartTextColor() },
-      }
-    : { top: 0, textStyle: { color: chartTextColor() } };
-  return {
-    backgroundColor: 'transparent',
-    textStyle: { color: chartTextColor(), fontFamily: 'inherit' },
-    grid,
-    legend,
-    tooltip: {
-      trigger: 'axis',
-      confine: true,
-      extraCssText: 'max-width:90vw;',
-      formatter: (params) => {
-        const list = Array.isArray(params) ? params : [params];
-        if (!list.length) return '';
-        const header = chartTimeTooltipLabel(list[0].axisValue);
-        const rows = list
-          .filter((p) => p.value !== null && p.value !== undefined)
-          .map((p) => `${p.marker}${p.seriesName}: <strong>${p.value}</strong>`)
-          .join('<br/>');
-        return `${header}<br/>${rows}`;
-      },
-    },
-    dataZoom: mobile
-      ? [{ type: 'inside' }, { type: 'slider', height: 10, bottom: 4, handleSize: '70%', textStyle: { color: chartTextColor(), fontSize: 10 } }]
-      : [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 8, textStyle: { color: chartTextColor() } }],
-    xAxis: {
-      type: 'category',
-      data: categories,
-      axisLine: { lineStyle: { color: chartLineColor() } },
-      axisLabel: Object.assign(
-        { color: chartTextColor(), formatter: chartTimeLabel, interval: 'auto' },
-        mobile ? { rotate: 45 } : {},
-      ),
-    },
-  };
-}
-
-function lineSeries(def, data) {
-  return {
-    name: def.name,
-    type: 'line',
-    smooth: true,
-    showSymbol: false,
-    yAxisIndex: def.axis || 0,
-    itemStyle: { color: def.color },
-    lineStyle: { color: def.color, width: 2 },
-    data,
-  };
-}
-
-function capacityHistoryChartOption(points) {
-  const categories = points.map((p) => p.timestamp);
-  const seriesDefs = [
-    { key: 'cpu_pct', name: 'CPU pressure', color: cssVar('--blue', '#3e8cff'), axis: 0, pct: true },
-    { key: 'memory_pct', name: 'Memory pressure', color: cssVar('--teal', '#2dd4bf'), axis: 0, pct: true },
-    { key: 'gpu_pct', name: 'GPU pressure', color: cssVar('--amber', '#ffb84d'), axis: 0, pct: true },
-    { key: 'running_jobs', name: 'Running jobs', color: cssVar('--green', '#53d88a'), axis: 1 },
-    { key: 'pending_jobs', name: 'Pending jobs', color: cssVar('--red', '#ff6b7a'), axis: 1 },
-    { key: 'draining_nodes', name: 'Draining nodes', color: cssVar('--cyan', '#30d5d0'), axis: 1 },
-  ];
-  return Object.assign(baseChartOption(categories, { right: 48 }), {
-    yAxis: [
-      { type: 'value', name: '%', min: 0, max: 100, axisLabel: { color: chartTextColor(), formatter: '{value}%' }, splitLine: { lineStyle: { color: chartLineColor() } } },
-      { type: 'value', name: 'jobs / nodes', min: 0, axisLabel: { color: chartTextColor() }, splitLine: { show: false } },
-    ],
-    series: seriesDefs.map((def) => lineSeries(def, points.map((p) => (def.pct ? chartPct(p[def.key]) : (p[def.key] === null || p[def.key] === undefined ? null : Number(p[def.key])))))),
-  });
-}
-
-function drainingHistoryChartOption(points) {
-  const categories = points.map((p) => p.timestamp);
-  const seriesDefs = [
-    { key: 'available_nodes', name: 'Available', color: cssVar('--green', '#53d88a') },
-    { key: 'draining_nodes', name: 'Draining', color: cssVar('--amber', '#ffb84d') },
-    { key: 'down_nodes', name: 'Down', color: cssVar('--red', '#ff6b7a') },
-  ];
-  return Object.assign(baseChartOption(categories), {
-    yAxis: { type: 'value', name: 'nodes', min: 0, axisLabel: { color: chartTextColor() }, splitLine: { lineStyle: { color: chartLineColor() } } },
-    series: seriesDefs.map((def) => lineSeries(def, points.map((p) => (p[def.key] === null || p[def.key] === undefined ? null : Number(p[def.key]))))),
-  });
-}
-
-function nodeHistoryChartOption(points) {
-  const categories = points.map((p) => p.timestamp);
-  const seriesDefs = [
-    { key: 'cpu_pct', name: 'CPU utilization', color: cssVar('--blue', '#3e8cff') },
-    { key: 'mem_pct', name: 'Memory utilization', color: cssVar('--teal', '#2dd4bf') },
-    { key: 'gpu_pct', name: 'GPU utilization', color: cssVar('--amber', '#ffb84d') },
-  ];
-  return Object.assign(baseChartOption(categories), {
-    yAxis: { type: 'value', name: '%', min: 0, max: 100, axisLabel: { color: chartTextColor(), formatter: '{value}%' }, splitLine: { lineStyle: { color: chartLineColor() } } },
-    series: seriesDefs.map((def) => lineSeries(def, points.map((p) => chartPct(p[def.key])))),
-  });
-}
-
-let activeCharts = [];
-let chartsRenderedForMobile = null;
-function disposeCharts() {
-  activeCharts.forEach((chart) => {
-    try { chart.dispose(); } catch (error) { /* chart already gone with its DOM node */ }
-  });
-  activeCharts = [];
-}
-
-function mountCharts() {
-  disposeCharts();
-  if (!window.echarts) return;
-  chartsRenderedForMobile = isMobileChartViewport();
-  document.querySelectorAll('[data-chart-kind]').forEach((el) => {
-    const kind = el.dataset.chartKind;
-    let option = null;
-    if (kind === 'capacity-history' && hasCapacityHistory()) {
-      option = capacityHistoryChartOption(filterPointsByRange(nodeInsightsHistory.capacity));
-    } else if (kind === 'draining-history' && hasCapacityHistory()) {
-      option = drainingHistoryChartOption(filterPointsByRange(nodeInsightsHistory.capacity));
-    } else if (kind === 'node-history') {
-      const points = nodeInsightsHistory && nodeInsightsHistory.available ? nodeInsightsHistory.nodes[el.dataset.chartNode] : null;
-      if (points && points.length) option = nodeHistoryChartOption(filterPointsByRange(points));
-    }
-    if (!option) return;
-    const chart = window.echarts.init(el, null, { renderer: 'svg' });
-    chart.setOption(option);
-    activeCharts.push(chart);
-  });
-}
-
-let chartResizeAttached = false;
-function setupChartResize() {
-  if (chartResizeAttached) return;
-  chartResizeAttached = true;
-  // Crossing the mobile breakpoint (e.g. rotating an iPhone) needs a full
-  // re-render so the legend/grid/axis switch layouts, not just a resize.
-  window.addEventListener('resize', () => {
-    if (chartsRenderedForMobile !== null && chartsRenderedForMobile !== isMobileChartViewport()) {
-      mountCharts();
-      return;
-    }
-    activeCharts.forEach((chart) => chart.resize());
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -948,18 +773,28 @@ function queueAdvisorPage() {
   const sp = asObject(queueInsights.submissionPatterns);
   const bestWindows = asArray(sp.best_submission_windows).slice()
     .sort((a, b) => num(a.median_wait_seconds) - num(b.median_wait_seconds));
+  // Total submissions actually analyzed per partition over the trailing
+  // window (sum of every weekday x hour cell already in sp.cells) - shown
+  // alongside the best-window sample so a low best-window count (a quiet
+  // partition's busiest qualifying hour) is never mistaken for a small
+  // analysis sample (which would instead show up here as a low total).
+  const totalsByPartition = {};
+  asArray(sp.cells).forEach((c) => {
+    totalsByPartition[c.partition_name] = (totalsByPartition[c.partition_name] || 0) + num(c.jobs);
+  });
 
   return `
     <div class="stack">
       <section class="section"><div class="section-head"><h2>Submission Advisor</h2><span class="subtle">${sp.window_days || 90}-day trailing window</span></div>
-        <p class="subtle">Historical tendencies only - never a guarantee for any individual job. Windows with fewer than ${fmt(sp.min_cell_sample)} sampled jobs are flagged low-confidence.</p>
+        <p class="subtle">Historical tendencies only - never a guarantee for any individual job. "Best-window sample" is how many jobs landed in that specific recommended day/hour - it is normally much smaller than the partition's total submissions (shown alongside it) because it is one of up to 168 weekday x hour slots, not the whole queue. Windows with fewer than ${fmt(sp.min_cell_sample)} sampled jobs are flagged low-confidence.</p>
         ${bestWindows.length
-          ? tableFromRows(['Partition', 'Best day', 'Best hour', 'Typical wait', 'Sample', 'Confidence'], bestWindows.map((w) => [
+          ? tableFromRows(['Partition', 'Best day', 'Best hour', 'Typical wait', 'Best-window sample', 'Total submissions (90d)', 'Confidence'], bestWindows.map((w) => [
               escapeHtml(w.partition_name),
               escapeHtml(WEEKDAY_NAMES[w.weekday] || String(w.weekday)),
               hourLabel(w.hour_of_day),
               durationLabel(w.median_wait_seconds),
               fmt(w.sample_jobs),
+              fmt(totalsByPartition[w.partition_name] || 0),
               `<span class="pill ${w.confidence === 'low' ? 'warn' : 'good'}">${escapeHtml(w.confidence)}</span>`,
             ]))
           : '<div class="empty-state">Not enough submission history yet to recommend a window.</div>'}
@@ -995,9 +830,9 @@ function queueTrendsPage() {
           chartSeries(depthRows, 'running_jobs', 'Running', '#30d5d0'),
           chartSeries(depthRows, 'pending_jobs', 'Pending', '#ff8a65'),
         ], fmt, { zeroBase: true }) : historyUnavailableNote()}</section>
-        <section class="section"><div class="section-head"><h2>Queue Health score</h2></div>${healthRows.length ? lineChart('Queue Health score (0-100)', healthRows, [
+        <section class="section"><div class="section-head"><h2>Queue Health score</h2><span class="subtle chart-drilldown-hint">Click chart for live Queue Overview</span></div>${healthRows.length ? lineChart('Queue Health score (0-100)', healthRows, [
           chartSeries(healthRows, 'score', 'Score', '#ffb74d'),
-        ], fmt, { zeroBase: true }) : historyUnavailableNote()}</section>
+        ], fmt, { zeroBase: true, onClick: '#/queue-overview', csv: true }) : historyUnavailableNote()}</section>
       </div>
       <div class="trend-grid">
         <section class="section"><div class="section-head"><h2>Top pending reasons</h2></div>${reasonRows.length ? lineChart('Pending jobs by reason', reasonRows, topReasons.map((reason, i) => chartSeries(reasonRows, reason, reason, reasonColors[i % reasonColors.length])), fmt, { zeroBase: true }) : historyUnavailableNote()}</section>
@@ -1022,6 +857,7 @@ function infrastructureOverviewPage() {
   const byClass = asArray(co.by_class);
   const byPartition = asArray(co.by_partition);
   const topReason = asArray(queue.pending_reasons)[0];
+  const allocationUpdatedLabel = `${snapshotAgeLabel(findModule(platformRegistry, 'node-insights')?.generatedAt)} ago`;
 
   return `
     <div class="stack">
@@ -1033,9 +869,9 @@ function infrastructureOverviewPage() {
         statBlock('Down nodes', fmt(totals.nodes_down), 'Unreachable or failed', totals.nodes_down ? 'bad' : 'good'),
       ].join('')}</div></section>
       <div class="cards-grid">
-        ${allocationGauge('CPU allocation', cpu.alloc, cpu.total, fmt)}
-        ${allocationGauge('Memory allocation', mem.alloc, mem.total, gib)}
-        ${allocationGauge('GPU allocation', gpu.alloc, gpu.total, fmt, gpu.alloc_pct_of_online !== null && gpu.alloc_pct_of_online !== undefined ? `${pct(gpu.alloc_pct_of_online)} of online GPUs` : null)}
+        ${allocationGauge('CPU allocation', cpu.alloc, cpu.total, fmt, null, allocationUpdatedLabel)}
+        ${allocationGauge('Memory allocation', mem.alloc, mem.total, gib, null, allocationUpdatedLabel)}
+        ${allocationGauge('GPU allocation', gpu.alloc, gpu.total, fmt, gpu.alloc_pct_of_online !== null && gpu.alloc_pct_of_online !== undefined ? `${pct(gpu.alloc_pct_of_online)} of online GPUs` : null, allocationUpdatedLabel)}
       </div>
       <section class="section"><div class="section-head"><h2>Queue right now</h2><span class="subtle">Aggregate counts only - no job or user identity</span></div><div class="cards-grid">${[
         statBlock('Jobs in queue', fmt(queue.jobs_total), 'Running + pending'),
@@ -1054,7 +890,7 @@ function infrastructureOverviewPage() {
         <section class="section"><div class="section-head"><h2>By class</h2><span class="subtle">Live classification rules</span></div>${tableFromRows(['Class', 'Nodes'], byClass.map((c) => [escapeHtml(c.class), fmt(c.count)]))}</section>
         <section class="section"><div class="section-head"><h2>By partition</h2><span class="subtle">Node membership</span></div>${tableFromRows(['Partition', 'Nodes'], byPartition.map((p) => [escapeHtml(p.partition), fmt(p.node_count)]))}</section>
       </div>
-      ${capacityHistorySection('chart-infra-history', 'Cluster pressure trend', 'CPU, memory, and GPU pressure plus running/pending jobs and draining nodes over time.')}
+      ${capacityHistorySection('Cluster pressure trend', 'CPU, memory, and GPU pressure plus running/pending jobs and draining nodes over time.')}
       ${disclaimer('GPU allocation reflects scheduler reservation (GresUsed from scontrol -d show node), not measured GPU utilization. GPU utilization is not currently measured on Mjolnir.')}
     </div>`;
 }
@@ -1109,7 +945,7 @@ function nodeInventoryPage() {
           ['State', 'state'], ['Partitions', null],
         ], tableRows, filters.sortKey, filters.sortDir)}</div>
       </section>
-      ${drainingHistorySection('chart-nodes-draining-history')}
+      ${drainingHistorySection()}
       ${disclaimer('GPU% reflects scheduler-reserved GPUs from scontrol -d show node (GresUsed), not measured GPU utilization.')}
     </div>`;
 }
@@ -1157,7 +993,7 @@ function capacityPlanningPage() {
   return `
     <div class="stack">
       ${infraStatusBar()}
-      ${capacityHistorySection('chart-capacity-history', 'Pressure & queue trend', 'CPU, memory, and GPU pressure plus running/pending jobs and draining nodes over time.')}
+      ${capacityHistorySection('Pressure & queue trend', 'CPU, memory, and GPU pressure plus running/pending jobs and draining nodes over time.')}
       <section class="section"><div class="section-head"><h2>Current pressure</h2><span class="subtle">Live snapshot</span></div><div class="cards-grid">${[
         statBlock('CPU pressure', pct(cpu.alloc_pct), `${fmt(cpu.alloc)} / ${fmt(cpu.total)} logical CPUs allocated`, toneFromReading(cpu.reading)),
         statBlock('Memory pressure', pct(mem.alloc_pct), `${gib(mem.alloc)} / ${gib(mem.total)} allocated`, toneFromReading(mem.reading)),
@@ -1218,7 +1054,7 @@ function nodeDetailPage(nodeName) {
           ['Running jobs on this node', fmt(node.running_jobs_count)],
         ])}</section>
       </div>
-      ${nodeHistorySection('chart-node-history', node.node, 'Utilization history')}
+      ${nodeHistorySection(node.node, 'Utilization history')}
       ${gpuIdleCpuBusy ? insight('GPU-idle, CPU-busy', `This node has ${fmt(node.cpu_alloc)} CPUs allocated but 0 of its ${fmt(node.gpu_total)} GPUs are reserved.${node.drain ? ' It is draining for maintenance but still absorbing CPU-only work.' : ''}`) : ''}
       ${disclaimer('Job-level detail (which user or job is running here) requires admin access and is not shown in this public view. No usernames, job names, or job IDs are exposed on this page.')}
       <p class="subtle"><a href="#/nodes">&larr; Back to Node Inventory</a></p>
@@ -1301,9 +1137,14 @@ function executiveKpiSection() {
   const gpu = asObject(co.gpu);
   const clusterSeries = clusterWaitSeriesRows(asObject(queueInsights?.waitTimeHistory).series);
   const latestWait = clusterSeries.length ? clusterSeries[clusterSeries.length - 1] : null;
-  const cpuPct = num(cpu.total) ? num(cpu.alloc) / num(cpu.total) : null;
-  const memPct = num(mem.total) ? num(mem.alloc) / num(mem.total) : null;
-  const gpuPct = num(gpu.total) ? num(gpu.alloc) / num(gpu.total) : null;
+  // Read the same pre-computed pressure fields Capacity Planning reads
+  // (export_node_insights.py's build_cluster_overview) rather than
+  // recomputing alloc/total locally, so the two pages never drift apart -
+  // GPU in particular prefers alloc_pct_of_online, excluding offline GPUs
+  // from the denominator the same way Capacity Planning does.
+  const cpuPct = cpu.alloc_pct ?? null;
+  const memPct = mem.alloc_pct ?? null;
+  const gpuPct = (gpu.alloc_pct_of_online ?? gpu.alloc_pct) ?? null;
 
   const cards = [
     statBlock('Running Jobs', fmt(queue.running), 'Across all partitions', 'good'),
@@ -1368,12 +1209,13 @@ function overnightSummarySection() {
 // reusable from the Warehouse page too if useful later.
 function reductionFunnel(w) {
   const ratio = w.reductionRatio ? `${(1 / w.reductionRatio).toFixed(2)} : 1` : '-';
+  const { html } = createFunnel([
+    { name: 'Accounting Records', value: w.accountingRecords },
+    { name: 'Canonical Jobs', value: w.canonicalJobs },
+  ], { label: 'Warehouse reduction funnel', onClick: '#/warehouse' });
   return `<div class="reduction-funnel">
-    <div class="reduction-funnel-step"><strong>${humanNumber(w.accountingRecords, { style: 'short' })}</strong><span>Accounting Records</span></div>
-    <div class="reduction-funnel-arrow">&darr;</div>
-    <div class="reduction-funnel-step"><strong>${humanNumber(w.canonicalJobs, { style: 'short' })}</strong><span>Canonical Jobs</span></div>
-    <div class="reduction-funnel-arrow">&darr;</div>
-    <div class="reduction-funnel-step reduction-funnel-result"><strong>${ratio}</strong><span>Reduction</span></div>
+    <div class="reduction-funnel-chart">${html}</div>
+    <div class="reduction-funnel-ratio"><strong>${ratio}</strong><span>Reduction</span></div>
   </div>`;
 }
 
@@ -1637,10 +1479,10 @@ function clusterPage() {
       ${analyticsStatusBar()}
       <section class="section"><div class="section-head"><h2>Efficiency and cost trends</h2><span class="subtle">Daily values with rolling averages</span></div><p class="subtle">Use these charts to spot whether Mjolnir is becoming more efficient or drifting toward larger resource gaps.</p></section>
       <div class="trend-grid">
-        ${lineChart('CPU efficiency', rows, [chartSeries(rows, 'avg_cpu_efficiency', 'Daily', '#3e8cff'), rollingSeries(rows, 'avg_cpu_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_cpu_efficiency', 30, '30-day', '#ffb84d')], pct, { zeroBase: true })}
+        ${lineChart('CPU efficiency', rows, [chartSeries(rows, 'avg_cpu_efficiency', 'Daily', '#3e8cff'), rollingSeries(rows, 'avg_cpu_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_cpu_efficiency', 30, '30-day', '#ffb84d')], pct, { zeroBase: true, events: OPERATIONAL_EVENTS, unitLabel: 'Share of allocated CPU time actually used' })}
         ${lineChart('Memory efficiency', rows, [chartSeries(rows, 'avg_memory_efficiency', 'Daily', '#53d88a'), rollingSeries(rows, 'avg_memory_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_memory_efficiency', 30, '30-day', '#ffb84d')], pct, { zeroBase: true })}
         ${lineChart('Daily cost and optimization opportunity', rows, [chartSeries(rows, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(rows, 'underutilized_cost_dkk', 'Underutilized cost', '#ff6b7a')], money, { zeroBase: true })}
-        ${lineChart('GPU hours', rows, [chartSeries(rows, 'gpu_hours', 'GPU hours', '#9cd0ff'), rollingSeries(rows, 'gpu_hours', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'gpu_hours', 30, '30-day', '#ffb84d')], fmt, { zeroBase: true })}
+        ${lineChart('GPU hours', rows, [chartSeries(rows, 'gpu_hours', 'GPU hours', '#9cd0ff'), rollingSeries(rows, 'gpu_hours', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'gpu_hours', 30, '30-day', '#ffb84d')], fmt, { zeroBase: true, emptyMessage: 'No GPU jobs during this period.' })}
       </div>
       </div>`;
 }
@@ -1712,25 +1554,24 @@ function rankingsPage() {
       </div>`;
 }
 
-function percentileBar(label, values, formatter, tone = 'info') {
-  const keys = ['5', '25', '50', '75', '95'];
-  const nums = keys.map((key) => num(values[key]));
-  const max = Math.max(...nums, 1e-9);
-  return `<article class="section percentile-viz"><div class="section-head"><h2>${label}</h2><span class="pill ${tone}">5-95 percentile</span></div><div class="percentile-scale">${keys.map((key) => `<div class="percentile-step"><div class="bar-track"><span style="height:${Math.max(5, (num(values[key]) / max) * 100)}%"></span></div><strong>p${key}</strong><em>${formatter(values[key])}</em></div>`).join('')}</div></article>`;
+function percentileBar(label, values, formatter, tone = 'info', sampleLabel) {
+  const { html } = createDistribution(values, formatter, tone, { label, sampleLabel });
+  return `<article class="section percentile-viz"><div class="section-head"><h2>${label}</h2><span class="pill ${tone}">5-95 percentile</span></div>${html}</article>`;
 }
 
 function benchmarkPage() {
   const percentiles = asObject(data?.percentiles);
+  const sampleLabel = data?.clusterSummary?.allTime?.jobs ? `Based on ${fmt(data.clusterSummary.allTime.jobs)} jobs` : undefined;
   return `
     <div class="stack">
       ${analyticsStatusBar()}
       ${infoPanel('How do percentiles work?', 'Percentiles show how a project or user\'s resource usage compares with the broader Mjolnir community. A percentile of 90 means usage is higher than 90% of comparable peers, while a percentile of 10 means usage is lower than most peers. Percentiles provide context, not judgement, and are most useful for spotting unusually high or unusually low resource usage patterns.')}
       <section class="section"><div class="section-head"><h2>How resource usage compares across Mjolnir</h2><span class="subtle">Context, not judgement - anonymized population view</span></div><p class="subtle">Percentiles help put your resource usage in context against peer behavior without showing real peer identities.</p></section>
       <div class="trend-grid">
-        ${percentileBar('CPU efficiency percentiles', asObject(percentiles.cpu), pct, 'info')}
-        ${percentileBar('Memory efficiency percentiles', asObject(percentiles.memory), pct, 'good')}
-        ${percentileBar('Cost percentiles', asObject(percentiles.cost), money, 'warn')}
-        ${percentileBar('GPU hour percentiles', asObject(percentiles.gpu), fmt, 'info')}
+        ${percentileBar('CPU efficiency percentiles', asObject(percentiles.cpu), pct, 'info', sampleLabel)}
+        ${percentileBar('Memory efficiency percentiles', asObject(percentiles.memory), pct, 'good', sampleLabel)}
+        ${percentileBar('Cost percentiles', asObject(percentiles.cost), money, 'warn', sampleLabel)}
+        ${percentileBar('GPU hour percentiles', asObject(percentiles.gpu), fmt, 'info', sampleLabel)}
       </div>
       </div>`;
 }
@@ -1973,10 +1814,8 @@ function savingsBreakdown(recommendations, metrics) {
   if (!rows.length && !total) return '<div class="empty-state">No savings breakdown is available yet.</div>';
   const residual = Math.max(0, total - rows.reduce((sum, [, value]) => sum + value, 0));
   const allRows = residual > 0 ? rows.concat([['Unassigned opportunity', residual]]) : rows;
-  return `<div class="savings-summary"><div class="savings-total"><span>Total practical opportunity</span><strong>${money(total)}</strong><em>Estimated from your personal bundle and recommendations.</em></div><div class="breakdown-list">${allRows.map(([label, value]) => {
-    const share = total ? Math.max(4, (value / total) * 100) : 0;
-    return `<div class="breakdown-row"><div><strong>${escapeHtml(label)}</strong><span>${money(value)} available</span></div><div class="breakdown-track"><i style="width:${share.toFixed(1)}%"></i></div></div>`;
-  }).join('')}</div></div>`;
+  const { html } = createBarChart(allRows.map(([label]) => label), allRows.map(([, value]) => value), money, { horizontal: true, color: '#53d88a', label: 'Savings opportunity breakdown', emptyMessage: 'No savings breakdown is available yet.' });
+  return `<div class="savings-summary"><div class="savings-total"><span>Total practical opportunity</span><strong>${money(total)}</strong><em>Estimated from your personal bundle and recommendations.</em></div>${html}</div>`;
 }
 
 function personalContextCards(metrics, percentile) {
@@ -2103,8 +1942,16 @@ function dot(tone) {
 // refresh-manager.js so this stays a one-line read on every render() pass.
 // #refresh-last-updated keeps a stable id so the manager's 15s tick can
 // patch just this text node directly, without forcing a full page re-render.
+// Shows both the absolute timestamp (so it's unambiguous and sortable) and
+// the relative age (so it's readable at a glance) - the relative half keeps
+// advancing every 15s via patchLastUpdatedIndicator() without a full render.
+function lastUpdatedFullLabel() {
+  const at = getLastUpdatedAt();
+  if (!at) return 'never';
+  return `${formatLocalTimestamp(at)} (${lastUpdatedLabel()})`;
+}
 function refreshStatusHtml() {
-  return `<span class="refresh-status"><span class="refresh-status-dot" aria-hidden="true"></span>Live<span id="refresh-last-updated" class="refresh-status-updated">Last updated: ${lastUpdatedLabel()}</span></span>`;
+  return `<span class="refresh-status"><span class="refresh-status-dot" aria-hidden="true"></span>Live<span id="refresh-last-updated" class="refresh-status-updated">Last updated: ${lastUpdatedFullLabel()}</span></span>`;
 }
 
 function refreshToastHtml() {
@@ -2139,6 +1986,7 @@ function renderShell(content) {
 
 function render() {
   document.documentElement.dataset.theme = state.theme;
+  resetChartRegistry();
   platformRegistry = buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights });
   warehouseSummary = buildWarehouseSummary({ slurmAnalyticsPipeline, nodeInsights });
   const renderers = {
@@ -2228,11 +2076,18 @@ function rerenderPreservingViewState() {
   const mainEl = document.querySelector('.main');
   const mainScrollTop = mainEl ? mainEl.scrollTop : null;
   const savedDisclosures = captureOpenDisclosures();
+  // The full innerHTML replace inside render() necessarily disposes and
+  // re-inits every ECharts instance - this brief opacity dip masks that as
+  // a soft cross-fade instead of an instant pop. Not real DOM diffing (that
+  // would need a different rendering model entirely), but enough to keep a
+  // background data refresh from looking like a layout jump.
+  if (mainEl) mainEl.classList.add('refreshing');
   render();
   restoreOpenDisclosures(savedDisclosures);
   window.scrollTo(0, scrollY);
   const newMainEl = document.querySelector('.main');
   if (newMainEl && mainScrollTop !== null) newMainEl.scrollTop = mainScrollTop;
+  requestAnimationFrame(() => newMainEl?.classList.remove('refreshing'));
 }
 
 // Cheap, render()-free DOM patches used for the 15s indicator tick and the
@@ -2240,7 +2095,7 @@ function rerenderPreservingViewState() {
 // risks the scroll/disclosure state the full rerender above protects.
 function patchLastUpdatedIndicator() {
   const el = document.getElementById('refresh-last-updated');
-  if (el) el.textContent = `Last updated: ${lastUpdatedLabel()}`;
+  if (el) el.textContent = `Last updated: ${lastUpdatedFullLabel()}`;
 }
 function patchToastVisibility(visible) {
   const el = document.getElementById('refresh-toast');
@@ -2383,6 +2238,7 @@ async function init() {
     loadSlurmAnalyticsPipelineStatus(),
     loadQueueInsightsData(),
   ]);
+  setLastUpdatedFromBundle(currentDataBundle());
   render();
   if (isPersonalRoute(state.route)) await loadPersonalRoute(state.route);
   startAutoRefresh({

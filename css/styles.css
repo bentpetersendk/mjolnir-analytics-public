@@ -414,15 +414,14 @@ td:last-child, th:last-child { text-align: right; }
 .cluster-health-sub { color: var(--muted); font-size: 14px; }
 
 .reduction-funnel {
-  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  display: flex; align-items: center; flex-wrap: wrap;
   gap: 14px; padding: 18px; margin: 14px 0;
   border-radius: var(--radius-sm); background: var(--surface-3);
 }
-.reduction-funnel-step { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 140px; text-align: center; }
-.reduction-funnel-step strong { font-size: 1.4rem; }
-.reduction-funnel-step span { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
-.reduction-funnel-step.reduction-funnel-result strong { color: var(--green); }
-.reduction-funnel-arrow { color: var(--muted); font-size: 1.2rem; }
+.reduction-funnel-chart { flex: 1; min-width: 220px; }
+.reduction-funnel-ratio { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 140px; text-align: center; }
+.reduction-funnel-ratio strong { font-size: 1.4rem; color: var(--green); }
+.reduction-funnel-ratio span { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
 
 .alert-row {
   display: flex; align-items: center; gap: 10px;
@@ -511,8 +510,9 @@ td:last-child, th:last-child { text-align: right; }
 }
 .savings-summary {
   display: grid;
-  grid-template-columns: minmax(220px, .55fr) minmax(0, 1fr);
+  grid-template-columns: minmax(220px, .4fr) minmax(0, 1fr);
   gap: 16px;
+  align-items: center;
 }
 .savings-total {
   padding: 18px;
@@ -522,8 +522,7 @@ td:last-child, th:last-child { text-align: right; }
   display: grid;
   gap: 8px;
 }
-.savings-total span,
-.breakdown-row span {
+.savings-total span {
   color: var(--muted);
   font-size: 13px;
 }
@@ -536,33 +535,6 @@ td:last-child, th:last-child { text-align: right; }
   font-style: normal;
   font-size: 13px;
   line-height: 1.5;
-}
-.breakdown-list {
-  display: grid;
-  gap: 12px;
-}
-.breakdown-row {
-  display: grid;
-  grid-template-columns: minmax(180px, .35fr) minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
-}
-.breakdown-row strong,
-.breakdown-row span {
-  display: block;
-}
-.breakdown-track {
-  height: 12px;
-  border-radius: 999px;
-  background: var(--surface-3);
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-.breakdown-track i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--green), var(--cyan));
 }
 .metric-explain {
   padding: 12px;
@@ -784,9 +756,6 @@ td:last-child, th:last-child { text-align: right; }
 .metric-card.bad, .stat-card.bad {
   border-color: rgba(255, 107, 122, 0.4);
 }
-.gauge-card .breakdown-track {
-  margin: 10px 0 8px;
-}
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
@@ -844,6 +813,44 @@ td:last-child, th:last-child { text-align: right; }
   width: 100%;
   height: 320px;
   margin-top: 8px;
+  position: relative;
+  border-radius: var(--radius-sm);
+}
+.chart-container--clickable {
+  cursor: pointer;
+}
+.chart-container.is-loading {
+  background: linear-gradient(100deg, var(--surface-2) 30%, var(--surface-3) 50%, var(--surface-2) 70%);
+  background-size: 200% 100%;
+  animation: chart-skeleton-sweep 1.4s ease-in-out infinite;
+}
+@keyframes chart-skeleton-sweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.chart-drilldown-hint {
+  margin: -4px 0 4px;
+}
+.chart-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.chart-toolbar-btn {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+.chart-toolbar-btn:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 .one-col {
   grid-template-columns: 1fr;
@@ -856,41 +863,6 @@ td:last-child, th:last-child { text-align: right; }
 
 .percentile-viz {
   min-height: 300px;
-}
-.percentile-scale {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-  align-items: end;
-  min-height: 210px;
-}
-.percentile-step {
-  display: grid;
-  gap: 8px;
-  text-align: center;
-  color: var(--muted);
-  font-size: 12px;
-}
-.percentile-step strong {
-  color: var(--text);
-}
-.percentile-step em {
-  font-style: normal;
-}
-.bar-track {
-  height: 150px;
-  display: flex;
-  align-items: end;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  overflow: hidden;
-}
-.bar-track span {
-  width: 100%;
-  display: block;
-  border-radius: 12px 12px 0 0;
-  background: linear-gradient(180deg, rgba(62, 140, 255, 0.95), rgba(45, 212, 191, 0.76));
 }
 
 .lineage {
@@ -921,25 +893,25 @@ td:last-child, th:last-child { text-align: right; }
 }
 
 @media (max-width: 900px) {
-  .priority-grid, .savings-summary, .breakdown-row { grid-template-columns: 1fr; }
+  .priority-grid, .savings-summary { grid-template-columns: 1fr; }
   .decision-summary { max-width: none; width: 100%; }
 }
 
 @media (max-width: 720px) {
   .load-banner, .prototype-banner, .personal-hero, .decision-hero { align-items: start; flex-direction: column; }
-  .percentile-scale { grid-template-columns: repeat(5, minmax(48px, 1fr)); overflow-x: auto; }
 }
 
 /* ECharts mobile layout: taller charts (room for the stacked vertical
-   legend - see baseChartOption() in js/app.js), full-width equal-size range
-   buttons with a real touch target, and a tighter card so the chart uses
-   the available screen width instead of looking like a shrunk desktop card. */
+   legend - see baseChartOption() in js/charts.js), full-width equal-size
+   range buttons with a real touch target, and a tighter card so the chart
+   uses the available screen width instead of looking like a shrunk desktop
+   card. */
 @media (max-width: 767px) {
   .chart-container {
     width: 100%;
     height: 450px;
   }
-  .chart-container[data-chart-kind="node-history"] {
+  .chart-container--tall {
     height: 500px;
   }
   .section:has(.chart-container) {
@@ -1092,4 +1064,55 @@ td:last-child, th:last-child { text-align: right; }
 
 @media (max-width: 480px) {
   .warehouse-grid { grid-template-columns: 1fr; }
+}
+
+/* --------------------------------------------------------------------------
+   Accessibility & motion (Version 1.1 polish milestone - see
+   docs/CHART_FRAMEWORK.md "Accessibility"). Visually-hidden text for screen
+   readers, visible keyboard focus everywhere interactive, and a single
+   reduced-motion switch that turns off both CSS animation and (via
+   prefersReducedMotion() in js/charts.js) ECharts' own animation.
+   -------------------------------------------------------------------------- */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.nav-link:focus-visible,
+.range-button:focus-visible,
+.sort-button:focus-visible,
+.chart-toolbar-btn:focus-visible,
+.chart-container--clickable:focus-visible,
+.btn:focus-visible,
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Cross-fades the .main panel during a background data refresh
+   (rerenderPreservingViewState() in js/app.js) so the inevitable
+   dispose/remount of every chart on a data-changed tick reads as a soft
+   update rather than a layout pop. */
+.main {
+  transition: opacity 150ms ease;
+}
+.main.refreshing {
+  opacity: 0.55;
 }
