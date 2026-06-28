@@ -35,6 +35,15 @@ COLLECTOR_NAME = "node_insights"
 PLATFORM_MODULE = "Node Insights"
 QUEUE_INSIGHTS_SUBDIR = "queue_insights"
 
+# Collector health cadence (docs/architecture/COLLECTOR_HEALTH.md): this
+# hourly cycle is the sole writer of generated_at for Node Insights and for
+# Queue Insights' live half (current_pressure/partition_pressure/
+# pending_reasons/queue_health_history). The frontend derives Healthy/
+# Warning/Critical from these fields instead of a hardcoded age threshold.
+EXPECTED_REFRESH_SECONDS = 60 * 60
+WARNING_AFTER_INTERVALS = 2
+CRITICAL_AFTER_INTERVALS = 4
+
 # Pressure reading thresholds shared by Cluster Overview's allocation gauges
 # and Capacity Planning's pressure cards.
 PRESSURE_WARN_PCT = 0.70
@@ -507,6 +516,9 @@ def main() -> int:
             "collector": COLLECTOR_NAME,
             "collector_status": collector_status,
             "platform_module": PLATFORM_MODULE,
+            "expected_refresh_seconds": EXPECTED_REFRESH_SECONDS,
+            "warning_after_intervals": WARNING_AFTER_INTERVALS,
+            "critical_after_intervals": CRITICAL_AFTER_INTERVALS,
             "data_window_days": None,
             "files": {
                 "cluster_overview": "cluster_overview",
@@ -527,6 +539,9 @@ def main() -> int:
             "collector": COLLECTOR_NAME,
             "collector_status": collector_status,
             "platform_module": PLATFORM_MODULE,
+            "expected_refresh_seconds": EXPECTED_REFRESH_SECONDS,
+            "warning_after_intervals": WARNING_AFTER_INTERVALS,
+            "critical_after_intervals": CRITICAL_AFTER_INTERVALS,
             "data_window_days": args.days,
             "retention_days": args.days,
             "points": capacity_points,
@@ -539,6 +554,9 @@ def main() -> int:
             "collector": COLLECTOR_NAME,
             "collector_status": collector_status,
             "platform_module": PLATFORM_MODULE,
+            "expected_refresh_seconds": EXPECTED_REFRESH_SECONDS,
+            "warning_after_intervals": WARNING_AFTER_INTERVALS,
+            "critical_after_intervals": CRITICAL_AFTER_INTERVALS,
             "data_window_days": args.days,
             "retention_days": args.days,
             "nodes": node_history_nodes,
@@ -561,6 +579,9 @@ def main() -> int:
             "collector": COLLECTOR_NAME,
             "collector_status": collector_status,
             "platform_module": "Queue Insights",
+            "expected_refresh_seconds": EXPECTED_REFRESH_SECONDS,
+            "warning_after_intervals": WARNING_AFTER_INTERVALS,
+            "critical_after_intervals": CRITICAL_AFTER_INTERVALS,
             "queue": {
                 "running": latest["running_jobs"] if latest else None,
                 "pending": latest["pending_jobs"] if latest else None,
@@ -577,6 +598,9 @@ def main() -> int:
             "collector": COLLECTOR_NAME,
             "collector_status": collector_status,
             "platform_module": "Queue Insights",
+            "expected_refresh_seconds": EXPECTED_REFRESH_SECONDS,
+            "warning_after_intervals": WARNING_AFTER_INTERVALS,
+            "critical_after_intervals": CRITICAL_AFTER_INTERVALS,
             "data_window_days": args.days,
             "retention_days": args.days,
             "points": partition_pressure_points,
@@ -589,6 +613,9 @@ def main() -> int:
             "collector": COLLECTOR_NAME,
             "collector_status": collector_status,
             "platform_module": "Queue Insights",
+            "expected_refresh_seconds": EXPECTED_REFRESH_SECONDS,
+            "warning_after_intervals": WARNING_AFTER_INTERVALS,
+            "critical_after_intervals": CRITICAL_AFTER_INTERVALS,
             "data_window_days": args.days,
             "retention_days": args.days,
             "points": pending_reasons_points,
@@ -601,6 +628,9 @@ def main() -> int:
             "collector": COLLECTOR_NAME,
             "collector_status": collector_status,
             "platform_module": "Queue Insights",
+            "expected_refresh_seconds": EXPECTED_REFRESH_SECONDS,
+            "warning_after_intervals": WARNING_AFTER_INTERVALS,
+            "critical_after_intervals": CRITICAL_AFTER_INTERVALS,
             "data_window_days": args.days,
             "retention_days": args.days,
             "points": queue_health_points,

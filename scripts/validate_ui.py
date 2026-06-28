@@ -2,6 +2,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 app = (root / 'js' / 'app.js').read_text()
 loader = (root / 'js' / 'data-loader.js').read_text()
+status = (root / 'js' / 'status.js').read_text()
 assert "loadMjolnirData" in app
 assert "loadPersonalData" in app
 assert "Prototype Personal Analytics - Authentication Not Yet Enabled" in app
@@ -47,4 +48,18 @@ for fn in (
 for route_id in ("queue-overview", "queue-live", "queue-wait-times", "queue-advisor", "queue-trends"):
     assert f"id: '{route_id}'" in app, f"missing Queue Insights nav route: {route_id}"
 assert "JobName" not in app and "JobName" not in loader
+
+# Collector Health architecture (docs/architecture/COLLECTOR_HEALTH.md): one
+# generic helper, fed by per-collector cadence metadata, no module-specific
+# or hardcoded freshness thresholds anywhere in the frontend.
+assert "calculateCollectorHealth" in status, "missing calculateCollectorHealth() helper"
+assert "HEALTH_THRESHOLDS_MS" not in status, "hardcoded freshness threshold constant must not exist"
+for hardcoded in ("2 * 60 * 60 * 1000", "6 * 60 * 60 * 1000"):
+    assert hardcoded not in status, f"hardcoded freshness threshold found: {hardcoded}"
+for field in ("expectedRefreshSeconds", "warningAfterIntervals", "criticalAfterIntervals"):
+    assert field in status, f"missing collector cadence field: {field}"
+    assert field in loader, f"data-loader.js does not thread through {field}"
+assert "Expected Refresh" in status, "missing Expected Refresh UI row"
+assert "Next Expected Update" in status, "missing Next Expected Update UI row"
+assert "Snapshot Age" not in status, "Snapshot Age must not appear in the collector status display"
 print('ui checks passed')

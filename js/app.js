@@ -100,8 +100,8 @@ let warehouseSummary = {};
 // Data Freshness / Platform Status framework (docs/PLATFORM_STATUS.md):
 // page renderers call analyticsStatusBar()/infraStatusBar() rather than
 // touching status.js directly, so every page stays on the same registry.
-function analyticsStatusBar() { return statusBar('analytics', findModule(platformRegistry, 'analytics-warehouse')); }
-function infraStatusBar() { return statusBar('infrastructure', findModule(platformRegistry, 'node-insights')); }
+function analyticsStatusBar() { return statusBar(findModule(platformRegistry, 'analytics-warehouse')); }
+function infraStatusBar() { return statusBar(findModule(platformRegistry, 'node-insights')); }
 
 function icon(name) {
   const icons = {
@@ -389,7 +389,14 @@ function warehouseOverviewCard(w) {
 // and the three headline counts. Reuses collectorHealth()/statusPillHtml()
 // from status.js so its health tone always agrees with Platform Status.
 function warehouseStatusCard(w) {
-  const health = collectorHealth({ generatedAt: w.lastImportAt || w.lastMaterializationAt, available: w.available, status: w.available ? null : 'failed' });
+  const health = collectorHealth({
+    generatedAt: w.lastImportAt || w.lastMaterializationAt,
+    expectedRefreshSeconds: w.expectedRefreshSeconds,
+    warningAfterIntervals: w.warningAfterIntervals,
+    criticalAfterIntervals: w.criticalAfterIntervals,
+    available: w.available,
+    status: w.available ? null : 'failed',
+  });
   return `<section class="section warehouse-status-card">
     <div class="section-head"><h2>Warehouse Status</h2>${statusPillHtml(health)}</div>
     <div class="cards-grid">${[
@@ -1354,7 +1361,7 @@ function platformStatusPage() {
       ${platformStatusPanel(platformRegistry, { snapshotCount, activeModuleCount })}
       <section class="section"><div class="section-head"><h2>Module detail</h2><span class="subtle">Per-collector freshness</span></div>
         <div class="stack">${platformRegistry.filter((m) => !m.planned).map((m) => (
-          `<div><h3 style="margin:0 0 8px;font-size:0.95rem">${m.label}</h3>${statusBar(m.kind === 'infrastructure' ? 'infrastructure' : 'analytics', m)}</div>`
+          `<div><h3 style="margin:0 0 8px;font-size:0.95rem">${m.label}</h3>${statusBar(m)}</div>`
         )).join('')}</div>
       </section>
     </div>`;

@@ -251,7 +251,7 @@ a.metric-card:hover { border-color: var(--accent, #3e8cff); }
 .pill.warn { color: #ffd08a; background: rgba(255, 184, 77, 0.12); }
 .pill.info { color: #9cd0ff; background: rgba(62, 140, 255, 0.12); }
 .pill.bad { color: #ffb3bd; background: rgba(255, 107, 122, 0.14); }
-.pill.stale { color: #ffc299; background: rgba(255, 138, 61, 0.14); }
+.pill.critical { color: #ffc299; background: rgba(255, 138, 61, 0.14); }
 .pill.muted { color: var(--muted); background: rgba(144, 162, 188, 0.12); }
 .pill.status-pill { display: inline-flex; align-items: center; gap: 6px; }
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; }
@@ -413,7 +413,7 @@ td:last-child, th:last-child { text-align: right; }
 }
 .system-health-indicator.system-health-healthy { background: var(--green); box-shadow: 0 0 0 0 rgba(83, 216, 138, 0.55); animation: pulse-green 2.4s ease-out infinite; }
 .system-health-indicator.system-health-warning { background: var(--amber); box-shadow: 0 0 0 0 rgba(255, 184, 77, 0.55); animation: pulse-orange 2.4s ease-out infinite; }
-.system-health-indicator.system-health-stale { background: var(--orange); box-shadow: 0 0 0 0 rgba(255, 138, 61, 0.55); animation: pulse-deep-orange 2.4s ease-out infinite; }
+.system-health-indicator.system-health-critical { background: var(--orange); box-shadow: 0 0 0 0 rgba(255, 138, 61, 0.55); animation: pulse-deep-orange 2.4s ease-out infinite; }
 .system-health-indicator.system-health-failed { background: var(--red); box-shadow: 0 0 0 0 rgba(255, 107, 122, 0.55); animation: pulse-red 1.6s ease-out infinite; }
 .system-health-indicator.system-health-unknown { background: var(--muted); }
 

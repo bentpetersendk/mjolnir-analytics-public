@@ -18,15 +18,10 @@
 // status bars, the Platform Status panel, the sidebar badge - needs to
 // change. See docs/PLATFORM_STATUS.md.
 
-const HEALTH_THRESHOLDS_MS = {
-  healthy: 2 * 60 * 60 * 1000,
-  warning: 6 * 60 * 60 * 1000,
-};
-
 const TONE_TO_VAR = {
   healthy: '--green',
   warning: '--amber',
-  stale: '--orange',
+  critical: '--orange',
   failed: '--red',
   planned: '--muted',
   unknown: '--muted',
@@ -35,7 +30,7 @@ const TONE_TO_VAR = {
 const TONE_TO_PILL_CLASS = {
   healthy: 'good',
   warning: 'warn',
-  stale: 'stale',
+  critical: 'critical',
   failed: 'bad',
   planned: 'muted',
   unknown: 'muted',
@@ -44,7 +39,7 @@ const TONE_TO_PILL_CLASS = {
 const TONE_TO_LABEL = {
   healthy: 'Healthy',
   warning: 'Warning',
-  stale: 'Stale',
+  critical: 'Critical',
   failed: 'Failed',
   planned: 'Planned',
   unknown: 'Unknown',
@@ -86,12 +81,9 @@ export function snapshotAgeMs(value) {
   return Date.now() - date.getTime();
 }
 
-export function snapshotAgeLabel(value) {
-  const ms = snapshotAgeMs(value);
-  if (ms === null) return 'Unavailable';
-  if (ms < 0) return 'Just now';
-  const minutes = Math.round(ms / 60000);
-  if (minutes < 1) return 'Just now';
+function humanizeDurationMs(ms) {
+  const minutes = Math.round(Math.abs(ms) / 60000);
+  if (minutes < 1) return 'less than a minute';
   if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'}`;
@@ -99,27 +91,118 @@ export function snapshotAgeLabel(value) {
   return `${days} day${days === 1 ? '' : 's'}`;
 }
 
-// Collector Status:
-//   Healthy  - last update under 2 hours old
-//   Warning  - last update 2-6 hours old
-//   Stale    - last update over 6 hours old
-//   Failed   - collector explicitly reports failure, or has no data at all
-export function collectorHealth(meta) {
-  const m = meta || {};
-  if (m.planned) return { status: 'planned', label: TONE_TO_LABEL.planned, tone: 'planned' };
-  if (m.status === 'failed' || m.available === false) {
-    return { status: 'failed', label: TONE_TO_LABEL.failed, tone: 'failed' };
-  }
-  const ms = snapshotAgeMs(m.generatedAt);
-  if (ms === null) return { status: 'unknown', label: TONE_TO_LABEL.unknown, tone: 'unknown' };
-  if (ms < HEALTH_THRESHOLDS_MS.healthy) return { status: 'healthy', label: TONE_TO_LABEL.healthy, tone: 'healthy' };
-  if (ms < HEALTH_THRESHOLDS_MS.warning) return { status: 'warning', label: TONE_TO_LABEL.warning, tone: 'warning' };
-  return { status: 'stale', label: TONE_TO_LABEL.stale, tone: 'stale' };
+export function snapshotAgeLabel(value) {
+  const ms = snapshotAgeMs(value);
+  if (ms === null) return 'Unavailable';
+  if (ms < 0) return 'Just now';
+  const duration = humanizeDurationMs(ms);
+  return duration === 'less than a minute' ? 'Just now' : duration;
 }
+
+// Expected-cadence label for the "Expected Refresh" UI row - purely derived
+// from expected_refresh_seconds, never a hardcoded per-module string.
+export function expectedRefreshLabel(expectedRefreshSeconds) {
+  const seconds = Number(expectedRefreshSeconds);
+  if (!Number.isFinite(seconds) || seconds <= 0) return 'Unavailable';
+  if (seconds % 86400 === 0) {
+    const days = seconds / 86400;
+    return days === 1 ? 'Nightly' : `Every ${days} days`;
+  }
+  if (seconds % 3600 === 0) {
+    const hours = seconds / 3600;
+    return hours === 1 ? 'Every hour' : `Every ${hours} hours`;
+  }
+  if (seconds % 60 === 0) {
+    const minutes = seconds / 60;
+    return `Every ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  }
+  return `Every ${seconds} seconds`;
+}
+
+function sameLocalDate(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+// "Next Expected Update" label for the UI row - derived from the same
+// calculateCollectorHealth() result every module already computed, never
+// recomputed ad hoc per page.
+export function nextExpectedUpdateLabel(health) {
+  const h = health || {};
+  if (h.nextExpectedAt === null || h.nextExpectedAt === undefined) return 'Unavailable';
+  if (h.overdueMs > 0) return `Overdue by ${humanizeDurationMs(h.overdueMs)}`;
+  const next = new Date(h.nextExpectedAt);
+  const now = new Date();
+  const deltaMs = next.getTime() - now.getTime();
+  if (deltaMs < 90 * 60 * 1000) return `in ${humanizeDurationMs(deltaMs)}`;
+  const time = next.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  if (sameLocalDate(next, now)) return `Today at ${time}`;
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  if (sameLocalDate(next, tomorrow)) return `${next.getHours() < 6 ? 'Tonight' : 'Tomorrow'} at ${time}`;
+  return formatLocalDateTime(h.nextExpectedAt);
+}
+
+// The single collector-health helper every module reuses (Node Insights,
+// Queue Insights, Analytics Warehouse, Analytics Pipeline, and any future
+// module). No module-specific freshness math should exist anywhere else -
+// each collector just declares its own cadence in its exported JSON
+// (expected_refresh_seconds / warning_after_intervals /
+// critical_after_intervals; see docs/architecture/COLLECTOR_HEALTH.md in the
+// private repo) and this function turns that + generatedAt into a health
+// state. A module whose export predates this contract (missing cadence
+// fields) renders Unknown rather than guessing a threshold or breaking.
+//
+// Status:
+//   Healthy  - age <= warning_after_intervals * expected_refresh_seconds
+//   Warning  - age <= critical_after_intervals * expected_refresh_seconds
+//   Critical - age beyond that
+//   Failed   - collector explicitly reports failure, or has no data at all
+//   Unknown  - no collector metadata (generatedAt/cadence) exists
+export function calculateCollectorHealth(meta) {
+  const m = meta || {};
+  if (m.planned) {
+    return { status: 'planned', label: TONE_TO_LABEL.planned, tone: 'planned', ageMs: null, expectedIntervalMs: null, nextExpectedAt: null, overdueMs: 0 };
+  }
+  if (m.status === 'failed' || m.available === false) {
+    return { status: 'failed', label: TONE_TO_LABEL.failed, tone: 'failed', ageMs: null, expectedIntervalMs: null, nextExpectedAt: null, overdueMs: 0 };
+  }
+  const generated = parseUtc(m.generatedAt);
+  const expectedRefreshSeconds = Number(m.expectedRefreshSeconds);
+  const warningAfterIntervals = Number(m.warningAfterIntervals);
+  const criticalAfterIntervals = Number(m.criticalAfterIntervals);
+  const hasCadence = Number.isFinite(expectedRefreshSeconds) && expectedRefreshSeconds > 0
+    && Number.isFinite(warningAfterIntervals) && Number.isFinite(criticalAfterIntervals);
+  if (!generated || !hasCadence) {
+    return { status: 'unknown', label: TONE_TO_LABEL.unknown, tone: 'unknown', ageMs: snapshotAgeMs(m.generatedAt), expectedIntervalMs: null, nextExpectedAt: null, overdueMs: 0 };
+  }
+  const ageMs = Date.now() - generated.getTime();
+  const expectedIntervalMs = expectedRefreshSeconds * 1000;
+  const warningThresholdMs = warningAfterIntervals * expectedIntervalMs;
+  const criticalThresholdMs = criticalAfterIntervals * expectedIntervalMs;
+  const nextExpectedAt = generated.getTime() + expectedIntervalMs;
+  const overdueMs = Math.max(0, Date.now() - nextExpectedAt);
+  let status = 'healthy';
+  if (ageMs > criticalThresholdMs) status = 'critical';
+  else if (ageMs > warningThresholdMs) status = 'warning';
+  return {
+    status,
+    label: TONE_TO_LABEL[status] || TONE_TO_LABEL.unknown,
+    tone: status,
+    ageMs,
+    expectedIntervalMs,
+    nextExpectedAt,
+    overdueMs,
+  };
+}
+
+// Backwards-compatible name used throughout this file and app.js - same
+// function, see calculateCollectorHealth() above for the canonical home.
+export const collectorHealth = calculateCollectorHealth;
 
 // Platform Status aggregates every active (non-planned) collector:
 //   Healthy  - every collector healthy
-//   Warning  - at least one collector warning or stale, none failed
+//   Warning  - at least one collector warning, none failed or critical
+//   Critical - at least one collector critical, none failed
 //   Degraded - exactly one collector failed
 //   Critical - two or more collectors failed
 export function platformHealth(collectors) {
@@ -128,7 +211,10 @@ export function platformHealth(collectors) {
   const failedCount = healths.filter((h) => h.status === 'failed').length;
   if (failedCount >= 2) return { status: 'critical', label: 'Critical', tone: 'failed' };
   if (failedCount === 1) return { status: 'degraded', label: 'Degraded', tone: 'failed' };
-  if (healths.some((h) => h.status === 'stale' || h.status === 'warning')) {
+  if (healths.some((h) => h.status === 'critical')) {
+    return { status: 'critical', label: TONE_TO_LABEL.critical, tone: 'critical' };
+  }
+  if (healths.some((h) => h.status === 'warning')) {
     return { status: 'warning', label: TONE_TO_LABEL.warning, tone: 'warning' };
   }
   return { status: 'healthy', label: TONE_TO_LABEL.healthy, tone: 'healthy' };
@@ -175,6 +261,9 @@ export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurm
     kind: 'analytics',
     collectorName: 'mjolnir_analytics_warehouse',
     generatedAt: warehouse.last_import_at || warehouse.last_materialization_at || warehouse.last_success_at || null,
+    expectedRefreshSeconds: slurmAnalyticsPipeline?.expectedRefreshSeconds ?? null,
+    warningAfterIntervals: slurmAnalyticsPipeline?.warningAfterIntervals ?? null,
+    criticalAfterIntervals: slurmAnalyticsPipeline?.criticalAfterIntervals ?? null,
     dataWindowDays: dataWindowDaysFromRange({ start: warehouse.earliest_date, end: warehouse.latest_date }, null),
     available: warehouseAvailable,
     status: warehouseAvailable ? null : 'failed',
@@ -192,6 +281,9 @@ export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurm
     kind: 'infrastructure',
     collectorName: nodeInsights?.collectorName || nodeInsightsHistory?.collectorName || 'node_insights',
     generatedAt: nodeGeneratedAt,
+    expectedRefreshSeconds: nodeInsights?.expectedRefreshSeconds ?? nodeInsightsHistory?.expectedRefreshSeconds ?? null,
+    warningAfterIntervals: nodeInsights?.warningAfterIntervals ?? nodeInsightsHistory?.warningAfterIntervals ?? null,
+    criticalAfterIntervals: nodeInsights?.criticalAfterIntervals ?? nodeInsightsHistory?.criticalAfterIntervals ?? null,
     dataWindowDays: nodeInsightsHistory?.dataWindowDays ?? nodeInsightsHistory?.retentionDays ?? null,
     available: nodeAvailable,
     status: nodeInsights?.collectorStatus || nodeInsightsHistory?.collectorStatus || (nodeAvailable ? null : 'failed'),
@@ -204,6 +296,9 @@ export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurm
     kind: 'infrastructure',
     collectorName: slurmAnalyticsPipeline?.collectorName || 'slurm_analytics_pipeline',
     generatedAt: slurmAnalyticsPipeline?.generatedAt ?? null,
+    expectedRefreshSeconds: slurmAnalyticsPipeline?.expectedRefreshSeconds ?? null,
+    warningAfterIntervals: slurmAnalyticsPipeline?.warningAfterIntervals ?? null,
+    criticalAfterIntervals: slurmAnalyticsPipeline?.criticalAfterIntervals ?? null,
     dataWindowDays: slurmAnalyticsPipeline?.dataWindowDays ?? null,
     available: Boolean(slurmAnalyticsPipeline?.available),
     status: slurmAnalyticsPipeline?.collectorStatus || (slurmAnalyticsPipeline?.available ? null : 'failed'),
@@ -211,7 +306,15 @@ export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurm
   };
 
   const planned = PLANNED_MODULES.map((m) => ({
-    ...m, planned: true, available: true, generatedAt: null, dataWindowDays: null, status: null,
+    ...m,
+    planned: true,
+    available: true,
+    generatedAt: null,
+    expectedRefreshSeconds: null,
+    warningAfterIntervals: null,
+    criticalAfterIntervals: null,
+    dataWindowDays: null,
+    status: null,
   }));
 
   return [warehouseModule, nodeModule, pipelineModule, ...planned];
@@ -251,26 +354,25 @@ export function buildWarehouseSummary({ slurmAnalyticsPipeline, nodeInsights }) 
     lastMaterializationAt: w.last_materialization_at ?? null,
     lastPublishAt: w.last_publish_at ?? null,
     nodeSnapshotAt: nodeInsights?.generatedAt ?? null,
+    expectedRefreshSeconds: slurmAnalyticsPipeline?.expectedRefreshSeconds ?? null,
+    warningAfterIntervals: slurmAnalyticsPipeline?.warningAfterIntervals ?? null,
+    criticalAfterIntervals: slurmAnalyticsPipeline?.criticalAfterIntervals ?? null,
     schemaVersion: w.db_schema_version ?? null,
     warehouseVersion: w.warehouse_version ?? null,
     reductionRatio: accountingRecords && canonicalJobs ? canonicalJobs / accountingRecords : null,
   };
 }
 
-// Reusable per-page freshness strip. kind 'infrastructure' shows Snapshot
-// Age (a live fleet snapshot has no "window"); kind 'analytics' shows Data
-// Window (a historical rollup has no meaningful "age" beyond its export
-// time).
-export function statusBar(kind, meta) {
+// Reusable per-page freshness strip. Every module renders the same four
+// rows, driven entirely by calculateCollectorHealth() - no module-specific
+// freshness math (docs/architecture/COLLECTOR_HEALTH.md).
+export function statusBar(meta) {
   const health = collectorHealth(meta);
-  const windowOrAge = kind === 'infrastructure'
-    ? ['Snapshot Age', snapshotAgeLabel(meta?.generatedAt)]
-    : ['Data Window', meta?.dataWindowDays ? `Last ${meta.dataWindowDays} Days` : 'Unavailable'];
   const rows = [
-    ['Last Updated', formatLocalDateTime(meta?.generatedAt)],
-    windowOrAge,
+    ['Last Update', formatLocalDateTime(meta?.generatedAt)],
+    ['Expected Refresh', expectedRefreshLabel(meta?.expectedRefreshSeconds)],
     ['Collector Status', statusPillHtml(health)],
-    ['Data Source', meta?.label || 'Unknown'],
+    ['Next Expected Update', nextExpectedUpdateLabel(health)],
   ];
   return `<div class="status-bar">${rows.map(([label, value]) => (
     `<div class="status-bar-item"><span class="status-bar-label">${label}</span><span class="status-bar-value">${value}</span></div>`
@@ -310,11 +412,10 @@ export function platformStatusBadge(registry) {
 
 // The module driving the platform's current status - whichever active
 // (non-planned) collector has the worst health, most-recent first on ties.
-// This is what the System Health card's Last Update/Snapshot Age/Data
-// Source/Collector Status rows describe, and it's why new modules need no
-// frontend change: a future Queue/Slurm/Cost collector that goes stale
-// simply becomes the new "worst" entry the next time this runs.
-const HEALTH_PRIORITY = { failed: 0, stale: 1, warning: 2, unknown: 3, healthy: 4, planned: 5 };
+// This is what the System Health card's rows describe, and it's why new
+// modules need no frontend change: a future Queue/Slurm/Cost collector that
+// goes stale simply becomes the new "worst" entry the next time this runs.
+const HEALTH_PRIORITY = { failed: 0, critical: 1, warning: 2, unknown: 3, healthy: 4, planned: 5 };
 function worstActiveModule(registry) {
   const active = (registry || []).filter((m) => !m.planned);
   if (!active.length) return null;
@@ -326,48 +427,30 @@ function worstActiveModule(registry) {
     ))[0];
 }
 
-// platformHealth() collapses a lone stale collector into "Warning" (see its
-// header comment) - that's the right call for the aggregate Degraded/Critical
-// scale, but the System Health card promises exactly four words (Healthy/
-// Warning/Stale/Failed). This re-expresses the same tones platformHealth()
-// already computed into that four-word vocabulary, using collectorHealth()
-// (already computed per module) to tell "nothing but stale collectors" apart
-// from "an actual warning" - no new threshold math.
-function systemHealthStatus(registry) {
-  const overall = platformHealth(registry);
-  if (overall.tone === 'failed') return { status: 'failed', label: TONE_TO_LABEL.failed, tone: 'failed' };
-  if (overall.tone === 'warning') {
-    const healths = (registry || []).filter((m) => !m.planned).map(collectorHealth);
-    const tone = healths.some((h) => h.status === 'warning') ? 'warning' : 'stale';
-    return { status: tone, label: TONE_TO_LABEL[tone], tone };
-  }
-  return overall;
-}
-
 const SYSTEM_HEALTH_COPY = {
   healthy: { headline: 'Healthy', sub: 'All systems operational' },
-  warning: { headline: 'Warning', sub: 'Data becoming stale' },
-  stale: { headline: 'Stale', sub: 'Update overdue' },
+  warning: { headline: 'Warning', sub: 'Update overdue' },
+  critical: { headline: 'Critical', sub: 'Update significantly overdue' },
   failed: { headline: 'Failed', sub: 'Collector error detected' },
   unknown: { headline: 'Unknown', sub: 'Status unavailable' },
 };
 
 // The prominent Overview-page card: a pulsating health indicator plus the
-// Last Update/Snapshot Age/Data Source/Collector Status of whichever module
-// is currently driving that health. Pure presentation over
+// Last Update/Expected Refresh/Collector Status/Next Expected Update of
+// whichever module is currently driving that health. Pure presentation over
 // buildPlatformRegistry()'s output - registering a future module there is
 // still the only step needed for this card to reflect it.
 export function renderSystemHealthCard(registry) {
-  const overall = systemHealthStatus(registry);
+  const overall = platformHealth(registry);
   const copy = SYSTEM_HEALTH_COPY[overall.tone] || SYSTEM_HEALTH_COPY.unknown;
   const worst = worstActiveModule(registry);
   const meta = worst?.module || null;
   const detailHealth = worst?.health || overall;
   const rows = [
     ['Last Update', formatLocalDateTime(meta?.generatedAt)],
-    ['Snapshot Age', snapshotAgeLabel(meta?.generatedAt)],
-    ['Data Source', meta?.label || 'Unknown'],
+    ['Expected Refresh', expectedRefreshLabel(meta?.expectedRefreshSeconds)],
     ['Collector Status', statusPillHtml(detailHealth)],
+    ['Next Expected Update', nextExpectedUpdateLabel(detailHealth)],
   ];
   return `<section class="section system-health-card">
     <div class="section-head"><h2>System Health</h2>${statusPillHtml(overall)}</div>
