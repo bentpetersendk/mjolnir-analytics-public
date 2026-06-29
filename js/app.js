@@ -1158,6 +1158,33 @@ function softwareInventorySummaryCards(summary, modules) {
   ].join('')}</div>`;
 }
 
+// Software Health (Software Knowledge Milestone 3): coverage metrics
+// computed server-side by export_software_inventory.py's
+// build_knowledge_summary() - this function only renders them, it never
+// recomputes a count. Returns '' entirely when knowledge collection has
+// not run yet (totalActiveModules is null on an export that predates
+// Milestone 3, or before collect_module_knowledge.py's first run), rather
+// than a section full of zeroes that would misleadingly read as "no
+// module has documentation" instead of "not collected yet."
+function softwareHealthSection(knowledgeSummary) {
+  const s = asObject(knowledgeSummary);
+  if (s.totalActiveModules === null || s.totalActiveModules === undefined) return '';
+  const coverage = s.knowledgeCoveragePct === null || s.knowledgeCoveragePct === undefined
+    ? '-' : `${fmt(s.knowledgeCoveragePct, 1)}%`;
+  return `<section class="section">
+    <div class="section-head"><h2>Software Health</h2><span class="subtle">Knowledge coverage across ${fmt(s.totalActiveModules)} active module(s)</span></div>
+    <div class="cards-grid">${[
+      statBlock('Knowledge Coverage', coverage, 'Modules with at least one matched registry'),
+      statBlock('With Homepage', fmt(s.modulesWithHomepage), 'Modules with a known homepage'),
+      statBlock('With Documentation', fmt(s.modulesWithDocumentation), 'Modules with a known documentation URL'),
+      statBlock('With Repository', fmt(s.modulesWithRepository), 'Modules with a known source/GitHub/GitLab repository'),
+      statBlock('With License', fmt(s.modulesWithLicense), 'Modules with a known license'),
+      statBlock('Update Available', fmt(s.modulesWithUpdateAvailable), 'Installed version is older than the known upstream version'),
+      statBlock('Missing Metadata', fmt(s.modulesMissingMetadata), 'No exact match on any registry yet'),
+    ].join('')}</div>
+  </section>`;
+}
+
 function selectSoftwareStatusFilter(selected) {
   const options = [['installed', 'Installed'], ['removed', 'Removed']];
   return `<label class="filter-field"><span>Status</span><select data-action="filter-software-status">
@@ -1221,6 +1248,7 @@ function softwareInventoryPage() {
         <div class="section-head"><h2>Software Inventory</h2><span class="subtle">Installed Environment Modules, scanned nightly via module -t avail</span></div>
         ${softwareInventorySummaryCards(asObject(softwareInventory.summary), allModules)}
       </section>
+      ${softwareHealthSection(softwareInventory.knowledgeSummary)}
       <section class="section">
         <div class="section-head"><h2>Search &amp; Filter</h2><span class="subtle">${fmt(filtered.length)} of ${fmt(allModules.length)} modules</span></div>
         <div class="table-toolbar">
@@ -1255,12 +1283,115 @@ function relatedVersionsSection(module, family) {
       ? `<li><strong>${label}</strong></li>`
       : `<li><a href="#/module/${encodeURIComponent(v.modulefilePath)}">${label}</a></li>`;
   }).join('');
-  const defaultStat = family.defaultVersion
-    ? `<div class="cards-grid">${statBlock('Default Version', escapeHtml(family.defaultVersion), 'Resolved by a bare `module load ' + escapeHtml(module.moduleName) + '`, no version given')}</div>`
-    : '';
+  // Version Intelligence (Software Knowledge Milestone 3): Default Version
+  // and Latest Installed Version are two different, both real, answers -
+  // Default Version is MODULEPATH-priority-scoped (can be lower than the
+  // highest installed version, e.g. gcc - see
+  // SOFTWARE_KNOWLEDGE_ARCHITECTURE.md); Latest Installed Version is
+  // simply the highest by version_sort_key(). Both stats are skipped
+  // individually when null, never shown as a guess.
+  const versionStats = [
+    family.defaultVersion
+      ? statBlock('Default Version', escapeHtml(family.defaultVersion), 'Resolved by a bare `module load ' + escapeHtml(module.moduleName) + '`, no version given')
+      : null,
+    family.latestInstalledVersion
+      ? statBlock('Latest Installed Version', escapeHtml(family.latestInstalledVersion), 'Highest version currently installed, any MODULEPATH root')
+      : null,
+  ].filter(Boolean);
+  const statsBlock = versionStats.length ? `<div class="cards-grid">${versionStats.join('')}</div>` : '';
   return `<section class="section">
     <div class="section-head"><h2>Related Versions</h2><span class="subtle">${escapeHtml(module.moduleName)} - ${fmt(family.versions.length)} installed version(s)</span></div>
-    ${defaultStat}
+    ${statsBlock}
+    <ul class="version-list">${items}</ul>
+  </section>`;
+}
+
+// Knowledge (Software Knowledge Milestone 3): license/language/maintainer/
+// provenance - the deterministic facts collect_module_knowledge.py found
+// for this module's exact module_name, or '' if nothing was ever found
+// (knowledgeSource is null) so no empty section/table renders for the
+// large fraction of modules with no exact registry match (e.g. compiled
+// tools with no PyPI/CRAN/conda package at all).
+function knowledgeSection(knowledge) {
+  if (!knowledge || !knowledge.knowledgeSource) return '';
+  const rows = [
+    knowledge.programmingLanguage ? ['Programming Language', escapeHtml(knowledge.programmingLanguage)] : null,
+    knowledge.license ? ['License', escapeHtml(knowledge.license)] : null,
+    knowledge.maintainer ? ['Maintainer', escapeHtml(knowledge.maintainer)] : null,
+    ['Knowledge Source', escapeHtml(knowledge.knowledgeSource) + (knowledge.confidence ? ` (${escapeHtml(knowledge.confidence)} match)` : '')],
+    knowledge.lastCheckedAt ? ['Last Checked', formatLocalDateTime(knowledge.lastCheckedAt, '-')] : null,
+  ].filter(Boolean);
+  if (!rows.length) return '';
+  return `<section class="section"><div class="section-head"><h2>Knowledge</h2><span class="subtle">Deterministic facts only - no AI, no web summarization</span></div>${tableFromRows(['Field', 'Value'], rows)}</section>`;
+}
+
+// Project Links (Milestone 3): every URL field is rendered as a real link,
+// never just displayed as text - this section returns '' entirely when no
+// link field is present, rather than a table of dashes.
+function projectLinksSection(knowledge) {
+  if (!knowledge) return '';
+  const link = (url) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+  const rows = [
+    knowledge.homepage ? ['Homepage', link(knowledge.homepage)] : null,
+    knowledge.documentationUrl ? ['Documentation', link(knowledge.documentationUrl)] : null,
+    knowledge.sourceRepositoryUrl ? ['Source Repository', link(knowledge.sourceRepositoryUrl)] : null,
+    knowledge.githubRepositoryUrl ? ['GitHub', link(knowledge.githubRepositoryUrl)] : null,
+    knowledge.gitlabRepositoryUrl ? ['GitLab', link(knowledge.gitlabRepositoryUrl)] : null,
+  ].filter(Boolean);
+  if (!rows.length) return '';
+  return `<section class="section"><div class="section-head"><h2>Project Links</h2></div>${tableFromRows(['Field', 'Link'], rows)}</section>`;
+}
+
+// Release Information (Milestone 3, Version Intelligence): combines
+// module_families (installed-side) with module_knowledge (upstream-side).
+// Update Available is rendered as a pill only when the exporter could
+// actually determine it (updateAvailable is true/false, never when null -
+// see export_software_inventory.py's build_module_knowledge() for why
+// that field is sometimes deliberately unknown rather than guessed).
+function releaseInformationSection(family, knowledge) {
+  const rows = [
+    family?.latestInstalledVersion ? ['Latest Installed Version', escapeHtml(family.latestInstalledVersion)] : null,
+    family?.defaultVersion ? ['Default Version', escapeHtml(family.defaultVersion)] : null,
+    knowledge?.upstreamVersion ? ['Latest Upstream Version', escapeHtml(knowledge.upstreamVersion)] : null,
+    knowledge && knowledge.updateAvailable !== null && knowledge.updateAvailable !== undefined
+      ? ['Update Available', knowledge.updateAvailable
+          ? '<span class="pill warn">Yes</span>'
+          : '<span class="pill good">No - up to date</span>']
+      : null,
+    knowledge?.releaseDate ? ['Release Date', formatLocalDateTime(knowledge.releaseDate, '-')] : null,
+    knowledge?.changelogUrl ? ['Changelog', `<a href="${escapeHtml(knowledge.changelogUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(knowledge.changelogUrl)}</a>`] : null,
+  ].filter(Boolean);
+  if (!rows.length) return '';
+  return `<section class="section"><div class="section-head"><h2>Release Information</h2></div>${tableFromRows(['Field', 'Value'], rows)}</section>`;
+}
+
+// Citation (Milestone 3): citation_info is not populated by any of the
+// four current collectors (none expose a clean structured citation field -
+// see SOFTWARE_KNOWLEDGE_ARCHITECTURE.md) - this section exists so a
+// future collector that does populate it (e.g. a CRAN CITATION-file
+// parser) needs zero frontend changes, but renders nothing today.
+function citationSection(knowledge) {
+  if (!knowledge || !knowledge.citationInfo) return '';
+  return `<section class="section"><div class="section-head"><h2>Citation</h2></div><p style="line-height:1.7">${escapeHtml(knowledge.citationInfo)}</p></section>`;
+}
+
+// Related Software (Milestone 3): deterministic, exact-shared-identity
+// grouping computed server-side (compute_related_software() - shared
+// repository or homepage, never keywords/fuzzy matching). Each related
+// name is resolved to a real link via its own family's default (or first)
+// version - relatedSoftware/moduleFamilies are both keyed by module_name,
+// so no new lookup structure is needed here.
+function relatedSoftwareSection(module, relatedNames, moduleFamilies) {
+  if (!relatedNames || !relatedNames.length) return '';
+  const items = relatedNames.map((name) => {
+    const family = asObject(moduleFamilies)[name];
+    const path = family?.defaultModulefilePath || family?.versions?.[0]?.modulefilePath;
+    return path
+      ? `<li><a href="#/module/${encodeURIComponent(path)}">${escapeHtml(name)}</a></li>`
+      : `<li>${escapeHtml(name)}</li>`;
+  }).join('');
+  return `<section class="section">
+    <div class="section-head"><h2>Related Software</h2><span class="subtle">Shares a repository or homepage with ${escapeHtml(module.moduleName)}</span></div>
     <ul class="version-list">${items}</ul>
   </section>`;
 }
@@ -1296,6 +1427,8 @@ function moduleDetailPage(modulefilePath) {
     return `<div class="stack"><section class="section"><div class="section-head"><h2>Module not found</h2><span class="pill warn">Unknown module</span></div><div class="empty-state">No module_catalog record matches this path. <a href="#/software-inventory">Back to Software Inventory</a></div></section></div>`;
   }
   const family = asObject(softwareInventory.moduleFamilies)[module.moduleName];
+  const knowledge = asObject(softwareInventory.moduleKnowledge)[module.moduleName] || null;
+  const relatedNames = asObject(softwareInventory.relatedSoftware)[module.moduleName];
   return `
     <div class="stack">
       ${softwareInventoryStatusBar()}
@@ -1312,6 +1445,11 @@ function moduleDetailPage(modulefilePath) {
       </section>
       ${relatedVersionsSection(module, family)}
       <section class="section"><div class="section-head"><h2>Technical Details</h2></div>${tableFromRows(['Field', 'Value'], technicalDetailsRows(module))}</section>
+      ${knowledgeSection(knowledge)}
+      ${projectLinksSection(knowledge)}
+      ${releaseInformationSection(family, knowledge)}
+      ${citationSection(knowledge)}
+      ${relatedSoftwareSection(module, relatedNames, softwareInventory.moduleFamilies)}
       <p class="subtle"><a href="#/software-inventory">&larr; Back to Software Inventory</a></p>
     </div>`;
 }

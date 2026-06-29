@@ -775,6 +775,9 @@ function emptySoftwareInventory(error) {
     summary: {},
     modules: [],
     moduleFamilies: {},
+    moduleKnowledge: {},
+    knowledgeSummary: {},
+    relatedSoftware: {},
   };
 }
 
@@ -814,6 +817,10 @@ function normalizeModuleFamily(raw) {
     })),
     defaultVersion: f.default_version || null,
     defaultModulefilePath: f.default_modulefile_path || null,
+    // Software Knowledge Milestone 3 ("Version Intelligence") - optional,
+    // same degrade-to-null rule as every other field added after the
+    // export contract's first release.
+    latestInstalledVersion: f.latest_installed_version || null,
   };
 }
 
@@ -822,6 +829,80 @@ function normalizeModuleFamilies(raw) {
   const out = {};
   for (const [name, family] of Object.entries(obj)) {
     out[name] = normalizeModuleFamily(family);
+  }
+  return out;
+}
+
+// Software Knowledge Milestone 3 (docs/architecture/SOFTWARE_KNOWLEDGE_ARCHITECTURE.md):
+// deterministic facts collected via exact-match-only registry lookups - no
+// AI, no web summarization. A module_name absent from the export's
+// module_knowledge object has simply never been checked yet; this loader
+// represents that as an absent key (checked with `in` / optional chaining
+// at the call site), never as an object full of nulls, so the "only
+// display sections when data exists" rule starts from the same absence
+// the exporter itself uses.
+function normalizeModuleKnowledgeEntry(raw) {
+  const k = asObject(raw);
+  return {
+    homepage: k.homepage || null,
+    documentationUrl: k.documentation_url || null,
+    sourceRepositoryUrl: k.source_repository_url || null,
+    githubRepositoryUrl: k.github_repository_url || null,
+    gitlabRepositoryUrl: k.gitlab_repository_url || null,
+    license: k.license || null,
+    citationInfo: k.citation_info || null,
+    programmingLanguage: k.programming_language || null,
+    maintainer: k.maintainer || null,
+    upstreamVersion: k.upstream_version || null,
+    latestRelease: k.latest_release || null,
+    releaseDate: k.release_date || null,
+    changelogUrl: k.changelog_url || null,
+    knowledgeSource: k.knowledge_source || null,
+    confidence: k.confidence || null,
+    lastCheckedAt: k.last_checked_at || null,
+    // True/False only when the exporter could actually compare upstream
+    // against what's installed; null means "unknown," never guessed.
+    updateAvailable: k.update_available ?? null,
+  };
+}
+
+function normalizeModuleKnowledge(raw) {
+  const obj = asObject(raw);
+  const out = {};
+  for (const [name, entry] of Object.entries(obj)) {
+    out[name] = normalizeModuleKnowledgeEntry(entry);
+  }
+  return out;
+}
+
+// Software Health summary (Milestone 3) - every key here is a real count
+// the exporter computed (build_knowledge_summary()), not a placeholder for
+// a future one. asObject(undefined) below yields {} against an older
+// export, and every field access at the call site already tolerates a
+// missing key.
+function normalizeKnowledgeSummary(raw) {
+  const s = asObject(raw);
+  return {
+    totalActiveModules: s.total_active_modules ?? null,
+    modulesWithHomepage: s.modules_with_homepage ?? null,
+    modulesWithDocumentation: s.modules_with_documentation ?? null,
+    modulesWithRepository: s.modules_with_repository ?? null,
+    modulesWithLicense: s.modules_with_license ?? null,
+    modulesWithUpdateAvailable: s.modules_with_update_available ?? null,
+    modulesMissingMetadata: s.modules_missing_metadata ?? null,
+    knowledgeCoveragePct: s.knowledge_coverage_pct ?? null,
+  };
+}
+
+// related_software is already exactly {module_name: [module_name, ...]} in
+// the export - no per-field normalization needed, just the same
+// asObject()/asArray() defensiveness against a missing or malformed key
+// every other optional block in this file already applies.
+function normalizeRelatedSoftware(raw) {
+  const obj = asObject(raw);
+  const out = {};
+  for (const [name, related] of Object.entries(obj)) {
+    out[name] = asArray(related);
   }
   return out;
 }
@@ -845,6 +926,9 @@ export async function loadSoftwareInventoryData() {
       summary: asObject(doc.summary),
       modules: asArray(doc.modules).map(normalizeSoftwareModule),
       moduleFamilies: normalizeModuleFamilies(doc.module_families),
+      moduleKnowledge: normalizeModuleKnowledge(doc.module_knowledge),
+      knowledgeSummary: normalizeKnowledgeSummary(doc.knowledge_summary),
+      relatedSoftware: normalizeRelatedSoftware(doc.related_software),
     };
   } catch (error) {
     return emptySoftwareInventory(error);
