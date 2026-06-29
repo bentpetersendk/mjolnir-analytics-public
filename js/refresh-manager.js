@@ -16,6 +16,7 @@ import {
   loadNodeInsightsHistory,
   loadSlurmAnalyticsPipelineStatus,
   loadQueueInsightsData,
+  loadSoftwareInventoryData,
 } from './data-loader.js';
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -88,6 +89,7 @@ function latestGeneratedAt(bundle) {
     b.slurmAnalyticsPipeline?.generatedAt,
     b.queueInsights?.status?.generated_at,
     b.queueInsights?.currentPressure?.generated_at,
+    b.softwareInventory?.generatedAt,
   ].map(parseDate).filter(Boolean);
   if (!candidates.length) return null;
   return new Date(Math.max(...candidates.map((d) => d.getTime())));
@@ -110,7 +112,7 @@ function deepEqual(a, b) {
   return sa === sb;
 }
 
-// Reuses the exact five loaders init() already calls - no duplicate fetch
+// Reuses the exact six loaders init() already calls - no duplicate fetch
 // logic anywhere in this file. Each loader already catches its own errors
 // and returns an "unavailable"/fallback shape rather than throwing, but
 // Promise.allSettled is kept as a second line of defense so one truly
@@ -122,10 +124,11 @@ async function fetchAll() {
     loadNodeInsightsHistory(),
     loadSlurmAnalyticsPipelineStatus(),
     loadQueueInsightsData(),
+    loadSoftwareInventoryData(),
   ]);
   const value = (result) => (result.status === 'fulfilled' ? result.value : null);
-  const [dataResult, nodeInsightsResult, nodeInsightsHistoryResult, slurmResult, queueResult] = settled.map(value);
-  return { dataResult, nodeInsightsResult, nodeInsightsHistoryResult, slurmResult, queueResult };
+  const [dataResult, nodeInsightsResult, nodeInsightsHistoryResult, slurmResult, queueResult, softwareResult] = settled.map(value);
+  return { dataResult, nodeInsightsResult, nodeInsightsHistoryResult, slurmResult, queueResult, softwareResult };
 }
 
 export function lastUpdatedLabel() {
@@ -154,7 +157,7 @@ function showToast(hooks) {
 }
 
 // hooks:
-//   getCurrent()      -> { data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights }
+//   getCurrent()      -> { data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory }
 //   applyUpdate(next) -> assign next.* onto app.js's own module-level state
 //   rerender()        -> app.js's render(), wrapped so it preserves route/
 //                        scroll/<details> state (app.js's responsibility)
@@ -174,6 +177,7 @@ async function runRefreshCycle(hooks) {
       nodeInsightsHistory: isAvailable(fetched.nodeInsightsHistoryResult) ? fetched.nodeInsightsHistoryResult : current.nodeInsightsHistory,
       slurmAnalyticsPipeline: isAvailable(fetched.slurmResult) ? fetched.slurmResult : current.slurmAnalyticsPipeline,
       queueInsights: mergeQueueInsights(current.queueInsights, fetched.queueResult),
+      softwareInventory: isAvailable(fetched.softwareResult) ? fetched.softwareResult : current.softwareInventory,
     };
     const changed = !deepEqual(current, next);
     setLastUpdatedFromBundle(next);

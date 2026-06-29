@@ -73,8 +73,8 @@ for fn in (
     "executiveRecommendations", "recommendationsSection", "platformOverviewSection",
 ):
     assert fn in app, f"missing Executive Overview renderer: {fn}"
-assert "queueInsights" in app and "buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights })" in app, \
-    "Queue Insights must be registered in buildPlatformRegistry, not left planned"
+assert "queueInsights" in app and "buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory })" in app, \
+    "Queue Insights/Software Inventory must be registered in buildPlatformRegistry, not left planned"
 assert "{ id: 'queue-insights'" not in status, "Queue Insights must not remain in PLANNED_MODULES now that it has a real collector"
 assert "renderSystemHealthCard" not in app and "renderSystemHealthCard" not in status, \
     "renderSystemHealthCard was superseded by the Executive Overview hero/Platform Overview - should be removed, not left dead"

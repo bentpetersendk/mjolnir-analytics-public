@@ -261,7 +261,7 @@ const PLANNED_MODULES = [
 // each module's data lives in - statusBar()/platformStatusPanel() below
 // just iterate the result, so adding a module here is the only frontend
 // change a future collector needs (see the file header).
-export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights }) {
+export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory }) {
   const warehouse = slurmAnalyticsPipeline?.warehouse || {};
   const warehouseAvailable = Boolean(slurmAnalyticsPipeline?.available) && Boolean(warehouse.total_jobs);
   const warehouseModule = {
@@ -336,6 +336,25 @@ export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurm
     planned: false,
   };
 
+  // software_inventory.json (Software Analytics Milestone 1) carries the
+  // same collector/collector_status/platform_module/cadence contract every
+  // other module's status document uses - see export_software_inventory.py.
+  const softwareInventoryAvailable = Boolean(softwareInventory?.available);
+  const softwareInventoryModule = {
+    id: 'software-inventory',
+    label: softwareInventory?.platformModule || 'Software Inventory',
+    kind: 'analytics',
+    collectorName: softwareInventory?.collectorName || 'software_inventory_export',
+    generatedAt: softwareInventory?.generatedAt ?? null,
+    expectedRefreshSeconds: softwareInventory?.expectedRefreshSeconds ?? null,
+    warningAfterIntervals: softwareInventory?.warningAfterIntervals ?? null,
+    criticalAfterIntervals: softwareInventory?.criticalAfterIntervals ?? null,
+    dataWindowDays: null,
+    available: softwareInventoryAvailable,
+    status: softwareInventory?.collectorStatus || (softwareInventoryAvailable ? null : 'failed'),
+    planned: false,
+  };
+
   const planned = PLANNED_MODULES.map((m) => ({
     ...m,
     planned: true,
@@ -348,7 +367,7 @@ export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurm
     status: null,
   }));
 
-  return [warehouseModule, nodeModule, pipelineModule, queueModule, ...planned];
+  return [warehouseModule, nodeModule, pipelineModule, queueModule, softwareInventoryModule, ...planned];
 }
 
 export function findModule(registry, id) {
