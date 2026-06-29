@@ -774,6 +774,7 @@ function emptySoftwareInventory(error) {
     criticalAfterIntervals: null,
     summary: {},
     modules: [],
+    moduleFamilies: {},
   };
 }
 
@@ -792,7 +793,37 @@ function normalizeSoftwareModule(raw) {
     firstSeen: m.first_seen || null,
     lastSeen: m.last_seen || null,
     removedAt: m.removed_at || null,
+    // Software Intelligence Milestone 2 - optional, only present once the
+    // exporter has shipped it; absent on an older export this loader simply
+    // yields null, never a guessed value.
+    modulepathRoot: m.modulepath_root || null,
   };
+}
+
+// Software Intelligence Milestone 2 (docs/architecture/SOFTWARE_INVENTORY_ARCHITECTURE.md,
+// "module_families"): one entry per module_name, used by the module detail
+// page for Related Versions/Default Version/version navigation. Optional -
+// an export that predates this milestone simply has no module_families
+// key, and asObject(undefined) below yields {}, not an error.
+function normalizeModuleFamily(raw) {
+  const f = asObject(raw);
+  return {
+    versions: asArray(f.versions).map((v) => ({
+      version: v?.version || '',
+      modulefilePath: v?.modulefile_path || '',
+    })),
+    defaultVersion: f.default_version || null,
+    defaultModulefilePath: f.default_modulefile_path || null,
+  };
+}
+
+function normalizeModuleFamilies(raw) {
+  const obj = asObject(raw);
+  const out = {};
+  for (const [name, family] of Object.entries(obj)) {
+    out[name] = normalizeModuleFamily(family);
+  }
+  return out;
 }
 
 export async function loadSoftwareInventoryData() {
@@ -813,6 +844,7 @@ export async function loadSoftwareInventoryData() {
       criticalAfterIntervals: doc.critical_after_intervals ?? null,
       summary: asObject(doc.summary),
       modules: asArray(doc.modules).map(normalizeSoftwareModule),
+      moduleFamilies: normalizeModuleFamilies(doc.module_families),
     };
   } catch (error) {
     return emptySoftwareInventory(error);
