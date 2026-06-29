@@ -800,6 +800,14 @@ function normalizeSoftwareModule(raw) {
     // exporter has shipped it; absent on an older export this loader simply
     // yields null, never a guessed value.
     modulepathRoot: m.modulepath_root || null,
+    // Software Explorer Milestone 4 ("Better Descriptions") - the
+    // exporter's own precedence (registry description -> whatis -> help ->
+    // none, see export_software_inventory.py's apply_display_description())
+    // computed once, server-side. This page never re-derives it from
+    // whatisText/module_knowledge itself - whatisText above remains the
+    // original `module whatis` text for provenance, displayDescription is
+    // what every page actually renders as "the description."
+    displayDescription: m.display_description || null,
   };
 }
 
@@ -863,6 +871,13 @@ function normalizeModuleKnowledgeEntry(raw) {
     // True/False only when the exporter could actually compare upstream
     // against what's installed; null means "unknown," never guessed.
     updateAvailable: k.update_available ?? null,
+    // Software Explorer Milestone 4 - the registry's own short summary
+    // field, verbatim (never the long free-text description some
+    // registries also expose - see collect_module_knowledge.py). Folded
+    // into normalizeSoftwareModule()'s displayDescription server-side
+    // already; exposed here too for any page that wants the raw field
+    // directly (e.g. to show "via bioconda" provenance alongside it).
+    registryDescription: k.registry_description || null,
   };
 }
 
@@ -891,6 +906,15 @@ function normalizeKnowledgeSummary(raw) {
     modulesWithUpdateAvailable: s.modules_with_update_available ?? null,
     modulesMissingMetadata: s.modules_missing_metadata ?? null,
     knowledgeCoveragePct: s.knowledge_coverage_pct ?? null,
+    // Software Explorer Milestone 4 ("Software Health" expansion) - one
+    // percentage per coverage dimension, computed server-side
+    // (build_knowledge_summary()'s pct() closure) alongside the raw counts
+    // above, so this page never computes its own percentage from them.
+    homepageCoveragePct: s.homepage_coverage_pct ?? null,
+    documentationCoveragePct: s.documentation_coverage_pct ?? null,
+    repositoryCoveragePct: s.repository_coverage_pct ?? null,
+    licenseCoveragePct: s.license_coverage_pct ?? null,
+    updateCoveragePct: s.update_coverage_pct ?? null,
   };
 }
 

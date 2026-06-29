@@ -46,4 +46,6 @@ The Software Inventory page (installed Environment Modules, scanned
 nightly by the private repo) follows this same shell/loader/Platform
 Status pattern - see
 [SOFTWARE_INVENTORY_FRONTEND.md](SOFTWARE_INVENTORY_FRONTEND.md) for its
-JSON contract, rendering flow, and future enrichment extension points.
+JSON contract and rendering flow, and
+[SOFTWARE_EXPLORER_ARCHITECTURE.md](SOFTWARE_EXPLORER_ARCHITECTURE.md) for
+the interactive filtering/dashboard layer built on top of it.

@@ -106,7 +106,13 @@ const state = {
   // sorting/pagination happens client-side over the already-loaded
   // softwareInventory.modules array - this is just the current view state,
   // never re-fetched on a keystroke.
-  softwareInventoryFilters: { search: '', statusFilter: 'all', sortKey: 'moduleName', sortDir: 'asc', page: 1 },
+  // quickFilter replaces the old separate statusFilter dropdown (Software
+  // Explorer Milestone 4, Parts 1-2) - 'installed'/'removed' are now two
+  // more entries in the same QUICK_FILTERS vocabulary instead of a second,
+  // parallel filtering axis, per the brief's "reuse the existing
+  // client-side filtering framework rather than introducing a second
+  // filtering implementation."
+  softwareInventoryFilters: { search: '', quickFilter: 'all', sortKey: 'moduleName', sortDir: 'asc', page: 1 },
 };
 
 let data = null;
@@ -427,6 +433,18 @@ function warehouseStatusCard(w) {
 
 function statBlock(label, value, trend, tone = '') {
   return `<article class="stat-card ${tone}"><div class="label">${label}</div><div class="value">${value}</div><div class="subtle">${trend}</div></article>`;
+}
+
+// Clickable summary cards (Software Explorer Milestone 4, Part 1): same
+// markup as statBlock() above, as a real <button> instead of an <article>
+// so it's keyboard-accessible, wired to the exact same QUICK_FILTERS
+// vocabulary the persistent quick-filter bar (Part 2) and Administrator
+// Dashboard cards (Part 7) use - one click handler in wireEvents()
+// (data-action="set-quick-filter") serves all three call sites.
+function clickableStatBlock(label, value, trend, filterId, tone = '') {
+  return `<button type="button" class="stat-card stat-card-clickable ${tone}" data-action="set-quick-filter" data-filter="${filterId}">
+    <div class="label">${label}</div><div class="value">${value}</div><div class="subtle">${trend}</div>
+  </button>`;
 }
 
 function percentileCard(label, value, status, tone) {
@@ -1114,6 +1132,48 @@ function softwareStatusPill(m) {
     : '<span class="pill good">&#128994; Installed</span>';
 }
 
+// Rich status badges (Software Explorer Milestone 4, Part 3) - replaces
+// the single Installed/Removed pill above with however many of four
+// independent, data-driven badges actually apply to this module. Every
+// badge reads a field the export already provides; none is a new state
+// invented for this milestone ("do not invent new states" - the brief's
+// own words):
+//   - Installed/Removed: removedAt, same as softwareStatusPill() above.
+//   - Update Available: module_knowledge.update_available, already
+//     computed server-side (export_software_inventory.py).
+//   - Knowledge Available: module_knowledge.knowledge_source presence.
+//   - Default Version: this row's moduleVersion equals its family's
+//     default_version (Milestone 2, already exported) - a plain string
+//     equality check against an already-resolved value, not a new
+//     computation.
+// Used identically in the inventory table and the module detail page so
+// the two never drift apart - one function, two call sites.
+// Clickable badge (Part 10): same data-action/click handler as every
+// other quick-filter trigger on this page. Default Version has no
+// dedicated quick filter (there is no useful "show me only default
+// versions" view - same reasoning softwareInventorySummaryCards() already
+// applies to Module Roots/Distinct Packages/Versions), so it stays a
+// plain, non-clickable badge below.
+function clickableBadge(tone, html, filterId) {
+  return `<button type="button" class="pill ${tone}" data-action="set-quick-filter" data-filter="${filterId}">${html}</button>`;
+}
+
+function softwareStatusBadges(m, knowledge, family) {
+  const badges = [m.removedAt
+    ? clickableBadge('muted', '&#9898; Removed', 'removed')
+    : clickableBadge('good', '&#128994; Installed', 'installed')];
+  if (knowledge?.updateAvailable === true) {
+    badges.push(clickableBadge('warn', '&#128993; Update Available', 'updates-available'));
+  }
+  if (knowledge?.knowledgeSource) {
+    badges.push(clickableBadge('info', '&#128311; Knowledge Available', 'knowledge-available'));
+  }
+  if (family?.defaultVersion && family.defaultVersion === m.moduleVersion) {
+    badges.push('<span class="pill">&#11088; Default Version</span>');
+  }
+  return `<span class="badge-group">${badges.join('')}</span>`;
+}
+
 function truncateText(text, maxLength) {
   const value = String(text || '');
   return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
@@ -1128,69 +1188,189 @@ function modulePathRoot(modulefilePath) {
   return parts.slice(0, -2).join('/') || '-';
 }
 
+// Software Explorer Milestone 4 (Parts 1-2): one filter vocabulary shared
+// by the quick-filter bar, every clickable summary/health/admin card, and
+// softwareInventoryFilteredModules() below - this is "reuse the existing
+// client-side filtering framework rather than introducing a second
+// filtering implementation" made literal. A predicate reads only fields
+// the export already provides (module_knowledge/module_families via the
+// two helpers passed in) - no new client-side computation beyond simple
+// presence/equality checks and a recency window using the existing
+// snapshotAgeMs() (already used elsewhere for collector freshness, not a
+// new date-handling concept introduced for this milestone).
+const RECENTLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const QUICK_FILTERS = [
+  { id: 'all', label: 'All', predicate: () => true },
+  { id: 'installed', label: 'Installed', predicate: (m) => !m.removedAt },
+  { id: 'removed', label: 'Removed', predicate: (m) => !!m.removedAt },
+  { id: 'updates-available', label: 'Updates Available', predicate: (m, h) => h.knowledge(m)?.updateAvailable === true },
+  { id: 'knowledge-available', label: 'Knowledge Available', predicate: (m, h) => !!h.knowledge(m)?.knowledgeSource },
+  { id: 'missing-metadata', label: 'Missing Metadata', predicate: (m, h) => !h.knowledge(m)?.knowledgeSource },
+  { id: 'with-repository', label: 'With Repository', predicate: (m, h) => hasRepository(h.knowledge(m)) },
+  { id: 'with-homepage', label: 'With Homepage', predicate: (m, h) => !!h.knowledge(m)?.homepage },
+  { id: 'with-documentation', label: 'With Documentation', predicate: (m, h) => !!h.knowledge(m)?.documentationUrl },
+  { id: 'with-license', label: 'With License', predicate: (m, h) => !!h.knowledge(m)?.license },
+  { id: 'recently-added', label: 'Recently Added', predicate: (m) => isRecent(m.firstSeen) },
+  { id: 'recently-updated', label: 'Recently Updated', predicate: (m, h) => isRecent(h.knowledge(m)?.lastCheckedAt) },
+  // Administrator Dashboard (Part 7) targets - same predicates the health/
+  // admin cards link to, not exposed as quick-filter-bar buttons (Part 2's
+  // suggested list does not include them) but reachable by clicking the
+  // relevant card, same mechanism throughout.
+  { id: 'deprecated-versions', label: 'Deprecated Versions', predicate: (m, h) => isDeprecatedVersion(m, h) },
+  { id: 'missing-homepage', label: 'Missing Homepage', predicate: (m, h) => !m.removedAt && !h.knowledge(m)?.homepage },
+  { id: 'missing-repository', label: 'Missing Repository', predicate: (m, h) => !m.removedAt && !hasRepository(h.knowledge(m)) },
+  { id: 'missing-license', label: 'Missing License', predicate: (m, h) => !m.removedAt && !h.knowledge(m)?.license },
+];
+const QUICK_FILTER_BY_ID = new Map(QUICK_FILTERS.map((f) => [f.id, f]));
+// Part 2's persistent bar only shows this subset - the rest (removed,
+// deprecated-versions, missing-*) are still real, working filters, just
+// reached via a card click (Parts 1/7) rather than a permanent button,
+// so the bar doesn't grow to sixteen buttons.
+const QUICK_FILTER_BAR_IDS = [
+  'all', 'installed', 'updates-available', 'knowledge-available', 'missing-metadata',
+  'with-repository', 'with-homepage', 'with-documentation', 'with-license',
+  'recently-added', 'recently-updated',
+];
+
+function hasRepository(knowledge) {
+  return !!(knowledge?.sourceRepositoryUrl || knowledge?.githubRepositoryUrl || knowledge?.gitlabRepositoryUrl);
+}
+
+function isRecent(isoDate) {
+  if (!isoDate) return false;
+  const age = snapshotAgeMs(isoDate);
+  return age !== null && age >= 0 && age <= RECENTLY_WINDOW_MS;
+}
+
+// Deprecated = an older installed version of a module_name that also has
+// a newer version installed right now - compares against
+// moduleFamilies[name].latestInstalledVersion, a value already sorted
+// server-side (db.version_sort_key()); this is a plain string equality
+// check against that pre-sorted result, not a new version-comparison
+// implementation.
+function isDeprecatedVersion(m, h) {
+  if (m.removedAt) return false;
+  const family = h.family(m);
+  return !!family?.latestInstalledVersion && family.latestInstalledVersion !== m.moduleVersion;
+}
+
+function softwareInventoryFilterHelpers() {
+  const knowledgeByName = asObject(softwareInventory?.moduleKnowledge);
+  const familiesByName = asObject(softwareInventory?.moduleFamilies);
+  return {
+    knowledge: (m) => knowledgeByName[m.moduleName] || null,
+    family: (m) => familiesByName[m.moduleName] || null,
+  };
+}
+
 function softwareInventoryFilteredModules() {
   const filters = state.softwareInventoryFilters;
   const all = asArray(softwareInventory?.modules);
   const term = filters.search.trim().toLowerCase();
+  const helpers = softwareInventoryFilterHelpers();
+  const quickFilter = QUICK_FILTER_BY_ID.get(filters.quickFilter) || QUICK_FILTER_BY_ID.get('all');
   const filtered = all.filter((m) => {
-    if (filters.statusFilter === 'installed' && m.removedAt) return false;
-    if (filters.statusFilter === 'removed' && !m.removedAt) return false;
+    if (!quickFilter.predicate(m, helpers)) return false;
     if (!term) return true;
-    return [m.moduleName, m.moduleVersion, m.whatisText, m.modulefilePath]
+    return [m.moduleName, m.moduleVersion, m.displayDescription, m.whatisText, m.modulefilePath]
       .some((field) => String(field || '').toLowerCase().includes(term));
   });
   const dir = filters.sortDir === 'desc' ? -1 : 1;
   return filtered.slice().sort((a, b) => dir * String(a[filters.sortKey] || '').localeCompare(String(b[filters.sortKey] || '')));
 }
 
+// Software Explorer Milestone 4, Part 1: each card that maps cleanly to a
+// real QUICK_FILTERS predicate is now clickable. Module Roots/Distinct
+// Software Packages/Distinct Versions deliberately stay plain statBlock()s -
+// there is no sensible single-predicate filter for "show me the modules
+// contributing to this directory/name/version count" (it would just be
+// "all" again), so making them clickable would be decorative, not
+// functional - a card is only made clickable when clicking it changes the
+// result set.
 function softwareInventorySummaryCards(summary, modules) {
   const distinctPackages = new Set(modules.map((m) => m.moduleName)).size;
   const distinctVersions = new Set(modules.map((m) => `${m.moduleName}/${m.moduleVersion}`)).size;
   const moduleRoots = new Set(modules.map((m) => modulePathRoot(m.modulefilePath))).size;
   const windowDays = summary.recent_window_days ?? 7;
   return `<div class="cards-grid">${[
-    statBlock('Installed Modules', fmt(summary.installed_modules), 'Currently active in module_catalog'),
-    statBlock('Newly Added', fmt(summary.new_modules), `Last ${fmt(windowDays)} days`),
-    statBlock('Removed', fmt(summary.removed_modules), `Last ${fmt(windowDays)} days`),
+    clickableStatBlock('Installed Modules', fmt(summary.installed_modules), 'Currently active in module_catalog', 'installed'),
+    clickableStatBlock('Newly Added', fmt(summary.new_modules), `Last ${fmt(windowDays)} days`, 'recently-added'),
+    clickableStatBlock('Removed', fmt(summary.removed_modules), `Last ${fmt(windowDays)} days`, 'removed'),
     statBlock('Module Roots', fmt(moduleRoots), 'Distinct MODULEPATH directories'),
     statBlock('Distinct Software Packages', fmt(distinctPackages), 'Unique module names'),
     statBlock('Distinct Versions', fmt(distinctVersions), 'Unique name/version pairs'),
   ].join('')}</div>`;
 }
 
-// Software Health (Software Knowledge Milestone 3): coverage metrics
-// computed server-side by export_software_inventory.py's
+// Software Health (Software Knowledge Milestone 3, expanded in Software
+// Explorer Milestone 4 Part 8): coverage metrics and their percentages,
+// both computed server-side by export_software_inventory.py's
 // build_knowledge_summary() - this function only renders them, it never
-// recomputes a count. Returns '' entirely when knowledge collection has
-// not run yet (totalActiveModules is null on an export that predates
-// Milestone 3, or before collect_module_knowledge.py's first run), rather
-// than a section full of zeroes that would misleadingly read as "no
-// module has documentation" instead of "not collected yet."
+// recomputes a count or a percentage. Returns '' entirely when knowledge
+// collection has not run yet (totalActiveModules is null on an export
+// that predates Milestone 3, or before collect_module_knowledge.py's
+// first run), rather than a section full of zeroes that would
+// misleadingly read as "no module has documentation" instead of "not
+// collected yet." Every card is clickable (Part 1) - same QUICK_FILTERS
+// mechanism the inventory summary cards and quick-filter bar use.
+function pctLabel(value) {
+  return value === null || value === undefined ? '-' : `${fmt(value, 1)}%`;
+}
+
 function softwareHealthSection(knowledgeSummary) {
   const s = asObject(knowledgeSummary);
   if (s.totalActiveModules === null || s.totalActiveModules === undefined) return '';
-  const coverage = s.knowledgeCoveragePct === null || s.knowledgeCoveragePct === undefined
-    ? '-' : `${fmt(s.knowledgeCoveragePct, 1)}%`;
   return `<section class="section">
     <div class="section-head"><h2>Software Health</h2><span class="subtle">Knowledge coverage across ${fmt(s.totalActiveModules)} active module(s)</span></div>
     <div class="cards-grid">${[
-      statBlock('Knowledge Coverage', coverage, 'Modules with at least one matched registry'),
-      statBlock('With Homepage', fmt(s.modulesWithHomepage), 'Modules with a known homepage'),
-      statBlock('With Documentation', fmt(s.modulesWithDocumentation), 'Modules with a known documentation URL'),
-      statBlock('With Repository', fmt(s.modulesWithRepository), 'Modules with a known source/GitHub/GitLab repository'),
-      statBlock('With License', fmt(s.modulesWithLicense), 'Modules with a known license'),
-      statBlock('Update Available', fmt(s.modulesWithUpdateAvailable), 'Installed version is older than the known upstream version'),
-      statBlock('Missing Metadata', fmt(s.modulesMissingMetadata), 'No exact match on any registry yet'),
+      clickableStatBlock('Knowledge Coverage', pctLabel(s.knowledgeCoveragePct), 'Modules with at least one matched registry', 'knowledge-available'),
+      clickableStatBlock('Homepage Coverage', pctLabel(s.homepageCoveragePct), `${fmt(s.modulesWithHomepage)} modules with a known homepage`, 'with-homepage'),
+      clickableStatBlock('Documentation Coverage', pctLabel(s.documentationCoveragePct), `${fmt(s.modulesWithDocumentation)} modules with a known documentation URL`, 'with-documentation'),
+      clickableStatBlock('Repository Coverage', pctLabel(s.repositoryCoveragePct), `${fmt(s.modulesWithRepository)} modules with a known repository`, 'with-repository'),
+      clickableStatBlock('License Coverage', pctLabel(s.licenseCoveragePct), `${fmt(s.modulesWithLicense)} modules with a known license`, 'with-license'),
+      clickableStatBlock('Update Coverage', pctLabel(s.updateCoveragePct), `${fmt(s.modulesWithUpdateAvailable)} modules with an update available`, 'updates-available', 'warn'),
+      clickableStatBlock('Missing Metadata', fmt(s.modulesMissingMetadata), 'No exact match on any registry yet', 'missing-metadata'),
     ].join('')}</div>
   </section>`;
 }
 
-function selectSoftwareStatusFilter(selected) {
-  const options = [['installed', 'Installed'], ['removed', 'Removed']];
-  return `<label class="filter-field"><span>Status</span><select data-action="filter-software-status">
-    <option value="all" ${selected === 'all' ? 'selected' : ''}>All</option>
-    ${options.map(([value, label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('')}
-  </select></label>`;
+// Administrator Dashboard (Software Explorer Milestone 4, Part 7) - the
+// operational "what needs attention" view, every card clickable into the
+// same filtered inventory below it. Returns '' under the same condition
+// softwareHealthSection() does (knowledge collection has never run) -
+// there is nothing actionable to show before that.
+function administratorDashboardSection(knowledgeSummary) {
+  const s = asObject(knowledgeSummary);
+  if (s.totalActiveModules === null || s.totalActiveModules === undefined) return '';
+  const deprecatedCount = asArray(softwareInventory?.modules)
+    .filter((m) => isDeprecatedVersion(m, softwareInventoryFilterHelpers())).length;
+  return `<section class="section">
+    <div class="section-head"><h2>Administrator Action Needed</h2><span class="subtle">Click a card to see the affected modules</span></div>
+    <div class="cards-grid">${[
+      clickableStatBlock('Updates Available', fmt(s.modulesWithUpdateAvailable), 'Installed version is older than the known upstream version', 'updates-available', 'warn'),
+      clickableStatBlock('Missing Metadata', fmt(s.modulesMissingMetadata), 'No exact match on any registry yet', 'missing-metadata'),
+      clickableStatBlock('Deprecated Versions', fmt(deprecatedCount), 'Installed versions superseded by a newer install of the same module', 'deprecated-versions'),
+      clickableStatBlock('Missing Homepage', fmt(s.totalActiveModules - s.modulesWithHomepage), 'Active modules with no known homepage', 'missing-homepage'),
+      clickableStatBlock('Missing Repository', fmt(s.totalActiveModules - s.modulesWithRepository), 'Active modules with no known repository', 'missing-repository'),
+      clickableStatBlock('Missing License', fmt(s.totalActiveModules - s.modulesWithLicense), 'Active modules with no known license', 'missing-license'),
+    ].join('')}</div>
+  </section>`;
+}
+
+// Quick Filter Bar (Software Explorer Milestone 4, Part 2) - replaces the
+// old single Status <select>. Persistent buttons for the subset of
+// QUICK_FILTERS named in the brief's Part 2 list; "Removed" and the
+// Administrator Dashboard's deprecated/missing-* filters are still real,
+// reachable filters (via a card click, Part 1/7) but not given a
+// permanent button here, so the bar doesn't grow unbounded as more
+// filters are added later (Part 11's future-compatibility goal).
+function quickFilterBar(selected) {
+  const buttons = QUICK_FILTER_BAR_IDS.map((id) => {
+    const filter = QUICK_FILTER_BY_ID.get(id);
+    const pressed = selected === id;
+    return `<button type="button" class="quick-filter-button" data-action="set-quick-filter" data-filter="${id}" aria-pressed="${pressed}">${escapeHtml(filter.label)}</button>`;
+  }).join('');
+  return `<div class="quick-filter-bar" role="group" aria-label="Quick filters">${buttons}</div>`;
 }
 
 function softwareInventorySortableTable(rows) {
@@ -1205,13 +1385,14 @@ function softwareInventorySortableTable(rows) {
     const arrow = active ? (filters.sortDir === 'desc' ? ' ↓' : ' ↑') : '';
     return `<th><button type="button" class="sort-button" data-action="sort-software-inventory" data-key="${key}">${escapeHtml(label)}${arrow}</button></th>`;
   }).join('');
+  const helpers = softwareInventoryFilterHelpers();
   const body = rows.length
     ? rows.map((m) => `<tr>
         <td><a href="#/module/${encodeURIComponent(m.modulefilePath)}"><strong>${escapeHtml(m.moduleName)}</strong></a></td>
         <td>${escapeHtml(m.moduleVersion)}</td>
-        <td>${m.whatisText ? escapeHtml(truncateText(m.whatisText, 90)) : '<span class="subtle">No description</span>'}</td>
+        <td>${m.displayDescription ? escapeHtml(truncateText(m.displayDescription, 90)) : '<span class="subtle">No description</span>'}</td>
         <td><code class="subtle">${escapeHtml(truncateText(m.modulefilePath, 60))}</code></td>
-        <td>${softwareStatusPill(m)}</td>
+        <td>${softwareStatusBadges(m, helpers.knowledge(m), helpers.family(m))}</td>
         <td>${formatLocalDateTime(m.firstSeen, '-')}</td>
         <td>${formatLocalDateTime(m.lastSeen, '-')}</td>
       </tr>`).join('')
@@ -1248,12 +1429,13 @@ function softwareInventoryPage() {
         <div class="section-head"><h2>Software Inventory</h2><span class="subtle">Installed Environment Modules, scanned nightly via module -t avail</span></div>
         ${softwareInventorySummaryCards(asObject(softwareInventory.summary), allModules)}
       </section>
+      ${administratorDashboardSection(softwareInventory.knowledgeSummary)}
       ${softwareHealthSection(softwareInventory.knowledgeSummary)}
       <section class="section">
         <div class="section-head"><h2>Search &amp; Filter</h2><span class="subtle">${fmt(filtered.length)} of ${fmt(allModules.length)} modules</span></div>
+        ${quickFilterBar(filters.quickFilter)}
         <div class="table-toolbar">
           <input type="search" class="search" data-action="search-software-inventory" placeholder="Search name, version, description, or path..." value="${escapeHtml(filters.search)}" />
-          ${selectSoftwareStatusFilter(filters.statusFilter)}
         </div>
         <div class="table-card">${softwareInventorySortableTable(pageRows)}</div>
         ${softwareInventoryPagination(page, totalPages, filtered.length)}
@@ -1381,18 +1563,37 @@ function citationSection(knowledge) {
 // name is resolved to a real link via its own family's default (or first)
 // version - relatedSoftware/moduleFamilies are both keyed by module_name,
 // so no new lookup structure is needed here.
-function relatedSoftwareSection(module, relatedNames, moduleFamilies) {
+// Software Collections (Software Explorer Milestone 4, Part 6): each
+// related module_name renders as a small card carrying the same
+// already-exported metadata the rest of this page already reads
+// (installed/latest version from moduleFamilies, update-available/
+// knowledge-available from moduleKnowledge) - no new fields, no new
+// computation, just a richer presentation of data this page already has
+// in hand. The whole card is one <a> (Part 10's "clickable related
+// software"). Laid out as a plain CSS grid of fixed-shape cards
+// specifically so a future milestone can add one more row inside a card
+// (e.g. a usage-statistics line) without restructuring the grid itself -
+// the brief's explicit "design so future usage statistics can be added
+// without redesign."
+function relatedSoftwareSection(module, relatedNames, moduleFamilies, moduleKnowledgeByName) {
   if (!relatedNames || !relatedNames.length) return '';
-  const items = relatedNames.map((name) => {
+  const cards = relatedNames.map((name) => {
     const family = asObject(moduleFamilies)[name];
+    const knowledge = asObject(moduleKnowledgeByName)[name] || null;
     const path = family?.defaultModulefilePath || family?.versions?.[0]?.modulefilePath;
+    const rows = [
+      family?.latestInstalledVersion ? `Latest: ${escapeHtml(family.latestInstalledVersion)}` : null,
+      knowledge?.updateAvailable === true ? '<span class="pill warn">Update Available</span>' : null,
+      knowledge?.knowledgeSource ? '<span class="pill info">Knowledge Available</span>' : null,
+    ].filter(Boolean).map((row) => `<div class="subtle">${row}</div>`).join('');
+    const inner = `<div class="name">${escapeHtml(name)}</div>${rows}`;
     return path
-      ? `<li><a href="#/module/${encodeURIComponent(path)}">${escapeHtml(name)}</a></li>`
-      : `<li>${escapeHtml(name)}</li>`;
+      ? `<a class="related-software-card" href="#/module/${encodeURIComponent(path)}">${inner}</a>`
+      : `<div class="related-software-card">${inner}</div>`;
   }).join('');
   return `<section class="section">
     <div class="section-head"><h2>Related Software</h2><span class="subtle">Shares a repository or homepage with ${escapeHtml(module.moduleName)}</span></div>
-    <ul class="version-list">${items}</ul>
+    <div class="related-software-grid">${cards}</div>
   </section>`;
 }
 
@@ -1429,19 +1630,33 @@ function moduleDetailPage(modulefilePath) {
   const family = asObject(softwareInventory.moduleFamilies)[module.moduleName];
   const knowledge = asObject(softwareInventory.moduleKnowledge)[module.moduleName] || null;
   const relatedNames = asObject(softwareInventory.relatedSoftware)[module.moduleName];
+  // Better Descriptions (Software Explorer Milestone 4, Part 4): renders
+  // module.displayDescription (the exporter's own precedence - registry
+  // description -> whatis -> help -> none), never recomputes the
+  // precedence here. The original `module whatis` text remains visible as
+  // a labelled secondary line whenever it differs from what's actually
+  // displayed - the brief's "original module whatis should remain stored
+  // for provenance" requirement, made visible rather than just retained
+  // in the data.
+  const descriptionSource = knowledge?.registryDescription && knowledge.registryDescription === module.displayDescription
+    ? `registry description via ${knowledge.knowledgeSource}`
+    : (module.displayDescription === module.whatisText ? 'module whatis' : 'module help');
+  const showWhatisProvenance = module.whatisText && module.displayDescription !== module.whatisText;
   return `
     <div class="stack">
+      <p class="breadcrumb"><a href="#/software-inventory">Software Inventory</a> &rsaquo; ${escapeHtml(module.moduleName)}</p>
       ${softwareInventoryStatusBar()}
       <section class="section">
-        <div class="section-head"><h2>${escapeHtml(module.moduleName)} / ${escapeHtml(module.moduleVersion)}</h2>${softwareStatusPill(module)}</div>
+        <div class="section-head"><h2>${escapeHtml(module.moduleName)} / ${escapeHtml(module.moduleVersion)}</h2>${softwareStatusBadges(module, knowledge, family)}</div>
         ${module.removedAt ? disclaimer(`No longer present in the most recent nightly module -t avail scan. Removed: ${formatLocalDateTime(module.removedAt, '-')}.`) : ''}
         <div class="cards-grid">${[
           statBlock('First Seen', formatLocalDateTime(module.firstSeen, '-'), 'First nightly scan that found this modulefile'),
           statBlock('Last Seen', formatLocalDateTime(module.lastSeen, '-'), 'Most recent nightly scan that found it'),
         ].join('')}</div>
       </section>
-      <section class="section"><div class="section-head"><h2>Description</h2><span class="subtle">module whatis</span></div>
-        ${module.whatisText ? `<p style="line-height:1.7">${escapeHtml(module.whatisText)}</p>` : '<div class="empty-state">No module-whatis description is defined for this modulefile.</div>'}
+      <section class="section"><div class="section-head"><h2>Description</h2><span class="subtle">${escapeHtml(descriptionSource)}</span></div>
+        ${module.displayDescription ? `<p style="line-height:1.7">${escapeHtml(module.displayDescription)}</p>` : '<div class="empty-state">No description is available from any source for this modulefile.</div>'}
+        ${showWhatisProvenance ? `<p class="subtle" style="margin-top:10px">Original <code>module whatis</code>: ${escapeHtml(module.whatisText)}</p>` : ''}
       </section>
       ${relatedVersionsSection(module, family)}
       <section class="section"><div class="section-head"><h2>Technical Details</h2></div>${tableFromRows(['Field', 'Value'], technicalDetailsRows(module))}</section>
@@ -1449,7 +1664,7 @@ function moduleDetailPage(modulefilePath) {
       ${projectLinksSection(knowledge)}
       ${releaseInformationSection(family, knowledge)}
       ${citationSection(knowledge)}
-      ${relatedSoftwareSection(module, relatedNames, softwareInventory.moduleFamilies)}
+      ${relatedSoftwareSection(module, relatedNames, softwareInventory.moduleFamilies, softwareInventory.moduleKnowledge)}
       <p class="subtle"><a href="#/software-inventory">&larr; Back to Software Inventory</a></p>
     </div>`;
 }
@@ -2580,10 +2795,27 @@ function wireEvents() {
       refocused.setSelectionRange(cursor, cursor);
     }
   });
-  document.querySelector('[data-action="filter-software-status"]')?.addEventListener('change', (event) => {
-    state.softwareInventoryFilters.statusFilter = event.currentTarget.value;
-    state.softwareInventoryFilters.page = 1;
-    render();
+  // Software Explorer Milestone 4, Parts 1-2: one click handler for every
+  // clickable card and quick-filter-bar button, all wired to the same
+  // data-action - this is what "reuse the existing client-side filtering
+  // framework" means in practice, not three separate handlers for three
+  // visually different UI elements that happen to do the same thing.
+  document.querySelectorAll('[data-action="set-quick-filter"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      state.softwareInventoryFilters.quickFilter = event.currentTarget.dataset.filter;
+      state.softwareInventoryFilters.page = 1;
+      // Badges on the module detail page (Part 10, "clickable badges") use
+      // this same data-action - clicking one there must also navigate to
+      // the inventory page itself. Setting location.hash triggers the
+      // existing 'hashchange' -> handleRoute() -> render() pipeline (no
+      // second render path introduced); when already on the inventory
+      // page, the hash is unchanged so we render() directly instead.
+      if (state.route === 'software-inventory') {
+        render();
+      } else {
+        location.hash = '#/software-inventory';
+      }
+    });
   });
   document.querySelectorAll('[data-action="sort-software-inventory"]').forEach((el) => {
     el.addEventListener('click', (event) => {
@@ -2657,7 +2889,19 @@ async function loadPersonalRoute(route) {
   }
 }
 
+// Software Explorer Milestone 4, Part 10 ("preserve scroll position"):
+// state.softwareInventoryFilters already survives navigation untouched
+// (handleRoute() never resets it, so quickFilter/search/sort/page are
+// "remembered when returning from a detail page" for free) - this map is
+// the one piece that genuinely didn't exist before: scroll position per
+// route, saved on the way out and restored on the way back in. Distinct
+// from rerenderPreservingViewState() below, which handles the background
+// auto-refresh case (same route, re-rendered in place); this handles
+// navigating between routes via the back button or a breadcrumb link.
+const routeScrollPositions = new Map();
+
 function handleRoute() {
+  routeScrollPositions.set(state.route, window.scrollY);
   state.route = location.hash.replace('#/', '') || 'landing';
   state.menuOpen = false;
   if (isPersonalRoute(state.route)) {
@@ -2665,6 +2909,8 @@ function handleRoute() {
   } else {
     loadPersonalRoute(null);
     render();
+    const savedScrollY = routeScrollPositions.get(state.route);
+    if (savedScrollY) window.scrollTo(0, savedScrollY);
   }
 }
 
