@@ -1,5 +1,5 @@
 # Software Inventory Frontend (Software Analytics Milestone 1b + Software
-Intelligence Milestone 2)
+Intelligence Milestone 2 + Software Knowledge Milestone 3)
 
 The Software Inventory page is the frontend half of Software Analytics
 Milestone 1 - it renders `software_inventory.json` (private repo's
@@ -13,6 +13,12 @@ Software Intelligence Milestone 2 extends the module detail page with
 version relationships (Related Versions, Default Version, Technical
 Details renamed from Location) - still zero AI/web/job data, see "Version
 relationships (Milestone 2)" below.
+
+Software Knowledge Milestone 3 extends it further with deterministic,
+exact-match-only software facts collected from public package registries
+(homepage, repository, license, upstream version, ...) - still zero AI,
+zero web summarization, zero fuzzy matching. See "Software Knowledge
+(Milestone 3)" below.
 
 ## JSON contract
 
@@ -44,17 +50,41 @@ Fetched from `${MJOLNIR_DASHBOARD_DATA_BASE}software_inventory/software_inventor
     "...module_name...": {
       "versions": [{"version": "...", "modulefile_path": "..."}],
       "default_version": "...",
-      "default_modulefile_path": "..."
+      "default_modulefile_path": "...",
+      "latest_installed_version": "..."
     }
+  },
+  "module_knowledge": {
+    "...module_name...": {
+      "homepage": "...", "documentation_url": "...", "source_repository_url": "...",
+      "github_repository_url": "...", "gitlab_repository_url": "...",
+      "license": "...", "citation_info": null, "programming_language": "...",
+      "maintainer": "...", "upstream_version": "...", "latest_release": "...",
+      "release_date": "...", "changelog_url": "...",
+      "knowledge_source": "bioconda", "confidence": "exact",
+      "last_checked_at": "...", "update_available": true
+    }
+  },
+  "knowledge_summary": {
+    "total_active_modules": 0, "modules_with_homepage": 0,
+    "modules_with_documentation": 0, "modules_with_repository": 0,
+    "modules_with_license": 0, "modules_with_update_available": 0,
+    "modules_missing_metadata": 0, "knowledge_coverage_pct": 0.0
+  },
+  "related_software": {
+    "...module_name...": ["...other module_name..."]
   }
 }
 ```
 
-`modulepath_root` (per-module) and `module_families` (top-level) are
-Milestone 2 additions - both optional/additive, `schema_version` is
-unchanged. An export from before Milestone 2 simply omits them; this
-loader treats that exactly like "no related versions exist," never an
-error (see "Version relationships (Milestone 2)" below).
+`modulepath_root`/`latest_installed_version` (per-module) and
+`module_families` (top-level) are Milestone 2 additions; `module_knowledge`,
+`knowledge_summary`, and `related_software` are Milestone 3 additions - all
+optional/additive, `schema_version` is unchanged throughout. An export
+from before a given milestone simply omits its keys; this loader treats
+that exactly like "nothing collected yet," never an error (see "Version
+relationships (Milestone 2)" and "Software Knowledge (Milestone 3)"
+below).
 
 This loader is the one exception to this repo's usual privacy-tier
 handling (`PLATFORM_STATUS.md`, `PUBLICATION_REVIEW.md`): `module_catalog`
@@ -202,20 +232,90 @@ already sorted by the exporter's `version_sort_key()` (natural/numeric,
 not alphabetic - see the private repo's architecture doc), so this page
 only ever reverses that array for newest-first display, never re-sorts it.
 
+## Software Knowledge (Milestone 3)
+
+Six new render functions, all pure functions of already-loaded data (no
+new fetch, no new state) - five on the module detail page, one on the
+inventory page. **Every one of them returns `''` when its module has
+nothing to show, rather than rendering an empty section or a table full of
+dashes** - this is the literal implementation of the brief's "only display
+sections when data exists, never display empty placeholders" rule, applied
+function-by-function rather than as a single page-level check:
+
+- **`knowledgeSection(knowledge)`**: License, Programming Language,
+  Maintainer, Knowledge Source (with confidence), Last Checked - skipped
+  entirely when `knowledge.knowledgeSource` is `null` (no registry ever
+  matched this exact `module_name`), the same signal
+  `knowledge_summary.modules_missing_metadata` counts server-side.
+- **`projectLinksSection(knowledge)`**: Homepage/Documentation/Source
+  Repository/GitHub/GitLab, each rendered as a real `<a>` (not just
+  displayed as plain text) - only the fields that are actually present;
+  `''` if none are.
+- **`releaseInformationSection(family, knowledge)`**: the one function
+  that reads from *both* `moduleFamilies` (installed side) and
+  `moduleKnowledge` (upstream side) - Latest Installed Version, Default
+  Version, Latest Upstream Version, an Update Available pill, Release
+  Date, Changelog link. The Update Available pill is rendered only when
+  `knowledge.updateAvailable` is strictly `true` or `false` - never when it
+  is `null` (the exporter could not determine it, e.g. no upstream version
+  is known at all) - see the next paragraph for why this page never
+  computes that comparison itself.
+- **`citationSection(knowledge)`**: renders `citation_info` verbatim as a
+  paragraph if present. None of the four current backend collectors
+  populate this field (see the private repo's
+  `SOFTWARE_KNOWLEDGE_ARCHITECTURE.md`) - this section exists so a future
+  collector that does needs zero frontend changes, but renders nothing
+  today.
+- **`relatedSoftwareSection(module, relatedNames, moduleFamilies)`**:
+  resolves each related `module_name` (from the export's `related_software`
+  - exact shared repository/homepage, computed server-side, never
+  keywords or fuzzy matching) to a real link via that name's own family
+  entry. `relatedSoftware`/`moduleFamilies` are both keyed by `module_name`,
+  so no new lookup structure was needed for this.
+- **`softwareHealthSection(knowledgeSummary)`** (inventory page, not the
+  detail page): Knowledge Coverage, and a card each for
+  homepage/documentation/repository/license/update-available coverage plus
+  modules missing metadata - every number is `knowledgeSummary`'s own
+  field, rendered, never recomputed from `modules`/`moduleFamilies` client
+  side. Renders `''` when `knowledgeSummary.totalActiveModules` is
+  `null`/`undefined` (collection has never run, or the export predates
+  Milestone 3) rather than a row of zeroes that would misleadingly read as
+  "no module has a homepage" instead of "not collected yet."
+
+**No version-comparison logic was added to the frontend for this
+milestone either** - `update_available` is computed once,
+server-side, by `export_software_inventory.py` (comparing
+`module_knowledge.upstream_version` against
+`module_families.latest_installed_version` via the exporter's
+`version_sort_key()`) and merely rendered here as a pill. This is the same
+discipline "No version-ordering logic exists in the frontend" above
+already established for Milestone 2's Version Timeline, now applied to
+Version Intelligence too - `validate_ui.py` asserts no
+`versionSortKey`/`version_sort_key` function is ever defined in `app.js`.
+
+`relatedVersionsSection()` (Milestone 2) also gained a "Latest Installed
+Version" stat alongside "Default Version" - both real, sometimes-different
+answers (see the private repo's architecture doc for the `gcc` example
+where they differ), each skipped individually when `null`.
+
 ## Future extension points
 
 This page is meant to become the foundation for a Software Intelligence
-dashboard (AI enrichment, categories/tags, usage statistics, popularity,
-recommendations - see the private repo's
-`docs/roadmap/SOFTWARE_ANALYTICS_COLLECTOR_DESIGN.md`). Nothing here was
-built to anticipate those fields with placeholders; instead, the structure
-already has clean seams for them:
+dashboard (AI enrichment/`module_intelligence`, usage statistics,
+popularity - see the private repo's
+`docs/roadmap/SOFTWARE_ANALYTICS_COLLECTOR_DESIGN.md` and
+`SOFTWARE_KNOWLEDGE_ARCHITECTURE.md`'s "Future compatibility"). Nothing
+here was built to anticipate those fields with placeholders; instead, the
+structure already has clean seams for them - Knowledge/Project
+Links/Release Information/Citation/Related Software (Milestone 3) are
+themselves proof of this: each was added as one more independent
+`<section>` without touching Related Versions, Technical Details, or
+Description above them.
 
 - **Module detail page**: a sequence of independent `<section>` blocks
   inside one `.stack` container (`moduleDetailPage()` in `js/app.js`). A
-  future milestone adds a new `<section>` (e.g. "Enrichment", "Usage",
-  "Related Software") wherever it belongs in that sequence - every existing
-  section is untouched.
+  future milestone (e.g. AI enrichment) adds a new `<section>` wherever it
+  belongs in that sequence - every existing section is untouched.
 - **Summary cards**: `softwareInventorySummaryCards()` returns a
   `.cards-grid` of `statBlock()` calls. Cards like "Most Popular Package"
   or "Containers Detected" (once usage data exists) are one more
