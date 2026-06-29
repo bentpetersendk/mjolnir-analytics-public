@@ -251,6 +251,7 @@ a.metric-card:hover { border-color: var(--accent, #3e8cff); }
 .percentile-card { padding: 14px; }
 .percentile-card strong { font-size: 1.6rem; display: block; margin-top: 6px; }
 .pill { display: inline-flex; padding: 6px 10px; border-radius: 999px; font-size: 12px; }
+button.pill { border: none; cursor: pointer; font: inherit; }
 .pill.good { color: #a9ffd1; background: rgba(83, 216, 138, 0.12); }
 .pill.warn { color: #ffd08a; background: rgba(255, 184, 77, 0.12); }
 .pill.info { color: #9cd0ff; background: rgba(62, 140, 255, 0.12); }
@@ -796,6 +797,67 @@ td:last-child, th:last-child { text-align: right; }
   gap: 8px;
 }
 .version-list a:hover {
+  text-decoration: underline;
+}
+.badge-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.stat-card-clickable {
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.stat-card-clickable:hover {
+  border-color: rgba(95, 180, 255, 0.4);
+}
+.quick-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.quick-filter-button {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.quick-filter-button[aria-pressed="true"] {
+  color: var(--text);
+  border-color: rgba(95, 180, 255, 0.4);
+  background: linear-gradient(180deg, rgba(62, 140, 255, 0.18), rgba(62, 140, 255, 0.08));
+}
+.related-software-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.related-software-card {
+  display: block;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.related-software-card:hover {
+  border-color: rgba(95, 180, 255, 0.4);
+}
+.related-software-card .name {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.breadcrumb {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.breadcrumb a:hover {
   text-decoration: underline;
 }
 .sort-button {

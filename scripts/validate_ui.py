@@ -123,4 +123,26 @@ assert "updateAvailable" in loader, "update_available must be threaded through b
 # function *definition* in app.js would violate this.)
 assert "function versionSortKey" not in app and "function version_sort_key" not in app, \
     "app.js must not implement its own version-sort/comparison function"
+
+# Software Explorer Milestone 4 (interactive dashboard - clickable cards,
+# quick filter bar, rich badges, description precedence, Software
+# Collections, Administrator Dashboard). "filter-software-status" (the old
+# single Status <select>) must be gone - quickFilter replaces it, the same
+# one filtering framework extended, not a second one introduced alongside it.
+assert 'data-action="filter-software-status"' not in app, \
+    "old single Status <select> must be removed, not left alongside the new quick-filter mechanism"
+assert "QUICK_FILTERS" in app, "missing the shared quick-filter predicate registry"
+assert "set-quick-filter" in app, "missing the single click-action every clickable card/badge/bar-button must share"
+assert "quickFilterBar" in app, "missing the persistent quick-filter bar renderer"
+assert "clickableStatBlock" in app, "summary/health/admin cards must use a clickable card helper, not plain statBlock()"
+assert "softwareStatusBadges" in app, "missing the rich multi-badge status renderer"
+assert "administratorDashboardSection" in app, "missing the Administrator Action Needed section"
+assert "displayDescription" in app and "displayDescription" in loader, \
+    "displayDescription (server-computed description precedence) must be threaded through, not recomputed in app.js"
+for filter_id in (
+    "updates-available", "knowledge-available", "missing-metadata", "with-repository",
+    "with-homepage", "with-documentation", "with-license", "recently-added", "recently-updated",
+    "deprecated-versions", "missing-homepage", "missing-repository", "missing-license",
+):
+    assert f"'{filter_id}'" in app, f"missing quick filter id: {filter_id}"
 print('ui checks passed')
