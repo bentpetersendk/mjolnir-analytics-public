@@ -1,4 +1,4 @@
-import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus, loadQueueInsightsData } from './data-loader.js';
+import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus, loadQueueInsightsData, loadSoftwareInventoryData } from './data-loader.js';
 import { requestAnalyticsRecovery } from './recovery-service.js';
 import { startAutoRefresh, setLastUpdatedFromBundle, lastUpdatedLabel, getLastUpdatedAt, isToastVisible } from './refresh-manager.js';
 import {
@@ -41,6 +41,12 @@ const navGroups = [
       { id: 'queue-wait-times', label: 'Wait Time Analysis', icon: 'chart' },
       { id: 'queue-advisor', label: 'Submission Advisor', icon: 'spark' },
       { id: 'queue-trends', label: 'Historical Trends', icon: 'cluster' },
+    ],
+  },
+  {
+    heading: 'Software',
+    items: [
+      { id: 'software-inventory', label: 'Software Inventory', icon: 'box' },
     ],
   },
   {
@@ -95,6 +101,12 @@ const state = {
   menuOpen: false,
   nodeFilters: { class: 'all', partition: 'all', state: 'all', sortKey: 'node', sortDir: 'asc' },
   historyRange: '7d',
+  // Software Inventory (Software Analytics Milestone 1 frontend, see
+  // docs/architecture/SOFTWARE_INVENTORY_FRONTEND.md). All filtering/
+  // sorting/pagination happens client-side over the already-loaded
+  // softwareInventory.modules array - this is just the current view state,
+  // never re-fetched on a keystroke.
+  softwareInventoryFilters: { search: '', statusFilter: 'all', sortKey: 'moduleName', sortDir: 'asc', page: 1 },
 };
 
 let data = null;
@@ -102,6 +114,7 @@ let nodeInsights = null;
 let nodeInsightsHistory = null;
 let slurmAnalyticsPipeline = null;
 let queueInsights = null;
+let softwareInventory = null;
 let platformRegistry = [];
 let warehouseSummary = {};
 
@@ -110,6 +123,7 @@ let warehouseSummary = {};
 // touching status.js directly, so every page stays on the same registry.
 function analyticsStatusBar() { return statusBar(findModule(platformRegistry, 'analytics-warehouse')); }
 function infraStatusBar() { return statusBar(findModule(platformRegistry, 'node-insights')); }
+function softwareInventoryStatusBar() { return statusBar(findModule(platformRegistry, 'software-inventory')); }
 
 function icon(name) {
   const icons = {
@@ -134,6 +148,7 @@ function icon(name) {
     info: '<path fill-rule="evenodd" d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14Z"/><rect x="11" y="10.5" width="2" height="7" rx="1"/><rect x="11" y="6.5" width="2" height="2" rx="1"/>',
     server: '<rect x="4" y="4" width="16" height="5" rx="1" fill="none"/><rect x="4" y="11" width="16" height="5" rx="1" fill="none"/><path d="M7 6.5h.01M7 13.5h.01" stroke-width="2.4"/><path d="M4 18.5h16" fill="none"/>',
     cpu: '<rect x="7" y="7" width="10" height="10" rx="1.5" fill="none"/><path d="M9 4v3M12 4v3M15 4v3M9 17v3M12 17v3M15 17v3M4 9h3M4 12h3M4 15h3M17 9h3M17 12h3M17 15h3" fill="none"/>',
+    box: '<path d="M12 3 4 7.5v9L12 21l8-4.5v-9z" fill="none"/><path d="M4 7.5 12 12l8-4.5M12 12v9" fill="none"/>',
   };
   return `<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || icons.home}</svg>`;
 }
@@ -227,6 +242,19 @@ function isHierarchyDetailRoute(route) { return /^(project|pi|group|section)\/[A
 function detailRouteParts(route) { const parts = String(route || '').split('/'); return { type: parts[0], id: parts[1] }; }
 function isNodeDetailRoute(route) { return /^node\/[A-Za-z0-9_.-]+$/.test(route || ''); }
 function nodeDetailRouteName(route) { return isNodeDetailRoute(route) ? route.split('/')[1] : null; }
+// Software module detail route: #/module/<encoded modulefile_path>. A plain
+// `/^module\/[id]+$/` split-on-slash pattern (as nodeDetailRouteName above
+// uses) does not work here - modulefile_path is itself a filesystem path
+// full of slashes (e.g. /opt/software/modules/ABC/1.0.0), and it is the
+// only field that uniquely identifies one module_catalog row (the same
+// module_name/module_version pair can be installed under more than one
+// MODULEPATH root - see SOFTWARE_INVENTORY_ARCHITECTURE.md). So the whole
+// remainder of the route after "module/" is captured as one
+// encodeURIComponent()-escaped segment instead.
+function isSoftwareModuleDetailRoute(route) { return /^module\/.+$/.test(route || ''); }
+function softwareModuleDetailKey(route) {
+  return isSoftwareModuleDetailRoute(route) ? decodeURIComponent(route.slice('module/'.length)) : null;
+}
 function pageTitle(route) {
   if (isPersonalRoute(route)) return 'My Analytics';
   if (isHierarchyDetailRoute(route)) {
@@ -234,6 +262,7 @@ function pageTitle(route) {
     return part === 'pi' ? 'PI Detail' : `${part.charAt(0).toUpperCase()}${part.slice(1)} Detail`;
   }
   if (isNodeDetailRoute(route)) return 'Node Detail';
+  if (isSoftwareModuleDetailRoute(route)) return 'Module Detail';
   return allRouteItems.find((item) => item.id === route)?.label || 'Overview';
 }
 function trendDirection(current, previous, lowerIsBetter = false) { const delta = num(current) - num(previous); const good = lowerIsBetter ? delta < 0 : delta > 0; if (Math.abs(delta) < 0.0001) return { text: 'Flat', tone: 'info' }; return { text: `${good ? 'Improving' : 'Needs attention'} (${delta > 0 ? '+' : ''}${pct(delta, 1)})`, tone: good ? 'good' : 'warn' }; }
@@ -1058,6 +1087,186 @@ function nodeDetailPage(nodeName) {
       ${gpuIdleCpuBusy ? insight('GPU-idle, CPU-busy', `This node has ${fmt(node.cpu_alloc)} CPUs allocated but 0 of its ${fmt(node.gpu_total)} GPUs are reserved.${node.drain ? ' It is draining for maintenance but still absorbing CPU-only work.' : ''}`) : ''}
       ${disclaimer('Job-level detail (which user or job is running here) requires admin access and is not shown in this public view. No usernames, job names, or job IDs are exposed on this page.')}
       <p class="subtle"><a href="#/nodes">&larr; Back to Node Inventory</a></p>
+    </div>`;
+}
+
+// ---- Software Inventory (Software Analytics Milestone 1 frontend) -------
+// Renders module_catalog exactly as published in software_inventory.json
+// (schema software-inventory-v1, scripts/export_software_inventory.py) -
+// see docs/architecture/SOFTWARE_INVENTORY_FRONTEND.md. No AI enrichment, no
+// usage statistics, no job metadata: every field rendered here already
+// exists in that export today. Filtering/sorting/pagination are all
+// client-side over the one already-loaded modules array - no per-keystroke
+// fetch, no server round-trip.
+const SOFTWARE_INVENTORY_PAGE_SIZE = 50;
+
+function softwareInventoryUnavailable() {
+  return `<div class="empty-state">Software Inventory data has not been published yet (or the file failed to load/parse). The nightly scanner and exporter run as part of the Slurm Analytics cycle - see docs/architecture/SOFTWARE_INVENTORY_ARCHITECTURE.md in the private repo.</div>`;
+}
+
+// Only two states exist in module_catalog today. The future states named
+// in the Software Analytics brief (update available / AI enriched) are
+// deliberately not implemented - this function's only job is to read
+// removedAt, never to guess at a state nothing in the export supports yet.
+function softwareStatusPill(m) {
+  return m.removedAt
+    ? '<span class="pill muted">&#9898; Removed</span>'
+    : '<span class="pill good">&#128994; Installed</span>';
+}
+
+function truncateText(text, maxLength) {
+  const value = String(text || '');
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
+}
+
+// MODULEPATH directory a modulefile_path was found under, e.g.
+// "/opt/software/modules/ABC/1.0.0" -> "/opt/software/modules" - the same
+// derivation scan_software_inventory.py's directory_of() does server-side,
+// just over a path string that is already in the export (not new data).
+function modulePathRoot(modulefilePath) {
+  const parts = String(modulefilePath || '').split('/');
+  return parts.slice(0, -2).join('/') || '-';
+}
+
+function softwareInventoryFilteredModules() {
+  const filters = state.softwareInventoryFilters;
+  const all = asArray(softwareInventory?.modules);
+  const term = filters.search.trim().toLowerCase();
+  const filtered = all.filter((m) => {
+    if (filters.statusFilter === 'installed' && m.removedAt) return false;
+    if (filters.statusFilter === 'removed' && !m.removedAt) return false;
+    if (!term) return true;
+    return [m.moduleName, m.moduleVersion, m.whatisText, m.modulefilePath]
+      .some((field) => String(field || '').toLowerCase().includes(term));
+  });
+  const dir = filters.sortDir === 'desc' ? -1 : 1;
+  return filtered.slice().sort((a, b) => dir * String(a[filters.sortKey] || '').localeCompare(String(b[filters.sortKey] || '')));
+}
+
+function softwareInventorySummaryCards(summary, modules) {
+  const distinctPackages = new Set(modules.map((m) => m.moduleName)).size;
+  const distinctVersions = new Set(modules.map((m) => `${m.moduleName}/${m.moduleVersion}`)).size;
+  const moduleRoots = new Set(modules.map((m) => modulePathRoot(m.modulefilePath))).size;
+  const windowDays = summary.recent_window_days ?? 7;
+  return `<div class="cards-grid">${[
+    statBlock('Installed Modules', fmt(summary.installed_modules), 'Currently active in module_catalog'),
+    statBlock('Newly Added', fmt(summary.new_modules), `Last ${fmt(windowDays)} days`),
+    statBlock('Removed', fmt(summary.removed_modules), `Last ${fmt(windowDays)} days`),
+    statBlock('Module Roots', fmt(moduleRoots), 'Distinct MODULEPATH directories'),
+    statBlock('Distinct Software Packages', fmt(distinctPackages), 'Unique module names'),
+    statBlock('Distinct Versions', fmt(distinctVersions), 'Unique name/version pairs'),
+  ].join('')}</div>`;
+}
+
+function selectSoftwareStatusFilter(selected) {
+  const options = [['installed', 'Installed'], ['removed', 'Removed']];
+  return `<label class="filter-field"><span>Status</span><select data-action="filter-software-status">
+    <option value="all" ${selected === 'all' ? 'selected' : ''}>All</option>
+    ${options.map(([value, label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('')}
+  </select></label>`;
+}
+
+function softwareInventorySortableTable(rows) {
+  const filters = state.softwareInventoryFilters;
+  const columns = [
+    ['Module Name', 'moduleName'], ['Version', 'moduleVersion'], ['Description', null],
+    ['Module Path', null], ['Status', null], ['First Seen', 'firstSeen'], ['Last Seen', 'lastSeen'],
+  ];
+  const headers = columns.map(([label, key]) => {
+    if (!key) return `<th>${escapeHtml(label)}</th>`;
+    const active = key === filters.sortKey;
+    const arrow = active ? (filters.sortDir === 'desc' ? ' ↓' : ' ↑') : '';
+    return `<th><button type="button" class="sort-button" data-action="sort-software-inventory" data-key="${key}">${escapeHtml(label)}${arrow}</button></th>`;
+  }).join('');
+  const body = rows.length
+    ? rows.map((m) => `<tr>
+        <td><a href="#/module/${encodeURIComponent(m.modulefilePath)}"><strong>${escapeHtml(m.moduleName)}</strong></a></td>
+        <td>${escapeHtml(m.moduleVersion)}</td>
+        <td>${m.whatisText ? escapeHtml(truncateText(m.whatisText, 90)) : '<span class="subtle">No description</span>'}</td>
+        <td><code class="subtle">${escapeHtml(truncateText(m.modulefilePath, 60))}</code></td>
+        <td>${softwareStatusPill(m)}</td>
+        <td>${formatLocalDateTime(m.firstSeen, '-')}</td>
+        <td>${formatLocalDateTime(m.lastSeen, '-')}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="${columns.length}">No modules match the current search/filters.</td></tr>`;
+  return `<table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function softwareInventoryPagination(page, totalPages, totalCount) {
+  if (totalPages <= 1) return '';
+  return `<div class="pagination">
+    <button type="button" class="btn" data-action="page-software-inventory" data-direction="prev" ${page <= 1 ? 'disabled' : ''}>&larr; Prev</button>
+    <span class="subtle">Page ${page} of ${totalPages} (${fmt(totalCount)} modules)</span>
+    <button type="button" class="btn" data-action="page-software-inventory" data-direction="next" ${page >= totalPages ? 'disabled' : ''}>Next &rarr;</button>
+  </div>`;
+}
+
+function softwareInventoryPage() {
+  if (!softwareInventory || !softwareInventory.available) return `<div class="stack">${softwareInventoryUnavailable()}</div>`;
+  const allModules = asArray(softwareInventory.modules);
+  if (!allModules.length) {
+    return `<div class="stack">${softwareInventoryStatusBar()}<div class="empty-state">The software inventory catalogue is empty - either the nightly scanner has not populated module_catalog yet, or every previously-installed module has since been removed.</div></div>`;
+  }
+
+  const filters = state.softwareInventoryFilters;
+  const filtered = softwareInventoryFilteredModules();
+  const totalPages = Math.max(1, Math.ceil(filtered.length / SOFTWARE_INVENTORY_PAGE_SIZE));
+  const page = Math.min(Math.max(1, filters.page), totalPages);
+  const pageRows = filtered.slice((page - 1) * SOFTWARE_INVENTORY_PAGE_SIZE, page * SOFTWARE_INVENTORY_PAGE_SIZE);
+
+  return `
+    <div class="stack">
+      ${softwareInventoryStatusBar()}
+      <section class="section">
+        <div class="section-head"><h2>Software Inventory</h2><span class="subtle">Installed Environment Modules, scanned nightly via module -t avail</span></div>
+        ${softwareInventorySummaryCards(asObject(softwareInventory.summary), allModules)}
+      </section>
+      <section class="section">
+        <div class="section-head"><h2>Search &amp; Filter</h2><span class="subtle">${fmt(filtered.length)} of ${fmt(allModules.length)} modules</span></div>
+        <div class="table-toolbar">
+          <input type="search" class="search" data-action="search-software-inventory" placeholder="Search name, version, description, or path..." value="${escapeHtml(filters.search)}" />
+          ${selectSoftwareStatusFilter(filters.statusFilter)}
+        </div>
+        <div class="table-card">${softwareInventorySortableTable(pageRows)}</div>
+        ${softwareInventoryPagination(page, totalPages, filtered.length)}
+      </section>
+    </div>`;
+}
+
+// Intentionally no "module help" / "module show" section below: those
+// fields exist in the database (mjolnir_analytics_db.py's module_catalog)
+// but export_software_inventory.py deliberately does not publish them (raw
+// admin-debug text, not dashboard payload - see
+// SOFTWARE_INVENTORY_ARCHITECTURE.md). This page must not invent fields the
+// export does not provide. A future milestone that changes the exporter's
+// contract can add another <section> here (e.g. between "Description" and
+// "Location") without touching anything else on this page - same reason no
+// empty placeholder is rendered for AI enrichment, license, homepage, etc.
+function moduleDetailPage(modulefilePath) {
+  if (!softwareInventory || !softwareInventory.available) return `<div class="stack">${softwareInventoryUnavailable()}</div>`;
+  const module = asArray(softwareInventory.modules).find((m) => m.modulefilePath === modulefilePath);
+  if (!module) {
+    return `<div class="stack"><section class="section"><div class="section-head"><h2>Module not found</h2><span class="pill warn">Unknown module</span></div><div class="empty-state">No module_catalog record matches this path. <a href="#/software-inventory">Back to Software Inventory</a></div></section></div>`;
+  }
+  return `
+    <div class="stack">
+      ${softwareInventoryStatusBar()}
+      <section class="section">
+        <div class="section-head"><h2>${escapeHtml(module.moduleName)} / ${escapeHtml(module.moduleVersion)}</h2>${softwareStatusPill(module)}</div>
+        ${module.removedAt ? disclaimer(`No longer present in the most recent nightly module -t avail scan. Removed: ${formatLocalDateTime(module.removedAt, '-')}.`) : ''}
+        <div class="cards-grid">${[
+          statBlock('First Seen', formatLocalDateTime(module.firstSeen, '-'), 'First nightly scan that found this modulefile'),
+          statBlock('Last Seen', formatLocalDateTime(module.lastSeen, '-'), 'Most recent nightly scan that found it'),
+        ].join('')}</div>
+      </section>
+      <section class="section"><div class="section-head"><h2>Description</h2><span class="subtle">module whatis</span></div>
+        ${module.whatisText ? `<p style="line-height:1.7">${escapeHtml(module.whatisText)}</p>` : '<div class="empty-state">No module-whatis description is defined for this modulefile.</div>'}
+      </section>
+      <section class="section"><div class="section-head"><h2>Location</h2></div>${tableFromRows(['Field', 'Value'], [
+        ['Modulefile path', `<code>${escapeHtml(module.modulefilePath)}</code>`],
+        ['MODULEPATH root', `<code>${escapeHtml(modulePathRoot(module.modulefilePath))}</code>`],
+      ])}</section>
+      <p class="subtle"><a href="#/software-inventory">&larr; Back to Software Inventory</a></p>
     </div>`;
 }
 
@@ -1987,7 +2196,7 @@ function renderShell(content) {
 function render() {
   document.documentElement.dataset.theme = state.theme;
   resetChartRegistry();
-  platformRegistry = buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights });
+  platformRegistry = buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory });
   warehouseSummary = buildWarehouseSummary({ slurmAnalyticsPipeline, nodeInsights });
   const renderers = {
     landing: landingPage,
@@ -2016,14 +2225,17 @@ function render() {
     recovery: recoveryPage,
     methodology: methodologyPage,
     'platform-status': platformStatusPage,
+    'software-inventory': softwareInventoryPage,
   };
   const content = isPersonalRoute(state.route)
     ? personalAnalyticsPage()
     : isNodeDetailRoute(state.route)
       ? nodeDetailPage(nodeDetailRouteName(state.route))
-      : isHierarchyDetailRoute(state.route)
-        ? hierarchyDetailPage(detailRouteParts(state.route).type, detailRouteParts(state.route).id)
-        : (renderers[state.route] || renderers.landing)();
+      : isSoftwareModuleDetailRoute(state.route)
+        ? moduleDetailPage(softwareModuleDetailKey(state.route))
+        : isHierarchyDetailRoute(state.route)
+          ? hierarchyDetailPage(detailRouteParts(state.route).type, detailRouteParts(state.route).id)
+          : (renderers[state.route] || renderers.landing)();
   app.innerHTML = renderShell(content);
   wireEvents();
   mountCharts();
@@ -2036,7 +2248,7 @@ function render() {
 // module-level data variables above, and re-render without disturbing what
 // the viewer is currently doing (route, scroll position, open <details>).
 function currentDataBundle() {
-  return { data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights };
+  return { data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory };
 }
 
 function applyDataUpdate(next) {
@@ -2045,6 +2257,7 @@ function applyDataUpdate(next) {
   nodeInsightsHistory = next.nodeInsightsHistory;
   slurmAnalyticsPipeline = next.slurmAnalyticsPipeline;
   queueInsights = next.queueInsights;
+  softwareInventory = next.softwareInventory;
 }
 
 // <details> elements (the "Why are there fewer unique jobs..." /
@@ -2165,6 +2378,49 @@ function wireEvents() {
       render();
     });
   });
+  // Software Inventory search: 'input' (not 'change') for instant, every-
+  // keystroke filtering. render() rebuilds the whole page, which would
+  // normally drop focus/cursor position out of a freshly-typed-in <input> -
+  // refocusing and restoring the caret position immediately after is the
+  // same fix-up rerenderPreservingViewState() already applies to scroll
+  // position and open <details> elsewhere in this file, just scoped to one
+  // input instead of the whole page.
+  document.querySelector('[data-action="search-software-inventory"]')?.addEventListener('input', (event) => {
+    const cursor = event.currentTarget.selectionStart;
+    state.softwareInventoryFilters.search = event.currentTarget.value;
+    state.softwareInventoryFilters.page = 1;
+    render();
+    const refocused = document.querySelector('[data-action="search-software-inventory"]');
+    if (refocused) {
+      refocused.focus();
+      refocused.setSelectionRange(cursor, cursor);
+    }
+  });
+  document.querySelector('[data-action="filter-software-status"]')?.addEventListener('change', (event) => {
+    state.softwareInventoryFilters.statusFilter = event.currentTarget.value;
+    state.softwareInventoryFilters.page = 1;
+    render();
+  });
+  document.querySelectorAll('[data-action="sort-software-inventory"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      const key = event.currentTarget.dataset.key;
+      if (state.softwareInventoryFilters.sortKey === key) {
+        state.softwareInventoryFilters.sortDir = state.softwareInventoryFilters.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.softwareInventoryFilters.sortKey = key;
+        state.softwareInventoryFilters.sortDir = 'asc';
+      }
+      state.softwareInventoryFilters.page = 1;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="page-software-inventory"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      const direction = event.currentTarget.dataset.direction;
+      state.softwareInventoryFilters.page += direction === 'prev' ? -1 : 1;
+      render();
+    });
+  });
   document.querySelector('[data-recovery-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -2231,12 +2487,13 @@ function handleRoute() {
 window.addEventListener('hashchange', handleRoute);
 
 async function init() {
-  [data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights] = await Promise.all([
+  [data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory] = await Promise.all([
     loadMjolnirData(),
     loadNodeInsightsData(),
     loadNodeInsightsHistory(),
     loadSlurmAnalyticsPipelineStatus(),
     loadQueueInsightsData(),
+    loadSoftwareInventoryData(),
   ]);
   setLastUpdatedFromBundle(currentDataBundle());
   render();

@@ -17,7 +17,9 @@ accounting data. Deployed via GitHub Pages at
 See [docs/PLATFORM_STATUS.md](docs/PLATFORM_STATUS.md) for the data-freshness
 framework and [docs/DASHBOARD_DATA_MIGRATION.md](docs/DASHBOARD_DATA_MIGRATION.md)
 for how live collector data reaches this frontend via the separate
-`dashboard-data` repository.
+`dashboard-data` repository. See
+[docs/SOFTWARE_INVENTORY_FRONTEND.md](docs/SOFTWARE_INVENTORY_FRONTEND.md)
+for the Software Inventory page (Software Analytics Milestone 1b).
 
 ## Development Workflow
 

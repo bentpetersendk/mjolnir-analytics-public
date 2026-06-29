@@ -39,3 +39,11 @@ whether the collector behind it is healthy. See
 [PLATFORM_STATUS.md](PLATFORM_STATUS.md) for the JSON contract, the health
 logic, and how a future module (Queue Insights, Slurm Insights, Predictions,
 ...) registers itself.
+
+## Software Inventory
+
+The Software Inventory page (installed Environment Modules, scanned
+nightly by the private repo) follows this same shell/loader/Platform
+Status pattern - see
+[SOFTWARE_INVENTORY_FRONTEND.md](SOFTWARE_INVENTORY_FRONTEND.md) for its
+JSON contract, rendering flow, and future enrichment extension points.

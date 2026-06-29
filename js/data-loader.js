@@ -23,6 +23,12 @@ const SLURM_ANALYTICS_BASE = `${NODE_INSIGHTS_HISTORY_BASE}slurm_analytics/`;
 // wait_time_history.json, submission_patterns.json. Same base as Node
 // Insights/Slurm Analytics above, just one more subdirectory over.
 const QUEUE_INSIGHTS_BASE = `${NODE_INSIGHTS_HISTORY_BASE}queue_insights/`;
+// Software Inventory (Software Analytics Milestone 1, private repo's
+// docs/architecture/SOFTWARE_INVENTORY_ARCHITECTURE.md) - one small
+// aggregate JSON refreshed nightly by the same Slurm Analytics cycle that
+// publishes Queue Insights' historical half above, just one more
+// subdirectory over.
+const SOFTWARE_INVENTORY_BASE = `${NODE_INSIGHTS_HISTORY_BASE}software_inventory/`;
 
 const LEGACY_EXPORT_ROW_COUNTS = {
   jobs: 2364601,
@@ -740,6 +746,76 @@ export async function loadQueueInsightsData() {
     };
   } catch (error) {
     return emptyQueueInsights(error);
+  }
+}
+
+// Software Inventory (Software Analytics Milestone 1): one file,
+// software_inventory.json, schema software-inventory-v1 - see the private
+// repo's scripts/export_software_inventory.py and
+// docs/architecture/SOFTWARE_INVENTORY_ARCHITECTURE.md. tryOptionalJson()
+// already turns a missing file (private repo's nightly stage has not run
+// yet) and a malformed/unparseable file (any JSON.parse failure) into the
+// same `null` - both degrade to the same "unavailable" shape below rather
+// than throwing, so this is the one loader in this file with no privacy
+// gate concerns: module_catalog has no username/jobid/account/workdir
+// field, so there is nothing here that ever needs tier separation.
+function emptySoftwareInventory(error) {
+  return {
+    available: false,
+    error: error ? String(error) : null,
+    generatedAt: null,
+    schemaVersion: null,
+    collectorName: null,
+    collectorStatus: 'failed',
+    platformModule: null,
+    failureMessage: null,
+    expectedRefreshSeconds: null,
+    warningAfterIntervals: null,
+    criticalAfterIntervals: null,
+    summary: {},
+    modules: [],
+  };
+}
+
+// Field names are normalized from the exporter's snake_case to this file's
+// camelCase convention (moduleName/moduleVersion/etc.) - the export's exact
+// keys (module_name, module_version, ...) are documented in
+// SOFTWARE_INVENTORY_ARCHITECTURE.md and intentionally not duplicated here;
+// changing that contract is the exporter's call, not this loader's.
+function normalizeSoftwareModule(raw) {
+  const m = asObject(raw);
+  return {
+    moduleName: m.module_name || '',
+    moduleVersion: m.module_version || '',
+    modulefilePath: m.modulefile_path || '',
+    whatisText: m.whatis_text || null,
+    firstSeen: m.first_seen || null,
+    lastSeen: m.last_seen || null,
+    removedAt: m.removed_at || null,
+  };
+}
+
+export async function loadSoftwareInventoryData() {
+  try {
+    const doc = await tryOptionalJson(`${SOFTWARE_INVENTORY_BASE}software_inventory.json`);
+    if (!doc) return emptySoftwareInventory(null);
+    return {
+      available: true,
+      error: null,
+      generatedAt: doc.generated_at || null,
+      schemaVersion: doc.schema_version || null,
+      collectorName: doc.collector || 'software_inventory_export',
+      collectorStatus: doc.collector_status || null,
+      platformModule: doc.platform_module || 'Software Inventory',
+      failureMessage: doc.failure_message || null,
+      expectedRefreshSeconds: doc.expected_refresh_seconds ?? null,
+      warningAfterIntervals: doc.warning_after_intervals ?? null,
+      criticalAfterIntervals: doc.critical_after_intervals ?? null,
+      summary: asObject(doc.summary),
+      modules: asArray(doc.modules).map(normalizeSoftwareModule),
+    };
+  } catch (error) {
+    return emptySoftwareInventory(error);
   }
 }
 
