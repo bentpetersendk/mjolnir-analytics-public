@@ -92,4 +92,35 @@ assert "Default Version" in app, "missing Default Version stat label"
 assert "Technical Details" in app, "Location section must be renamed to Technical Details"
 assert "<h2>Location</h2>" not in app, "old Location heading must not remain alongside the new Technical Details heading"
 assert "technicalDetailsRows" in app, "Technical Details rows must come from an extensible row-list helper, not a hardcoded table body"
+
+# Software Knowledge Milestone 3 (docs/architecture/SOFTWARE_KNOWLEDGE_ARCHITECTURE.md):
+# deterministic, exact-match-only software facts (homepage/repository/
+# license/upstream version), Software Health summary cards, and
+# deterministic Related Software - no AI, no web summarization, no fuzzy
+# matching anywhere in the frontend.
+assert "normalizeModuleKnowledge" in loader, "missing module_knowledge normalizer in data-loader.js"
+assert "normalizeKnowledgeSummary" in loader, "missing knowledge_summary normalizer in data-loader.js"
+assert "normalizeRelatedSoftware" in loader, "missing related_software normalizer in data-loader.js"
+assert "moduleKnowledge" in loader and "moduleKnowledge" in app, \
+    "moduleKnowledge must be threaded from data-loader.js through to app.js"
+assert "knowledgeSummary" in loader and "knowledgeSummary" in app, \
+    "knowledgeSummary must be threaded from data-loader.js through to app.js"
+assert "relatedSoftware" in loader and "relatedSoftware" in app, \
+    "relatedSoftware must be threaded from data-loader.js through to app.js"
+for fn in (
+    "knowledgeSection", "projectLinksSection", "releaseInformationSection",
+    "citationSection", "relatedSoftwareSection", "softwareHealthSection",
+):
+    assert fn in app, f"missing Software Knowledge section renderer: {fn}"
+assert "Latest Installed Version" in app, "missing Latest Installed Version stat (Version Intelligence)"
+assert "Update Available" in app, "missing Update Available row (Version Intelligence)"
+assert "updateAvailable" in loader, "update_available must be threaded through by data-loader.js, not recomputed in app.js"
+# The frontend must never implement its own version comparison - Milestone
+# 2 already established this rule (pre-sorted arrays only); update_available
+# being computed server-side and merely rendered here is the same rule
+# applied to Milestone 3's Version Intelligence. (Comments referencing the
+# backend's version_sort_key() by name are fine - only a same-named
+# function *definition* in app.js would violate this.)
+assert "function versionSortKey" not in app and "function version_sort_key" not in app, \
+    "app.js must not implement its own version-sort/comparison function"
 print('ui checks passed')
