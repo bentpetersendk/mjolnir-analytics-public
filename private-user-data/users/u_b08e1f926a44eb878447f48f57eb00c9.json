@@ -1,0 +1,853 @@
+{
+  "schema_version": "analytics-v1",
+  "generated_at": "2026-06-29T22:34:16Z",
+  "all_time_summary": {
+    "jobs": 26998,
+    "completed_jobs": 15339,
+    "failed_jobs": 11659,
+    "cpu_hours_allocated": 47418.892778,
+    "measured_cpu_hours": 24009.964444,
+    "avg_cpu_efficiency": 0.132802,
+    "jobs_with_measured_cpu": 21039,
+    "requested_mem_gb_hours": 1172950.804516,
+    "measured_mem_gb_max_sum": 55868.012073,
+    "avg_memory_efficiency": 0.038346,
+    "jobs_with_measured_memory": 24100,
+    "estimated_cost_dkk": 19434.302577,
+    "underutilized_cost_dkk": 18295.486723,
+    "gpu_hours": 0.0,
+    "cpu_cost_dkk": 3082.228031,
+    "mem_cost_dkk": 19060.450573,
+    "gpu_cost_dkk": 0.0,
+    "cost_bearer": "memory",
+    "cost_bearer_cost_dkk": 19060.450573,
+    "cost_bearer_efficiency": 0.038346,
+    "cost_bearer_waste_dkk": 18295.486723
+  },
+  "rolling_summaries": {
+    "7d": {
+      "jobs": 1579,
+      "completed_jobs": 1141,
+      "failed_jobs": 438,
+      "cpu_hours_allocated": 1400.298333,
+      "measured_cpu_hours": 977.848889,
+      "avg_cpu_efficiency": 0.257026,
+      "jobs_with_measured_cpu": 1261,
+      "requested_mem_gb_hours": 9930.734005,
+      "measured_mem_gb_max_sum": 507.035519,
+      "avg_memory_efficiency": 0.024649,
+      "jobs_with_measured_memory": 1261,
+      "estimated_cost_dkk": 162.993113,
+      "underutilized_cost_dkk": 141.964707,
+      "gpu_hours": 0.0,
+      "cpu_cost_dkk": 91.019392,
+      "mem_cost_dkk": 161.374428,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 161.374428,
+      "cost_bearer_efficiency": 0.024649,
+      "cost_bearer_waste_dkk": 141.964707
+    },
+    "30d": {
+      "jobs": 8856,
+      "completed_jobs": 5235,
+      "failed_jobs": 3621,
+      "cpu_hours_allocated": 10123.815,
+      "measured_cpu_hours": 4747.396944,
+      "avg_cpu_efficiency": 0.089513,
+      "jobs_with_measured_cpu": 8385,
+      "requested_mem_gb_hours": 314493.810103,
+      "measured_mem_gb_max_sum": 788.92805,
+      "avg_memory_efficiency": 0.006723,
+      "jobs_with_measured_memory": 8386,
+      "estimated_cost_dkk": 5357.911938,
+      "underutilized_cost_dkk": 5253.84662,
+      "gpu_hours": 0.0,
+      "cpu_cost_dkk": 658.047975,
+      "mem_cost_dkk": 5110.524414,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 5110.524414,
+      "cost_bearer_efficiency": 0.006723,
+      "cost_bearer_waste_dkk": 5253.84662
+    },
+    "90d": {
+      "jobs": 26998,
+      "completed_jobs": 15339,
+      "failed_jobs": 11659,
+      "cpu_hours_allocated": 47418.892778,
+      "measured_cpu_hours": 24009.964444,
+      "avg_cpu_efficiency": 0.132802,
+      "jobs_with_measured_cpu": 21039,
+      "requested_mem_gb_hours": 1172950.804516,
+      "measured_mem_gb_max_sum": 55868.012073,
+      "avg_memory_efficiency": 0.038346,
+      "jobs_with_measured_memory": 24100,
+      "estimated_cost_dkk": 19434.302577,
+      "underutilized_cost_dkk": 18295.486723,
+      "gpu_hours": 0.0,
+      "cpu_cost_dkk": 3082.228031,
+      "mem_cost_dkk": 19060.450573,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 19060.450573,
+      "cost_bearer_efficiency": 0.038346,
+      "cost_bearer_waste_dkk": 18295.486723
+    }
+  },
+  "daily_trends": [
+    {
+      "report_date": "2026-04-13",
+      "avg_cpu_efficiency": 0.017337184925324555,
+      "avg_memory_efficiency": 0.0022864500681559247,
+      "estimated_cost_dkk": 3.7884888888888884,
+      "underutilized_cost_dkk": 3.6533069444444437,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-14",
+      "avg_cpu_efficiency": 0.10915675308163927,
+      "avg_memory_efficiency": 0.003108052077436059,
+      "estimated_cost_dkk": 23.352044444444733,
+      "underutilized_cost_dkk": 14.632456944444579,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-15",
+      "avg_cpu_efficiency": 0.49367668557725136,
+      "avg_memory_efficiency": 0.11433855243715417,
+      "estimated_cost_dkk": 67.99774583333352,
+      "underutilized_cost_dkk": 34.253266666666725,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-16",
+      "avg_cpu_efficiency": 0.230748392587478,
+      "avg_memory_efficiency": 0.08460385841766589,
+      "estimated_cost_dkk": 107.1550999999987,
+      "underutilized_cost_dkk": 24.311661111111345,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-17",
+      "avg_cpu_efficiency": 0.7450292023007649,
+      "avg_memory_efficiency": 0.24152218821373853,
+      "estimated_cost_dkk": 67.39922222222224,
+      "underutilized_cost_dkk": 45.289973370501066,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-18",
+      "avg_cpu_efficiency": 0.8423506567926902,
+      "avg_memory_efficiency": 0.7906918600201607,
+      "estimated_cost_dkk": 51.77784444444444,
+      "underutilized_cost_dkk": 8.645541773007643,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-19",
+      "avg_cpu_efficiency": 0.022510382511390058,
+      "avg_memory_efficiency": 0.02091224961306738,
+      "estimated_cost_dkk": 9.997361111111118,
+      "underutilized_cost_dkk": 9.813880555555563,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-20",
+      "avg_cpu_efficiency": 0.08047072132764077,
+      "avg_memory_efficiency": 0.026223025799796566,
+      "estimated_cost_dkk": 191.53853333333348,
+      "underutilized_cost_dkk": 171.74829710536963,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-21",
+      "avg_cpu_efficiency": 0.3005778067760281,
+      "avg_memory_efficiency": 0.09092069913943608,
+      "estimated_cost_dkk": 105.5052916666667,
+      "underutilized_cost_dkk": 53.100261124178736,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-22",
+      "avg_cpu_efficiency": 0.29320831495457517,
+      "avg_memory_efficiency": 0.032225469491262544,
+      "estimated_cost_dkk": 1650.3159472222214,
+      "underutilized_cost_dkk": 1552.2915323283246,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-23",
+      "avg_cpu_efficiency": 0.16484497035071852,
+      "avg_memory_efficiency": 0.054821407935750764,
+      "estimated_cost_dkk": 404.383055555556,
+      "underutilized_cost_dkk": 372.8387026051238,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-24",
+      "avg_cpu_efficiency": 0.5953996189417896,
+      "avg_memory_efficiency": 0.0683398059182995,
+      "estimated_cost_dkk": 417.12439166666655,
+      "underutilized_cost_dkk": 133.72760504884852,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-25",
+      "avg_cpu_efficiency": 0.8502781717192534,
+      "avg_memory_efficiency": 0.08955573358319023,
+      "estimated_cost_dkk": 53.53472222222222,
+      "underutilized_cost_dkk": 7.989240277777777,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-26",
+      "avg_cpu_efficiency": 0.8217734348573881,
+      "avg_memory_efficiency": 0.0940338522195816,
+      "estimated_cost_dkk": 3.3460555555555556,
+      "underutilized_cost_dkk": 0.596411111111111,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-27",
+      "avg_cpu_efficiency": 0.2502068139655917,
+      "avg_memory_efficiency": 0.024208253080194645,
+      "estimated_cost_dkk": 5.726861111111111,
+      "underutilized_cost_dkk": 2.8515888570312002,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-28",
+      "avg_cpu_efficiency": 0.1836296926350364,
+      "avg_memory_efficiency": 0.18175015846888223,
+      "estimated_cost_dkk": 0.54665,
+      "underutilized_cost_dkk": 0.3961027777777778,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-29",
+      "avg_cpu_efficiency": 0.6872368583845359,
+      "avg_memory_efficiency": 0.20461999624967575,
+      "estimated_cost_dkk": 33.23645,
+      "underutilized_cost_dkk": 24.316027090018334,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-04-30",
+      "avg_cpu_efficiency": 0.5256942313014039,
+      "avg_memory_efficiency": 0.2890977878123522,
+      "estimated_cost_dkk": 52.61403333333333,
+      "underutilized_cost_dkk": 30.925734434911607,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-01",
+      "avg_cpu_efficiency": 0.06681612255119988,
+      "avg_memory_efficiency": 0.2369730904773252,
+      "estimated_cost_dkk": 87.81709444444468,
+      "underutilized_cost_dkk": 30.826348601211784,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-03",
+      "avg_cpu_efficiency": 0.0966817534316843,
+      "avg_memory_efficiency": 0.22767907953310956,
+      "estimated_cost_dkk": 21.817466666666668,
+      "underutilized_cost_dkk": 6.765813601915042,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-04",
+      "avg_cpu_efficiency": 0.005923198506557553,
+      "avg_memory_efficiency": 0.07972218593963054,
+      "estimated_cost_dkk": 49.14236527777787,
+      "underutilized_cost_dkk": 20.179640277630764,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-05",
+      "avg_cpu_efficiency": 0.11522099905301308,
+      "avg_memory_efficiency": 0.06229893366495768,
+      "estimated_cost_dkk": 1.136398611111111,
+      "underutilized_cost_dkk": 0.9738479142477116,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-06",
+      "avg_cpu_efficiency": 0.43354556307202546,
+      "avg_memory_efficiency": 0.28988784551620483,
+      "estimated_cost_dkk": 0.3629888888888889,
+      "underutilized_cost_dkk": 0.25776282194256783,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-07",
+      "avg_cpu_efficiency": 0.04610251847879221,
+      "avg_memory_efficiency": 0.2834293134510517,
+      "estimated_cost_dkk": 0.3981611111111111,
+      "underutilized_cost_dkk": 0.3713486111111111,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-08",
+      "avg_cpu_efficiency": 0.0,
+      "avg_memory_efficiency": 5.9977173805236816e-05,
+      "estimated_cost_dkk": 0.001588888888888889,
+      "underutilized_cost_dkk": 0.001588888888888889,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-11",
+      "avg_cpu_efficiency": 0.0835453774385072,
+      "avg_memory_efficiency": 0.016740997632344563,
+      "estimated_cost_dkk": 0.1991166666666667,
+      "underutilized_cost_dkk": 0.14931944444444448,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-14",
+      "avg_cpu_efficiency": 0.12496850684509567,
+      "avg_memory_efficiency": 0.0037608002011795022,
+      "estimated_cost_dkk": 21.695488936021594,
+      "underutilized_cost_dkk": 15.870204674408832,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-15",
+      "avg_cpu_efficiency": 0.19269411385723023,
+      "avg_memory_efficiency": 0.002586943431840563,
+      "estimated_cost_dkk": 23.52994311353895,
+      "underutilized_cost_dkk": 17.73447168500623,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-16",
+      "avg_cpu_efficiency": 0.3666582198436571,
+      "avg_memory_efficiency": 0.005453080112863754,
+      "estimated_cost_dkk": 107.22054044799803,
+      "underutilized_cost_dkk": 106.81447903997072,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-17",
+      "avg_cpu_efficiency": 0.9536461531296294,
+      "avg_memory_efficiency": 0.00019804278006008572,
+      "estimated_cost_dkk": 231.43612556966144,
+      "underutilized_cost_dkk": 231.40201226334636,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-18",
+      "avg_cpu_efficiency": 0.16801403618219737,
+      "avg_memory_efficiency": 0.0028129506550276322,
+      "estimated_cost_dkk": 100.68543096618643,
+      "underutilized_cost_dkk": 34.626472566856606,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-19",
+      "avg_cpu_efficiency": 0.1352840735467697,
+      "avg_memory_efficiency": 0.0028484537944557897,
+      "estimated_cost_dkk": 321.6478375362841,
+      "underutilized_cost_dkk": 241.4867758110447,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-20",
+      "avg_cpu_efficiency": 0.4201945579506624,
+      "avg_memory_efficiency": 0.027688691944887992,
+      "estimated_cost_dkk": 609.6195261552608,
+      "underutilized_cost_dkk": 598.509808383242,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-21",
+      "avg_cpu_efficiency": 0.26690959408670356,
+      "avg_memory_efficiency": 0.011837452487732911,
+      "estimated_cost_dkk": 685.6258621266685,
+      "underutilized_cost_dkk": 684.5356394826825,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-22",
+      "avg_cpu_efficiency": 0.6150129531685322,
+      "avg_memory_efficiency": 0.0004968807277830364,
+      "estimated_cost_dkk": 145.21010943976506,
+      "underutilized_cost_dkk": 145.16582610549398,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-23",
+      "avg_cpu_efficiency": 0.2883157019957012,
+      "avg_memory_efficiency": 0.00033809505008994517,
+      "estimated_cost_dkk": 210.9128529442681,
+      "underutilized_cost_dkk": 210.86018986920513,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-24",
+      "avg_cpu_efficiency": 0.04830609747457174,
+      "avg_memory_efficiency": 0.005958181084113221,
+      "estimated_cost_dkk": 2006.877399563938,
+      "underutilized_cost_dkk": 2004.616830828808,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-25",
+      "avg_cpu_efficiency": 0.11447092534846494,
+      "avg_memory_efficiency": 0.006731306219048983,
+      "estimated_cost_dkk": 1903.8521059716127,
+      "underutilized_cost_dkk": 1901.63561608989,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-27",
+      "avg_cpu_efficiency": 0.49215290112145765,
+      "avg_memory_efficiency": 0.00044857883453369143,
+      "estimated_cost_dkk": 963.1873152777778,
+      "underutilized_cost_dkk": 963.1058034926871,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-28",
+      "avg_cpu_efficiency": 0.49010148578103896,
+      "avg_memory_efficiency": 0.00042800521850585937,
+      "estimated_cost_dkk": 1236.489763888889,
+      "underutilized_cost_dkk": 1236.3841162536676,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-29",
+      "avg_cpu_efficiency": 0.37521284459068033,
+      "avg_memory_efficiency": 0.00010930060914624191,
+      "estimated_cost_dkk": 1841.3691351969403,
+      "underutilized_cost_dkk": 1841.2013500746184,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-05-30",
+      "avg_cpu_efficiency": 0.0,
+      "avg_memory_efficiency": 0.00012841014334178796,
+      "estimated_cost_dkk": 256.81622329915365,
+      "underutilized_cost_dkk": 256.7832454911073,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-02",
+      "avg_cpu_efficiency": 0.5873826272083282,
+      "avg_memory_efficiency": 0.05129175186157227,
+      "estimated_cost_dkk": 0.6505777777777778,
+      "underutilized_cost_dkk": 0.09511666666666667,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-03",
+      "avg_cpu_efficiency": 0.2000947068849122,
+      "avg_memory_efficiency": 0.0047117000817705965,
+      "estimated_cost_dkk": 3900.4667604746496,
+      "underutilized_cost_dkk": 3899.804695098043,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-04",
+      "avg_cpu_efficiency": 0.0011033054502303824,
+      "avg_memory_efficiency": 0.00022097361142114596,
+      "estimated_cost_dkk": 0.8455702443440755,
+      "underutilized_cost_dkk": 0.8454659568581319,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-05",
+      "avg_cpu_efficiency": 0.1965458844401975,
+      "avg_memory_efficiency": 0.004245418327657911,
+      "estimated_cost_dkk": 64.65712547166618,
+      "underutilized_cost_dkk": 63.33828422306844,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-06",
+      "avg_cpu_efficiency": 0.31525257104321946,
+      "avg_memory_efficiency": 0.0018093744125552947,
+      "estimated_cost_dkk": 7.7011157701280375,
+      "underutilized_cost_dkk": 7.6930209675004075,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-07",
+      "avg_cpu_efficiency": 0.0,
+      "avg_memory_efficiency": 8.798175387912328e-07,
+      "estimated_cost_dkk": 0.7222222222222223,
+      "underutilized_cost_dkk": 0.7222215819852221,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-08",
+      "avg_cpu_efficiency": 0.11244935068828689,
+      "avg_memory_efficiency": 0.004566958286808385,
+      "estimated_cost_dkk": 129.7715623630095,
+      "underutilized_cost_dkk": 112.1570444806793,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-09",
+      "avg_cpu_efficiency": 0.0600645978663359,
+      "avg_memory_efficiency": 0.0037749851596576133,
+      "estimated_cost_dkk": 632.133008987768,
+      "underutilized_cost_dkk": 618.29581095094,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-10",
+      "avg_cpu_efficiency": 0.0005417118093174431,
+      "avg_memory_efficiency": 0.00041513070836627405,
+      "estimated_cost_dkk": 1.3384677975124784,
+      "underutilized_cost_dkk": 1.3381883838660185,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-11",
+      "avg_cpu_efficiency": 0.001211084788160675,
+      "avg_memory_efficiency": 0.00213816603024562,
+      "estimated_cost_dkk": 41.67176122809502,
+      "underutilized_cost_dkk": 41.640123864859376,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-12",
+      "avg_cpu_efficiency": 0.00017680339462517678,
+      "avg_memory_efficiency": 0.0020332229560639584,
+      "estimated_cost_dkk": 15.97195093756783,
+      "underutilized_cost_dkk": 15.964552743541203,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-17",
+      "avg_cpu_efficiency": 0.19165976249654793,
+      "avg_memory_efficiency": 0.8924315571784973,
+      "estimated_cost_dkk": 0.2615166666666667,
+      "underutilized_cost_dkk": 0.21139444444444444,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-18",
+      "avg_cpu_efficiency": 0.00031882060197246546,
+      "avg_memory_efficiency": 0.0018459424936531266,
+      "estimated_cost_dkk": 17.933748175727196,
+      "underutilized_cost_dkk": 17.92858086537774,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-19",
+      "avg_cpu_efficiency": 0.02343544122307133,
+      "avg_memory_efficiency": 0.0045700531776522585,
+      "estimated_cost_dkk": 134.26336257188578,
+      "underutilized_cost_dkk": 113.41227224543888,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-20",
+      "avg_cpu_efficiency": 0.032345664033443015,
+      "avg_memory_efficiency": 0.002774935390184204,
+      "estimated_cost_dkk": 199.9366867129856,
+      "underutilized_cost_dkk": 172.43449922270486,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-21",
+      "avg_cpu_efficiency": 0.002920626727227919,
+      "avg_memory_efficiency": 0.0008511526146659003,
+      "estimated_cost_dkk": 44.17572606879342,
+      "underutilized_cost_dkk": 43.584021515837655,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-22",
+      "avg_cpu_efficiency": 0.00039411539332602746,
+      "avg_memory_efficiency": 0.0005528552348961417,
+      "estimated_cost_dkk": 2.4176617757161454,
+      "underutilized_cost_dkk": 2.416619868786468,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-24",
+      "avg_cpu_efficiency": 0.2685432224178282,
+      "avg_memory_efficiency": 0.09134082255505095,
+      "estimated_cost_dkk": 7.254626302083331,
+      "underutilized_cost_dkk": 3.6235376769810905,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-25",
+      "avg_cpu_efficiency": 0.24294922070133634,
+      "avg_memory_efficiency": 0.031502486743024055,
+      "estimated_cost_dkk": 10.072872239176437,
+      "underutilized_cost_dkk": 6.113804128574008,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-26",
+      "avg_cpu_efficiency": 0.2590076334963583,
+      "avg_memory_efficiency": 0.003615969109499078,
+      "estimated_cost_dkk": 109.32616356472408,
+      "underutilized_cost_dkk": 108.82166579248802,
+      "gpu_hours": 0.0
+    },
+    {
+      "report_date": "2026-06-27",
+      "avg_cpu_efficiency": 0.7000920388655717,
+      "avg_memory_efficiency": 0.355914873046875,
+      "estimated_cost_dkk": 36.33945041232639,
+      "underutilized_cost_dkk": 23.40569953223003,
+      "gpu_hours": 0.0
+    }
+  ],
+  "recommendations": [
+    {
+      "type": "cpu_efficiency",
+      "severity": "high",
+      "title": "Low measured CPU utilization",
+      "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
+      "confidence": "medium",
+      "evidence": {
+        "avg_cpu_efficiency": 0.132802,
+        "jobs_with_measured_cpu": 21039
+      }
+    },
+    {
+      "type": "memory_efficiency",
+      "severity": "medium",
+      "title": "Requested memory is much higher than MaxRSS",
+      "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
+      "confidence": "medium",
+      "evidence": {
+        "avg_memory_efficiency": 0.038346,
+        "jobs_with_measured_memory": 24100
+      }
+    }
+  ],
+  "top_inefficient_jobs": [
+    {
+      "report_date": "2026-06-03",
+      "partition_name": "cpuqueue",
+      "state": "COMPLETED",
+      "alloc_cpus": 8,
+      "elapsed_hours": 237.80138888888888,
+      "measured_cpu_efficiency": 0.9702255033086667,
+      "memory_efficiency": 8.48245620727539e-05,
+      "gpu_count": 0,
+      "estimated_cost_dkk": 3864.2725694444443,
+      "underutilized_cost_dkk": 3863.9447842160116,
+      "cpu_cost_dkk": 123.65672222222223,
+      "mem_cost_dkk": 3864.2725694444443,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 3864.2725694444443,
+      "cost_bearer_efficiency": 8.48245620727539e-05,
+      "cost_bearer_waste_dkk": 3863.9447842160116
+    },
+    {
+      "report_date": "2026-05-29",
+      "partition_name": "cpuqueue",
+      "state": "COMPLETED",
+      "alloc_cpus": 8,
+      "elapsed_hours": 106.60888888888888,
+      "measured_cpu_efficiency": 0.983669865447951,
+      "memory_efficiency": 8.989620208740235e-05,
+      "gpu_count": 0,
+      "estimated_cost_dkk": 1732.3944444444446,
+      "underutilized_cost_dkk": 1732.2387087633717,
+      "cpu_cost_dkk": 55.43662222222222,
+      "mem_cost_dkk": 1732.3944444444446,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 1732.3944444444446,
+      "cost_bearer_efficiency": 8.989620208740235e-05,
+      "cost_bearer_waste_dkk": 1732.2387087633717
+    },
+    {
+      "report_date": "2026-05-28",
+      "partition_name": "cpuqueue",
+      "state": "COMPLETED",
+      "alloc_cpus": 8,
+      "elapsed_hours": 76.09166666666667,
+      "measured_cpu_efficiency": 0.9802029715620779,
+      "memory_efficiency": 8.544158935546875e-05,
+      "gpu_count": 0,
+      "estimated_cost_dkk": 1236.4895833333335,
+      "underutilized_cost_dkk": 1236.383935698112,
+      "cpu_cost_dkk": 39.56766666666667,
+      "mem_cost_dkk": 1236.4895833333335,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 1236.4895833333335,
+      "cost_bearer_efficiency": 8.544158935546875e-05,
+      "cost_bearer_waste_dkk": 1236.383935698112
+    },
+    {
+      "report_date": "2026-05-27",
+      "partition_name": "cpuqueue",
+      "state": "COMPLETED",
+      "alloc_cpus": 8,
+      "elapsed_hours": 59.27305555555556,
+      "measured_cpu_efficiency": 0.9843058022429153,
+      "memory_efficiency": 8.462715148925781e-05,
+      "gpu_count": 0,
+      "estimated_cost_dkk": 963.1871527777778,
+      "underutilized_cost_dkk": 963.1056409926871,
+      "cpu_cost_dkk": 30.821988888888892,
+      "mem_cost_dkk": 963.1871527777778,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 963.1871527777778,
+      "cost_bearer_efficiency": 8.462715148925781e-05,
+      "cost_bearer_waste_dkk": 963.1056409926871
+    },
+    {
+      "report_date": "2026-05-25",
+      "partition_name": "cpuqueue",
+      "state": "COMPLETED",
+      "alloc_cpus": 8,
+      "elapsed_hours": 65.37277777777778,
+      "measured_cpu_efficiency": 0.9350344392416143,
+      "memory_efficiency": 9.569759815401265e-05,
+      "gpu_count": 0,
+      "estimated_cost_dkk": 935.5859565592449,
+      "underutilized_cost_dkk": 935.4964232303356,
+      "cpu_cost_dkk": 33.99384444444445,
+      "mem_cost_dkk": 935.5859565592449,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 935.5859565592449,
+      "cost_bearer_efficiency": 9.569759815401265e-05,
+      "cost_bearer_waste_dkk": 935.4964232303356
+    },
+    {
+      "report_date": "2026-05-24",
+      "partition_name": "cpuqueue",
+      "state": "COMPLETED",
+      "alloc_cpus": 8,
+      "elapsed_hours": 58.31,
+      "measured_cpu_efficiency": 0.9333477438594485,
+      "memory_efficiency": 8.685990845116765e-05,
+      "gpu_count": 0,
+      "estimated_cost_dkk": 928.0704160888672,
+      "underutilized_cost_dkk": 927.9898039774895,
+      "cpu_cost_dkk": 30.3212,
+      "mem_cost_dkk": 928.0704160888672,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 928.0704160888672,
+      "cost_bearer_efficiency": 8.685990845116765e-05,
+      "cost_bearer_waste_dkk": 927.9898039774895
+    },
+    {
+      "report_date": "2026-05-24",
+      "partition_name": "cpuqueue",
+      "state": "COMPLETED",
+      "alloc_cpus": 8,
+      "elapsed_hours": 61.47388888888889,
+      "measured_cpu_efficiency": 0.9363392768384048,
+      "memory_efficiency": 9.295182402293967e-05,
+      "gpu_count": 0,
+      "estimated_cost_dkk": 918.566380750868,
+      "underutilized_cost_dkk": 918.4809983302911,
+      "cpu_cost_dkk": 31.96642222222222,
+      "mem_cost_dkk": 918.566380750868,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 918.566380750868,
+      "cost_bearer_efficiency": 9.295182402293967e-05,
+      "cost_bearer_waste_dkk": 918.4809983302911
+    },
+    {
+      "report_date": "2026-05-21",
+      "partition_name": "cpuqueue",
+      "state": "TIMEOUT",
+      "alloc_cpus": 8,
+      "elapsed_hours": 41.78527777777778,
+      "measured_cpu_efficiency": 0.9277972039593956,
+      "memory_efficiency": 0.00017537701764872447,
+      "gpu_count": 0,
+      "estimated_cost_dkk": 332.5302703962538,
+      "underutilized_cost_dkk": 332.47195222915377,
+      "cpu_cost_dkk": 21.728344444444446,
+      "mem_cost_dkk": 332.5302703962538,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 332.5302703962538,
+      "cost_bearer_efficiency": 0.00017537701764872447,
+      "cost_bearer_waste_dkk": 332.47195222915377
+    },
+    {
+      "report_date": "2026-06-09",
+      "partition_name": "cpuqueue",
+      "state": "CANCELLED by 487227354",
+      "alloc_cpus": 8,
+      "elapsed_hours": 19.70611111111111,
+      "measured_cpu_efficiency": 0.0,
+      "memory_efficiency": 8.483314514160156e-05,
+      "gpu_count": 0,
+      "estimated_cost_dkk": 320.22430555555553,
+      "underutilized_cost_dkk": 320.19713992056444,
+      "cpu_cost_dkk": 10.247177777777777,
+      "mem_cost_dkk": 320.22430555555553,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 320.22430555555553,
+      "cost_bearer_efficiency": 8.483314514160156e-05,
+      "cost_bearer_waste_dkk": 320.19713992056444
+    },
+    {
+      "report_date": "2026-05-20",
+      "partition_name": "cpuqueue",
+      "state": "COMPLETED",
+      "alloc_cpus": 8,
+      "elapsed_hours": 31.926388888888887,
+      "measured_cpu_efficiency": 0.9149541044938444,
+      "memory_efficiency": 0.0001597759043987236,
+      "gpu_count": 0,
+      "estimated_cost_dkk": 277.3761315019396,
+      "underutilized_cost_dkk": 277.33181347967025,
+      "cpu_cost_dkk": 16.60172222222222,
+      "mem_cost_dkk": 277.3761315019396,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 277.3761315019396,
+      "cost_bearer_efficiency": 0.0001597759043987236,
+      "cost_bearer_waste_dkk": 277.33181347967025
+    }
+  ],
+  "public_user_id": "usr_37452ff33cf9",
+  "display_pseudonym": "Violet Glacier",
+  "personal_route_token": "u_b08e1f926a44eb878447f48f57eb00c9",
+  "username": "pgk128",
+  "percentile_position": {
+    "overall": 53.1,
+    "cpu": 29.5,
+    "memory": 32.8,
+    "savings": 96.9
+  },
+  "peer_comparisons": [
+    {
+      "display_pseudonym": "Lunar Nova",
+      "avg_cpu_efficiency": 0.17370916762364044,
+      "avg_memory_efficiency": 0.09271159436967637,
+      "underutilized_cost_dkk": 4.06486098821097,
+      "percentile_position": 14.6
+    },
+    {
+      "display_pseudonym": "Steel Summit",
+      "avg_cpu_efficiency": 0.12287081169594392,
+      "avg_memory_efficiency": 0.0021830605926701336,
+      "underutilized_cost_dkk": 18760.317012921445,
+      "percentile_position": 97.7
+    },
+    {
+      "display_pseudonym": "Silver Summit",
+      "avg_cpu_efficiency": 0.007385958856328002,
+      "avg_memory_efficiency": 0.0019330509646448071,
+      "underutilized_cost_dkk": 4.252530897700796,
+      "percentile_position": 16.9
+    }
+  ]
+}
