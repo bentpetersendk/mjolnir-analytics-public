@@ -1233,6 +1233,52 @@ function softwareInventoryPage() {
     </div>`;
 }
 
+// Related Versions (Software Intelligence Milestone 2): looks up the
+// module's family in softwareInventory.moduleFamilies, keyed by exact
+// module_name - the same unambiguous boundary Environment Modules itself
+// uses (python/python2/python-newick are three distinct families, never
+// merged - see export_software_inventory.py's build_module_families()).
+// Displayed newest-first for quick scanning (the family object itself
+// stores versions ascending, by version_sort_key(), for Version Timeline
+// use elsewhere); the current module's own version is highlighted and not
+// a link. Returns '' (renders nothing) when the family has only this one
+// version - a module with no siblings has nothing to relate.
+function relatedVersionsSection(module, family) {
+  if (!family || family.versions.length <= 1) return '';
+  const newestFirst = family.versions.slice().reverse();
+  const items = newestFirst.map((v) => {
+    const isCurrent = v.modulefilePath === module.modulefilePath;
+    const isDefault = family.defaultVersion != null && v.version === family.defaultVersion;
+    const suffix = [isCurrent ? 'current' : null, isDefault ? 'default' : null].filter(Boolean).join(', ');
+    const label = `${escapeHtml(v.version)}${suffix ? ` (${suffix})` : ''}`;
+    return isCurrent
+      ? `<li><strong>${label}</strong></li>`
+      : `<li><a href="#/module/${encodeURIComponent(v.modulefilePath)}">${label}</a></li>`;
+  }).join('');
+  const defaultStat = family.defaultVersion
+    ? `<div class="cards-grid">${statBlock('Default Version', escapeHtml(family.defaultVersion), 'Resolved by a bare `module load ' + escapeHtml(module.moduleName) + '`, no version given')}</div>`
+    : '';
+  return `<section class="section">
+    <div class="section-head"><h2>Related Versions</h2><span class="subtle">${escapeHtml(module.moduleName)} - ${fmt(family.versions.length)} installed version(s)</span></div>
+    ${defaultStat}
+    <ul class="version-list">${items}</ul>
+  </section>`;
+}
+
+// Technical Details (renamed from "Location" in Milestone 2): a plain
+// [label, value] row list rather than a hardcoded two-cell table body, so
+// a future milestone can append a row (Module Family, Hidden Module,
+// Dependencies, Aliases, ...) without restructuring this section - see
+// SOFTWARE_INVENTORY_ARCHITECTURE.md's "Milestone 2: version relationships"
+// for why only Modulefile Path/MODULEPATH Root are populated today; every
+// other field named in the brief is intentionally not invented yet.
+function technicalDetailsRows(module) {
+  return [
+    ['Modulefile Path', `<code>${escapeHtml(module.modulefilePath)}</code>`],
+    ['MODULEPATH Root', `<code>${escapeHtml(module.modulepathRoot || modulePathRoot(module.modulefilePath))}</code>`],
+  ];
+}
+
 // Intentionally no "module help" / "module show" section below: those
 // fields exist in the database (mjolnir_analytics_db.py's module_catalog)
 // but export_software_inventory.py deliberately does not publish them (raw
@@ -1240,14 +1286,16 @@ function softwareInventoryPage() {
 // SOFTWARE_INVENTORY_ARCHITECTURE.md). This page must not invent fields the
 // export does not provide. A future milestone that changes the exporter's
 // contract can add another <section> here (e.g. between "Description" and
-// "Location") without touching anything else on this page - same reason no
-// empty placeholder is rendered for AI enrichment, license, homepage, etc.
+// "Technical Details") without touching anything else on this page - same
+// reason no empty placeholder is rendered for AI enrichment, license,
+// homepage, etc.
 function moduleDetailPage(modulefilePath) {
   if (!softwareInventory || !softwareInventory.available) return `<div class="stack">${softwareInventoryUnavailable()}</div>`;
   const module = asArray(softwareInventory.modules).find((m) => m.modulefilePath === modulefilePath);
   if (!module) {
     return `<div class="stack"><section class="section"><div class="section-head"><h2>Module not found</h2><span class="pill warn">Unknown module</span></div><div class="empty-state">No module_catalog record matches this path. <a href="#/software-inventory">Back to Software Inventory</a></div></section></div>`;
   }
+  const family = asObject(softwareInventory.moduleFamilies)[module.moduleName];
   return `
     <div class="stack">
       ${softwareInventoryStatusBar()}
@@ -1262,10 +1310,8 @@ function moduleDetailPage(modulefilePath) {
       <section class="section"><div class="section-head"><h2>Description</h2><span class="subtle">module whatis</span></div>
         ${module.whatisText ? `<p style="line-height:1.7">${escapeHtml(module.whatisText)}</p>` : '<div class="empty-state">No module-whatis description is defined for this modulefile.</div>'}
       </section>
-      <section class="section"><div class="section-head"><h2>Location</h2></div>${tableFromRows(['Field', 'Value'], [
-        ['Modulefile path', `<code>${escapeHtml(module.modulefilePath)}</code>`],
-        ['MODULEPATH root', `<code>${escapeHtml(modulePathRoot(module.modulefilePath))}</code>`],
-      ])}</section>
+      ${relatedVersionsSection(module, family)}
+      <section class="section"><div class="section-head"><h2>Technical Details</h2></div>${tableFromRows(['Field', 'Value'], technicalDetailsRows(module))}</section>
       <p class="subtle"><a href="#/software-inventory">&larr; Back to Software Inventory</a></p>
     </div>`;
 }

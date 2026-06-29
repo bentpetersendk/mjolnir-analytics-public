@@ -1,4 +1,5 @@
-# Software Inventory Frontend (Software Analytics Milestone 1b)
+# Software Inventory Frontend (Software Analytics Milestone 1b + Software
+Intelligence Milestone 2)
 
 The Software Inventory page is the frontend half of Software Analytics
 Milestone 1 - it renders `software_inventory.json` (private repo's
@@ -7,6 +8,11 @@ see that repo's `docs/architecture/SOFTWARE_INVENTORY_ARCHITECTURE.md`)
 exactly as exported. No AI enrichment, no usage statistics, no job
 metadata, no categories/tags - those are later milestones. This page only
 ever displays fields that already exist in the export today.
+
+Software Intelligence Milestone 2 extends the module detail page with
+version relationships (Related Versions, Default Version, Technical
+Details renamed from Location) - still zero AI/web/job data, see "Version
+relationships (Milestone 2)" below.
 
 ## JSON contract
 
@@ -31,10 +37,24 @@ Fetched from `${MJOLNIR_DASHBOARD_DATA_BASE}software_inventory/software_inventor
   },
   "modules": [
     {"module_name": "...", "module_version": "...", "modulefile_path": "...",
-     "whatis_text": "...", "first_seen": "...", "last_seen": "...", "removed_at": null}
-  ]
+     "whatis_text": "...", "first_seen": "...", "last_seen": "...", "removed_at": null,
+     "modulepath_root": "..."}
+  ],
+  "module_families": {
+    "...module_name...": {
+      "versions": [{"version": "...", "modulefile_path": "..."}],
+      "default_version": "...",
+      "default_modulefile_path": "..."
+    }
+  }
 }
 ```
+
+`modulepath_root` (per-module) and `module_families` (top-level) are
+Milestone 2 additions - both optional/additive, `schema_version` is
+unchanged. An export from before Milestone 2 simply omits them; this
+loader treats that exactly like "no related versions exist," never an
+error (see "Version relationships (Milestone 2)" below).
 
 This loader is the one exception to this repo's usual privacy-tier
 handling (`PLATFORM_STATUS.md`, `PUBLICATION_REVIEW.md`): `module_catalog`
@@ -142,6 +162,45 @@ Enriched) that this milestone explicitly does not implement -
 a state nothing in the export supports yet. Adding a third/fourth state
 later is a matter of adding more cases to that one function once the
 underlying export field actually exists - no template or layout change.
+
+## Version relationships (Milestone 2)
+
+`normalizeModuleFamilies()`/`normalizeModuleFamily()` (`js/data-loader.js`)
+turn the export's `module_families` object into
+`softwareInventory.moduleFamilies`, keyed by `module_name` exactly as
+exported - no client-side grouping or fuzzy matching, since `module_name`
+is already the unambiguous relationship boundary (the export computed it
+the same way; see the private repo's
+`docs/architecture/SOFTWARE_INVENTORY_ARCHITECTURE.md`).
+
+`moduleDetailPage()` looks up `moduleFamilies[module.moduleName]` and
+passes it to two new functions:
+
+- **`relatedVersionsSection(module, family)`**: renders nothing if the
+  family has only one version (nothing to relate). Otherwise renders a
+  "Default Version" stat (omitted entirely when `family.defaultVersion` is
+  `null` - this page never guesses one) and a `<ul class="version-list">`
+  of every sibling version, newest-first, each a link to
+  `#/module/<encodeURIComponent(modulefile_path)>` except the current
+  module's own version, which renders as plain bold text with no link (the
+  same "don't link to the page you're already on" rule the existing nav
+  sidebar follows). A version that is also the resolved default is
+  additionally labelled `(default)` alongside `(current)` when both apply.
+- **`technicalDetailsRows(module)`**: replaces the old hardcoded
+  two-row table body (renamed from "Location") with a small array of
+  `[label, value]` pairs, specifically so a future milestone can append a
+  row (Module Family, Hidden Module, Dependencies, Aliases - the brief's
+  own future-fields list) by adding one array entry, not restructuring the
+  section. Today it has exactly two rows: Modulefile Path and MODULEPATH
+  Root (the latter now read from the export's `modulepath_root` field when
+  present, falling back to the existing client-side `modulePathRoot()`
+  derivation for an older export that doesn't have it yet - so this page
+  never breaks against a pre-Milestone-2 `software_inventory.json`).
+
+No version-ordering logic exists in the frontend: `family.versions` is
+already sorted by the exporter's `version_sort_key()` (natural/numeric,
+not alphabetic - see the private repo's architecture doc), so this page
+only ever reverses that array for newest-first display, never re-sorts it.
 
 ## Future extension points
 

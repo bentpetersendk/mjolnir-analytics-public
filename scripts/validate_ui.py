@@ -78,4 +78,18 @@ assert "queueInsights" in app and "buildPlatformRegistry({ data, nodeInsights, n
 assert "{ id: 'queue-insights'" not in status, "Queue Insights must not remain in PLANNED_MODULES now that it has a real collector"
 assert "renderSystemHealthCard" not in app and "renderSystemHealthCard" not in status, \
     "renderSystemHealthCard was superseded by the Executive Overview hero/Platform Overview - should be removed, not left dead"
+
+# Software Intelligence Milestone 2 (docs/architecture/SOFTWARE_INVENTORY_ARCHITECTURE.md,
+# "Milestone 2: version relationships"): related versions/default version/
+# version navigation on the module detail page, all derived from the new
+# module_families export key - no AI, no web lookup, no job/usage data.
+assert "normalizeModuleFamilies" in loader, "missing module_families normalizer in data-loader.js"
+assert "moduleFamilies" in loader and "moduleFamilies" in app, \
+    "moduleFamilies must be threaded from data-loader.js through to app.js"
+assert "relatedVersionsSection" in app, "missing Related Versions section renderer"
+assert "Related Versions" in app, "missing Related Versions section heading"
+assert "Default Version" in app, "missing Default Version stat label"
+assert "Technical Details" in app, "Location section must be renamed to Technical Details"
+assert "<h2>Location</h2>" not in app, "old Location heading must not remain alongside the new Technical Details heading"
+assert "technicalDetailsRows" in app, "Technical Details rows must come from an extensible row-list helper, not a hardcoded table body"
 print('ui checks passed')
