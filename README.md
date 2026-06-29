@@ -19,7 +19,9 @@ framework and [docs/DASHBOARD_DATA_MIGRATION.md](docs/DASHBOARD_DATA_MIGRATION.m
 for how live collector data reaches this frontend via the separate
 `dashboard-data` repository. See
 [docs/SOFTWARE_INVENTORY_FRONTEND.md](docs/SOFTWARE_INVENTORY_FRONTEND.md)
-for the Software Inventory page (Software Analytics Milestone 1b).
+for the Software Inventory page (Software Analytics Milestone 1b) and
+[docs/SOFTWARE_EXPLORER_ARCHITECTURE.md](docs/SOFTWARE_EXPLORER_ARCHITECTURE.md)
+for its interactive dashboard extension (Software Explorer Milestone 4).
 
 ## Development Workflow
 

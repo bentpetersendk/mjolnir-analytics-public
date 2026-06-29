@@ -20,6 +20,14 @@ exact-match-only software facts collected from public package registries
 zero web summarization, zero fuzzy matching. See "Software Knowledge
 (Milestone 3)" below.
 
+Software Explorer Milestone 4 turns this page into an interactive
+dashboard - clickable summary/health/admin cards, a persistent quick-filter
+bar, rich multi-badge status, and a Software Collections card grid for
+Related Software - built entirely on data the first three milestones
+already exported, with no new client-side computation. See
+[SOFTWARE_EXPLORER_ARCHITECTURE.md](SOFTWARE_EXPLORER_ARCHITECTURE.md) for
+the full design.
+
 ## JSON contract
 
 Fetched from `${MJOLNIR_DASHBOARD_DATA_BASE}software_inventory/software_inventory.json`
