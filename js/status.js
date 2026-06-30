@@ -261,7 +261,7 @@ const PLANNED_MODULES = [
 // each module's data lives in - statusBar()/platformStatusPanel() below
 // just iterate the result, so adding a module here is the only frontend
 // change a future collector needs (see the file header).
-export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory }) {
+export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory, softwareIntelligence }) {
   const warehouse = slurmAnalyticsPipeline?.warehouse || {};
   const warehouseAvailable = Boolean(slurmAnalyticsPipeline?.available) && Boolean(warehouse.total_jobs);
   const warehouseModule = {
@@ -355,6 +355,29 @@ export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurm
     planned: false,
   };
 
+  // software_intelligence's overview.json (Phase 1 backend, pre-Prolog) carries
+  // the same collector/collector_status/platform_module/cadence contract -
+  // see export_software_intelligence.py. "Operational, waiting for usage
+  // data" (overview.totalJobsIngested === 0) is still `available: true` and
+  // a healthy collectorStatus - this registry entry should read as Healthy
+  // in that state, never Failed; only an unreachable/malformed overview.json
+  // (available: false) reads as failed here.
+  const softwareIntelligenceAvailable = Boolean(softwareIntelligence?.available);
+  const softwareIntelligenceModule = {
+    id: 'software-intelligence',
+    label: softwareIntelligence?.platformModule || 'Software Intelligence',
+    kind: 'analytics',
+    collectorName: softwareIntelligence?.collectorName || 'software_intelligence_export',
+    generatedAt: softwareIntelligence?.generatedAt ?? null,
+    expectedRefreshSeconds: softwareIntelligence?.expectedRefreshSeconds ?? null,
+    warningAfterIntervals: softwareIntelligence?.warningAfterIntervals ?? null,
+    criticalAfterIntervals: softwareIntelligence?.criticalAfterIntervals ?? null,
+    dataWindowDays: null,
+    available: softwareIntelligenceAvailable,
+    status: softwareIntelligence?.collectorStatus || (softwareIntelligenceAvailable ? null : 'failed'),
+    planned: false,
+  };
+
   const planned = PLANNED_MODULES.map((m) => ({
     ...m,
     planned: true,
@@ -367,7 +390,7 @@ export function buildPlatformRegistry({ nodeInsights, nodeInsightsHistory, slurm
     status: null,
   }));
 
-  return [warehouseModule, nodeModule, pipelineModule, queueModule, softwareInventoryModule, ...planned];
+  return [warehouseModule, nodeModule, pipelineModule, queueModule, softwareInventoryModule, softwareIntelligenceModule, ...planned];
 }
 
 export function findModule(registry, id) {
