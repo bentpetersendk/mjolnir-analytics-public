@@ -293,12 +293,28 @@ function mountChartToolbar(el, chart, entry) {
 
 export function mountCharts() {
   disposeCharts();
+  delete document.body.dataset.chartsReady;
   if (!window.echarts) return;
   chartsRenderedForMobile = isMobileChartViewport();
+  // Readiness signal (Version 1.3, Reporting & Executive Briefings): ECharts'
+  // SVG layout can still settle in a microtask/animation-frame after init()+
+  // setOption() return, so a headless --print-to-pdf invocation can't just
+  // fire on page load - it needs something to wait on. Once every chart
+  // mounted this pass has fired its own 'finished' event, mark the body
+  // ready; reporting/print.js (and any future headless PDF script) polls
+  // this instead of a fixed sleep. Harmless on every other page too - it's
+  // just an unused attribute if nothing reads it.
+  const pendingIds = new Set(chartRegistry.keys());
+  const markFinished = (id) => {
+    pendingIds.delete(id);
+    if (pendingIds.size === 0) document.body.dataset.chartsReady = 'true';
+  };
+  if (pendingIds.size === 0) document.body.dataset.chartsReady = 'true';
   chartRegistry.forEach((entry, id) => {
     const el = document.getElementById(id);
-    if (!el) return;
+    if (!el) { markFinished(id); return; }
     const chart = window.echarts.init(el, null, { renderer: 'svg' });
+    chart.on('finished', () => markFinished(id));
     chart.setOption(entry.option);
     el.classList.remove('is-loading');
     if (entry.onClick) {
