@@ -17,6 +17,7 @@ import {
   loadSlurmAnalyticsPipelineStatus,
   loadQueueInsightsData,
   loadSoftwareInventoryData,
+  loadSoftwareIntelligenceData,
 } from './data-loader.js';
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -112,7 +113,7 @@ function deepEqual(a, b) {
   return sa === sb;
 }
 
-// Reuses the exact six loaders init() already calls - no duplicate fetch
+// Reuses the exact seven loaders init() already calls - no duplicate fetch
 // logic anywhere in this file. Each loader already catches its own errors
 // and returns an "unavailable"/fallback shape rather than throwing, but
 // Promise.allSettled is kept as a second line of defense so one truly
@@ -125,10 +126,11 @@ async function fetchAll() {
     loadSlurmAnalyticsPipelineStatus(),
     loadQueueInsightsData(),
     loadSoftwareInventoryData(),
+    loadSoftwareIntelligenceData(),
   ]);
   const value = (result) => (result.status === 'fulfilled' ? result.value : null);
-  const [dataResult, nodeInsightsResult, nodeInsightsHistoryResult, slurmResult, queueResult, softwareResult] = settled.map(value);
-  return { dataResult, nodeInsightsResult, nodeInsightsHistoryResult, slurmResult, queueResult, softwareResult };
+  const [dataResult, nodeInsightsResult, nodeInsightsHistoryResult, slurmResult, queueResult, softwareResult, softwareIntelligenceResult] = settled.map(value);
+  return { dataResult, nodeInsightsResult, nodeInsightsHistoryResult, slurmResult, queueResult, softwareResult, softwareIntelligenceResult };
 }
 
 export function lastUpdatedLabel() {
@@ -178,6 +180,7 @@ async function runRefreshCycle(hooks) {
       slurmAnalyticsPipeline: isAvailable(fetched.slurmResult) ? fetched.slurmResult : current.slurmAnalyticsPipeline,
       queueInsights: mergeQueueInsights(current.queueInsights, fetched.queueResult),
       softwareInventory: isAvailable(fetched.softwareResult) ? fetched.softwareResult : current.softwareInventory,
+      softwareIntelligence: isAvailable(fetched.softwareIntelligenceResult) ? fetched.softwareIntelligenceResult : current.softwareIntelligence,
     };
     const changed = !deepEqual(current, next);
     setLastUpdatedFromBundle(next);

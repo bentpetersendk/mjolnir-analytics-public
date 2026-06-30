@@ -1,4 +1,4 @@
-import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus, loadQueueInsightsData, loadSoftwareInventoryData } from './data-loader.js';
+import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus, loadQueueInsightsData, loadSoftwareInventoryData, loadSoftwareIntelligenceData, loadSoftwareIntelligenceModuleDetail } from './data-loader.js';
 import { requestAnalyticsRecovery } from './recovery-service.js';
 import { startAutoRefresh, setLastUpdatedFromBundle, lastUpdatedLabel, getLastUpdatedAt, isToastVisible } from './refresh-manager.js';
 import {
@@ -57,6 +57,17 @@ const navGroups = [
     ],
   },
   {
+    heading: 'Software Intelligence',
+    items: [
+      { id: 'si-overview', label: 'Overview', icon: 'home' },
+      { id: 'si-most-used', label: 'Most Used Software', icon: 'trophy' },
+      { id: 'si-trending', label: 'Trending', icon: 'spark' },
+      { id: 'si-versions', label: 'Version Adoption', icon: 'chart' },
+      { id: 'si-relationships', label: 'Relationships', icon: 'cluster' },
+      { id: 'si-timeline', label: 'Timeline', icon: 'chart' },
+    ],
+  },
+  {
     heading: 'Infrastructure',
     items: [
       { id: 'infrastructure', label: 'Infrastructure', icon: 'server' },
@@ -103,6 +114,7 @@ const navItems = navGroups.flatMap((group) => group.items);
 const hiddenRouteItems = [
   { id: 'groups', label: 'Groups', icon: 'cluster' },
   { id: 'sections', label: 'Sections', icon: 'book' },
+  { id: 'si-module', label: 'Module Detail', icon: 'box' },
 ];
 const allRouteItems = navItems.concat(hiddenRouteItems);
 
@@ -129,6 +141,15 @@ const state = {
   // client-side filtering framework rather than introducing a second
   // filtering implementation."
   softwareInventoryFilters: { search: '', quickFilter: 'all', sortKey: 'moduleName', sortDir: 'asc', page: 1 },
+  // Software Intelligence (docs/architecture/SOFTWARE_INTELLIGENCE_ARCHITECTURE.md
+  // in the private repo). Same client-side-only filter/sort/paginate state
+  // shape as softwareInventoryFilters above, namespaced for this module's
+  // Most Used Software table.
+  softwareIntelligenceFilters: { search: '', sortKey: 'jobs', sortDir: 'desc', page: 1 },
+  softwareIntelligenceTrendingWindow: 'all-time',
+  softwareIntelligenceRelationshipsModule: null,
+  softwareIntelligenceTimelineModule: 'all',
+  softwareIntelligenceTimelineGranularity: 'daily',
 };
 
 let data = null;
@@ -137,8 +158,32 @@ let nodeInsightsHistory = null;
 let slurmAnalyticsPipeline = null;
 let queueInsights = null;
 let softwareInventory = null;
+let softwareIntelligence = null;
 let platformRegistry = [];
 let warehouseSummary = {};
+
+// Lazy per-module Software Intelligence detail fetches (module/<name>.json) -
+// deliberately outside `state` (not part of view-state serialization
+// concerns) and outside the init() Promise.all bundle, so opening a module
+// detail page or filtering Timeline/Relationships to one module is the only
+// thing that ever fetches that module's file. Map<moduleName, detailOrNull>;
+// a pending fetch is tracked in the Set so a second render() while it's in
+// flight doesn't trigger a duplicate request.
+const softwareIntelligenceModuleCache = new Map();
+const softwareIntelligenceModuleLoading = new Set();
+
+function requestSoftwareIntelligenceModuleDetail(moduleName) {
+  if (!moduleName || softwareIntelligenceModuleCache.has(moduleName) || softwareIntelligenceModuleLoading.has(moduleName)) return;
+  softwareIntelligenceModuleLoading.add(moduleName);
+  loadSoftwareIntelligenceModuleDetail(moduleName).then((detail) => {
+    softwareIntelligenceModuleLoading.delete(moduleName);
+    softwareIntelligenceModuleCache.set(moduleName, detail);
+    if (state.route === `si-module/${encodeURIComponent(moduleName)}`
+      || (isSoftwareIntelligenceTimelineRoute(state.route) && state.softwareIntelligenceTimelineModule === moduleName)) {
+      render();
+    }
+  });
+}
 
 // Data Freshness / Platform Status framework (docs/PLATFORM_STATUS.md):
 // page renderers call analyticsStatusBar()/infraStatusBar() rather than
@@ -146,6 +191,7 @@ let warehouseSummary = {};
 function analyticsStatusBar() { return statusBar(findModule(platformRegistry, 'analytics-warehouse')); }
 function infraStatusBar() { return statusBar(findModule(platformRegistry, 'node-insights')); }
 function softwareInventoryStatusBar() { return statusBar(findModule(platformRegistry, 'software-inventory')); }
+function softwareIntelligenceStatusBar() { return statusBar(findModule(platformRegistry, 'software-intelligence')); }
 
 function icon(name) {
   const icons = {
@@ -283,6 +329,26 @@ function isSoftwareModuleDetailRoute(route) { return /^module\/.+$/.test(route |
 function softwareModuleDetailKey(route) {
   return isSoftwareModuleDetailRoute(route) ? decodeURIComponent(route.slice('module/'.length)) : null;
 }
+// Software Intelligence module detail: #/si-module/<encoded module_name>.
+// Module names don't contain "/", but decoded/encoded the same defensive
+// way as softwareModuleDetailKey() above rather than a plain split-on-slash.
+function isSoftwareIntelligenceModuleDetailRoute(route) { return /^si-module\/.+$/.test(route || ''); }
+function softwareIntelligenceModuleDetailKey(route) {
+  return isSoftwareIntelligenceModuleDetailRoute(route) ? decodeURIComponent(route.slice('si-module/'.length)) : null;
+}
+// Relationships deep-link: #/si-relationships (default selection) or
+// #/si-relationships/<encoded module_name> (pre-selected). This app's
+// router has no query-string parsing anywhere - every parametrized route is
+// a plain hash segment (module/<path>, u/<token>) - so an optional segment
+// after si-relationships follows that same convention rather than
+// introducing ?module= parsing for the first time.
+function isSoftwareIntelligenceRelationshipsRoute(route) { return /^si-relationships(\/.+)?$/.test(route || ''); }
+function softwareIntelligenceRelationshipsModuleKey(route) {
+  if (!isSoftwareIntelligenceRelationshipsRoute(route)) return null;
+  const rest = route.slice('si-relationships'.length);
+  return rest.startsWith('/') ? decodeURIComponent(rest.slice(1)) : null;
+}
+function isSoftwareIntelligenceTimelineRoute(route) { return route === 'si-timeline'; }
 function pageTitle(route) {
   if (isUserReportRoute(route)) return 'My Analytics Report';
   if (isPersonalRoute(route)) return 'My Analytics';
@@ -293,6 +359,8 @@ function pageTitle(route) {
   }
   if (isNodeDetailRoute(route)) return 'Node Detail';
   if (isSoftwareModuleDetailRoute(route)) return 'Module Detail';
+  if (isSoftwareIntelligenceModuleDetailRoute(route)) return 'Software Intelligence: Module Detail';
+  if (isSoftwareIntelligenceRelationshipsRoute(route)) return 'Relationships';
   return allRouteItems.find((item) => item.id === route)?.label || 'Overview';
 }
 function trendDirection(current, previous, lowerIsBetter = false) { const delta = num(current) - num(previous); const good = lowerIsBetter ? delta < 0 : delta > 0; if (Math.abs(delta) < 0.0001) return { text: 'Flat', tone: 'info' }; return { text: `${good ? 'Improving' : 'Needs attention'} (${delta > 0 ? '+' : ''}${pct(delta, 1)})`, tone: good ? 'good' : 'warn' }; }
@@ -1682,6 +1750,568 @@ function moduleDetailPage(modulefilePath) {
     </div>`;
 }
 
+// ============================================================================
+// Software Intelligence (private repo's docs/architecture/
+// SOFTWARE_INTELLIGENCE_ARCHITECTURE.md) - "what software is actually being
+// used," complementing Software Inventory above ("what software exists").
+// The export is documented as the complete public API for this module (no
+// server-side Top-N truncation anywhere) - every list-rendering page below
+// sorts/paginates/limits-for-display purely client-side over an
+// already-loaded array, the same posture Software Inventory's table uses.
+// ============================================================================
+
+// Two distinct empty states, per the brief: a true "data has not been
+// published yet" failure (file missing/unparseable, or collectorStatus
+// explicitly 'failed') vs. an operational-but-empty state (the collector
+// ran fine, there is simply no usage data ingested yet - expected and
+// healthy before a Slurm Prolog exists). Every page calls this first and
+// renders whatever it returns instead of its own content when non-null.
+function softwareIntelligenceUnavailable() {
+  return `<div class="empty-state">Software Intelligence data has not been published yet (or the file failed to load/parse). See docs/architecture/SOFTWARE_INTELLIGENCE_ARCHITECTURE.md in the private repo.</div>`;
+}
+
+function softwareIntelligenceWaitingForData() {
+  return `<div class="empty-state">Software Intelligence is operational. Waiting for usage data. The importer, materializer, and export run nightly - this view will populate automatically once a Slurm Prolog (or the sample generator) starts dropping per-job usage records.</div>`;
+}
+
+function softwareIntelligenceGuard() {
+  if (!softwareIntelligence || !softwareIntelligence.available) {
+    return `<div class="stack">${softwareIntelligenceUnavailable()}</div>`;
+  }
+  if (!softwareIntelligence.overview.totalJobsIngested) {
+    return `<div class="stack">${softwareIntelligenceStatusBar()}${softwareIntelligenceWaitingForData()}</div>`;
+  }
+  return null;
+}
+
+// Richer than the standard 4-row statusBar() - every operational metric
+// overview.collectorStats actually carries, declared as a [label, key]
+// list so a future additional metric the backend starts exposing needs no
+// change here beyond one more row.
+const COLLECTOR_STATS_ROWS = [
+  ['Files Discovered', 'filesDiscovered'],
+  ['Files Processed', 'filesProcessed'],
+  ['Files Invalid', 'filesInvalid'],
+  ['Files Failed', 'filesFailed'],
+  ['Jobs Imported', 'jobsImported'],
+];
+function softwareIntelligenceHealthPanel() {
+  const stats = asObject(softwareIntelligence?.overview?.collectorStats);
+  const rows = COLLECTOR_STATS_ROWS
+    .filter(([, key]) => stats[key] !== null && stats[key] !== undefined)
+    .map(([label, key]) => [label, fmt(stats[key])]);
+  rows.push(['Last Import', formatLocalDateTime(stats.lastImportAt, 'Never')]);
+  rows.push(['Last Materialized', formatLocalDateTime(stats.lastMaterializedAt, 'Never')]);
+  rows.push(['Drop Zone Status', stats.dropZoneHasData
+    ? '<span class="pill good">Receiving data</span>'
+    : '<span class="pill info">Waiting for usage data</span>']);
+  return `<section class="section">
+    <div class="section-head"><h2>Software Intelligence Health</h2><span class="subtle">Operational detail behind the collector status above</span></div>
+    ${tableFromRows(['Metric', 'Value'], rows)}
+  </section>`;
+}
+
+function trendBadge(direction) {
+  const tones = { up: ['good', '&#8593; Up'], down: ['bad', '&#8595; Down'], flat: ['muted', '&#8594; Flat'] };
+  const [tone, label] = tones[direction] || tones.flat;
+  return `<span class="pill ${tone}">${label}</span>`;
+}
+
+function softwareIntelligenceModuleLink(moduleName) {
+  return `<a href="#/si-module/${encodeURIComponent(moduleName)}">${escapeHtml(moduleName)}</a>`;
+}
+
+// --- Overview ---------------------------------------------------------------
+
+function softwareIntelligenceOverviewPage() {
+  const guard = softwareIntelligenceGuard();
+  if (guard) return guard;
+  const o = softwareIntelligence.overview;
+  const allTime = asArray(softwareIntelligence.topModules.all_time);
+  const top10 = allTime.slice(0, 10);
+  const growing = asArray(softwareIntelligence.growthDecline.growing).slice(0, 5);
+  const declining = asArray(softwareIntelligence.growthDecline.declining).slice(0, 5);
+  // createLineChart() reads each row's report_date/timestamp field for its
+  // x-axis categories - the normalized dailyUsage shape uses `date`, so
+  // rows are remapped here rather than changing that normalization (other
+  // callers read `.date` directly, e.g. buildWeeklyUsage() below).
+  const recentDays = asArray(softwareIntelligence.dailyUsage).slice(-30).map((r) => ({ report_date: r.date, jobs: r.jobs }));
+
+  const topChart = createBarChart(
+    top10.map((m) => m.moduleName),
+    top10.map((m) => m.jobs),
+    (v) => fmt(v),
+    { horizontal: true, label: 'Top 10 modules by jobs', csv: true },
+  );
+  const activityChart = createLineChart(
+    'Recent Activity (last 30 days)',
+    recentDays,
+    [{ label: 'Jobs', color: 'var(--blue)', values: recentDays.map((r) => r.jobs) }],
+    (v) => fmt(v),
+    { label: 'Software Intelligence recent activity', csv: true },
+  );
+
+  const growthList = (entries, emptyMessage) => (entries.length
+    ? `<ul class="version-list">${entries.map((e) => `<li>${softwareIntelligenceModuleLink(e.moduleName)} <span class="subtle">${pct((e.changePct ?? 0) / 100, 1)}</span></li>`).join('')}</ul>`
+    : `<div class="empty-state">${emptyMessage}</div>`);
+
+  return `
+    <div class="stack">
+      ${softwareIntelligenceStatusBar()}
+      ${softwareIntelligenceHealthPanel()}
+      <section class="section">
+        <div class="section-head"><h2>Software Intelligence Overview</h2><span class="subtle">Usage analytics derived from per-job module-load records</span></div>
+        <div class="cards-grid">${[
+          statBlock('Total Jobs Analysed', fmt(o.totalJobsIngested), 'Jobs ingested into software_usage_raw'),
+          statBlock('Distinct Software Packages', fmt(o.distinctModules), 'Unique module names observed'),
+          statBlock('Distinct Versions', fmt(o.distinctModuleVersions), 'Unique name/version pairs observed'),
+          statBlock('Unique Users', fmt(o.uniqueUsers), 'Count only - no usernames ever published'),
+          statBlock('Unique Accounts', fmt(o.uniqueAccounts), 'Count only - see Top Software by Account'),
+          statBlock('Total CPU Hours', fmt(o.totalCpuHours), 'Summed across all ingested jobs'),
+          statBlock('Date Range', `${o.dateRange.firstDate || '-'} &rarr; ${o.dateRange.lastDate || '-'}`, 'Coverage of software_usage_daily'),
+        ].join('')}</div>
+      </section>
+      <section class="section">
+        <div class="section-head"><h2>Top 10 Software</h2><span class="subtle">By job count, all time</span></div>
+        ${typeof topChart === 'string' ? topChart : topChart.html}
+      </section>
+      <div class="cards-grid">
+        <section class="section"><div class="section-head"><h2>Fastest Growing</h2><span class="subtle">Trailing 30d vs prior 30d</span></div>${growthList(growing, 'No module shows growth over the trailing 30 days yet.')}</section>
+        <section class="section"><div class="section-head"><h2>Fastest Declining</h2><span class="subtle">Trailing 30d vs prior 30d</span></div>${growthList(declining, 'No module shows decline over the trailing 30 days yet.')}</section>
+      </div>
+      <section class="section">
+        <div class="section-head"><h2>Recent Activity</h2></div>
+        ${typeof activityChart === 'string' ? activityChart : activityChart.html}
+      </section>
+    </div>`;
+}
+
+// --- Most Used Software -----------------------------------------------------
+
+const SOFTWARE_INTELLIGENCE_PAGE_SIZE = 50;
+
+function softwareIntelligenceTrendForModule(moduleName) {
+  const entry = asArray(softwareIntelligence?.trending?.modules).find((m) => m.moduleName === moduleName);
+  return entry ? entry.trendDirection : 'flat';
+}
+
+function softwareIntelligenceFilteredModules() {
+  const filters = state.softwareIntelligenceFilters;
+  const all = asArray(softwareIntelligence?.topModules?.all_time);
+  const term = filters.search.trim().toLowerCase();
+  const filtered = term ? all.filter((m) => m.moduleName.toLowerCase().includes(term)) : all.slice();
+  const dir = filters.sortDir === 'desc' ? -1 : 1;
+  filtered.sort((a, b) => {
+    const av = a[filters.sortKey];
+    const bv = b[filters.sortKey];
+    if (typeof av === 'number' && typeof bv === 'number') return dir * (av - bv);
+    return dir * String(av || '').localeCompare(String(bv || ''));
+  });
+  return filtered;
+}
+
+function softwareIntelligenceMostUsedTable(rows) {
+  const filters = state.softwareIntelligenceFilters;
+  const columns = [
+    ['Module', 'moduleName'], ['Jobs', 'jobs'], ['Users', 'uniqueUsers'], ['CPU Hours', 'cpuHours'],
+    ['First Seen', 'firstSeen'], ['Last Seen', 'lastSeen'], ['Trend', null],
+  ];
+  const headers = columns.map(([label, key]) => {
+    if (!key) return `<th>${escapeHtml(label)}</th>`;
+    const active = key === filters.sortKey;
+    const arrow = active ? (filters.sortDir === 'desc' ? ' &darr;' : ' &uarr;') : '';
+    return `<th><button type="button" class="sort-button" data-action="sort-software-intelligence" data-key="${key}">${escapeHtml(label)}${arrow}</button></th>`;
+  }).join('');
+  const body = rows.length
+    ? rows.map((m) => `<tr>
+        <td>${softwareIntelligenceModuleLink(m.moduleName)}</td>
+        <td>${fmt(m.jobs)}</td>
+        <td>${fmt(m.uniqueUsers)}</td>
+        <td>${fmt(m.cpuHours)}</td>
+        <td>${formatLocalDateTime(m.firstSeen, '-')}</td>
+        <td>${formatLocalDateTime(m.lastSeen, '-')}</td>
+        <td>${trendBadge(softwareIntelligenceTrendForModule(m.moduleName))}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="${columns.length}">No modules match the current search.</td></tr>`;
+  return `<table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function softwareIntelligencePagination(page, totalPages, totalCount) {
+  if (totalPages <= 1) return '';
+  return `<div class="pagination">
+    <button type="button" class="btn" data-action="page-software-intelligence" data-direction="prev" ${page <= 1 ? 'disabled' : ''}>&larr; Prev</button>
+    <span class="subtle">Page ${page} of ${totalPages} (${fmt(totalCount)} modules)</span>
+    <button type="button" class="btn" data-action="page-software-intelligence" data-direction="next" ${page >= totalPages ? 'disabled' : ''}>Next &rarr;</button>
+  </div>`;
+}
+
+function softwareIntelligenceMostUsedPage() {
+  const guard = softwareIntelligenceGuard();
+  if (guard) return guard;
+  const filters = state.softwareIntelligenceFilters;
+  const filtered = softwareIntelligenceFilteredModules();
+  const totalPages = Math.max(1, Math.ceil(filtered.length / SOFTWARE_INTELLIGENCE_PAGE_SIZE));
+  const page = Math.min(Math.max(1, filters.page), totalPages);
+  const pageRows = filtered.slice((page - 1) * SOFTWARE_INTELLIGENCE_PAGE_SIZE, page * SOFTWARE_INTELLIGENCE_PAGE_SIZE);
+  return `
+    <div class="stack">
+      ${softwareIntelligenceStatusBar()}
+      <section class="section">
+        <div class="section-head"><h2>Most Used Software</h2><span class="subtle">${fmt(filtered.length)} of ${fmt(softwareIntelligence.topModules.all_time.length)} modules</span></div>
+        <div class="table-toolbar">
+          <input type="search" class="search" data-action="search-software-intelligence" placeholder="Search module name..." value="${escapeHtml(filters.search)}" />
+        </div>
+        <div class="table-card">${softwareIntelligenceMostUsedTable(pageRows)}</div>
+        ${softwareIntelligencePagination(page, totalPages, filtered.length)}
+      </section>
+    </div>`;
+}
+
+// --- Trending -----------------------------------------------------------
+
+const TRENDING_WINDOWS = [
+  { id: '7d', label: '7 Day', key: 'changeVsWeekAvgPct' },
+  { id: '30d', label: '30 Day', key: 'changeVsMonthAvgPct' },
+  { id: 'all-time', label: 'All Time', key: null },
+];
+
+function trendingBucket(module, windowId) {
+  if (windowId === 'all-time') return module.trendDirection;
+  const window = TRENDING_WINDOWS.find((w) => w.id === windowId);
+  const value = module[window.key];
+  if (value === null || value === undefined) return 'flat';
+  if (value > 10) return 'up';
+  if (value < -10) return 'down';
+  return 'flat';
+}
+
+function trendingModuleRow(m) {
+  return `<li>${softwareIntelligenceModuleLink(m.moduleName)} <span class="subtle">${fmt(m.jobsToday)} jobs today &middot; 7d avg ${fmt(m.avgJobsPerDayLast7d, 1)} &middot; 30d avg ${fmt(m.avgJobsPerDayLast30d, 1)}</span></li>`;
+}
+
+function softwareIntelligenceTrendingPage() {
+  const guard = softwareIntelligenceGuard();
+  if (guard) return guard;
+  const windowId = state.softwareIntelligenceTrendingWindow;
+  const modules = asArray(softwareIntelligence.trending.modules);
+  const buckets = { up: [], down: [], flat: [] };
+  modules.forEach((m) => buckets[trendingBucket(m, windowId)].push(m));
+
+  const recentDays = asArray(softwareIntelligence.dailyUsage).slice(-60).map((r) => ({ report_date: r.date, jobs: r.jobs }));
+  const contextChart = createLineChart(
+    'Cluster-wide Daily Jobs (last 60 days)',
+    recentDays,
+    [{ label: 'Jobs', color: 'var(--blue)', values: recentDays.map((r) => r.jobs) }],
+    (v) => fmt(v),
+    { label: 'Software Intelligence cluster activity context', csv: true },
+  );
+
+  const windowButtons = TRENDING_WINDOWS.map((w) => `<button type="button" class="quick-filter-button" data-action="set-trending-window" data-window="${w.id}" aria-pressed="${windowId === w.id}">${w.label}</button>`).join('');
+
+  const section = (title, tone, list) => `<section class="section">
+    <div class="section-head"><h2><span class="pill ${tone}">${list.length}</span> ${title}</h2></div>
+    ${list.length ? `<ul class="version-list">${list.map(trendingModuleRow).join('')}</ul>` : '<div class="empty-state">No modules in this category for the selected window.</div>'}
+  </section>`;
+
+  return `
+    <div class="stack">
+      ${softwareIntelligenceStatusBar()}
+      <section class="section">
+        <div class="section-head"><h2>Trending</h2><span class="subtle">As of ${softwareIntelligence.trending.asOf || '-'}</span></div>
+        <div class="quick-filter-bar" role="group" aria-label="Trending window">${windowButtons}</div>
+      </section>
+      <section class="section">${typeof contextChart === 'string' ? contextChart : contextChart.html}</section>
+      ${section('Trending Up', 'good', buckets.up)}
+      ${section('Trending Down', 'bad', buckets.down)}
+      ${section('Stable', 'muted', buckets.flat)}
+    </div>`;
+}
+
+// --- Version Adoption ---------------------------------------------------
+
+function versionAdoptionRow(moduleName, info) {
+  const versions = asArray(info.versions);
+  const totalJobs = versions.reduce((sum, v) => sum + (v.jobs || 0), 0);
+  const chart = createBarChart(
+    versions.map((v) => v.moduleVersion),
+    versions.map((v) => v.jobs),
+    (v) => fmt(v),
+    { horizontal: true, height: Math.max(120, versions.length * 32), label: `${moduleName} version distribution`, csv: true },
+  );
+  const rows = versions.map((v) => [
+    v.moduleVersion,
+    fmt(v.jobs),
+    fmt(v.users),
+    totalJobs ? pct(v.jobs / totalJobs, 1) : '-',
+    formatLocalDateTime(v.firstSeen, '-'),
+    formatLocalDateTime(v.lastSeen, '-'),
+  ]);
+  return `<section class="section">
+    <div class="section-head"><h2>${softwareIntelligenceModuleLink(moduleName)}</h2><span class="subtle">Latest: ${escapeHtml(info.latestVersion || '-')} &middot; Most used: ${escapeHtml(info.mostUsedVersion || '-')}</span></div>
+    ${typeof chart === 'string' ? chart : chart.html}
+    ${tableFromRows(['Version', 'Jobs', 'Users', 'Adoption %', 'First Seen', 'Last Seen'], rows)}
+    <p class="subtle"><a href="#/si-module/${encodeURIComponent(moduleName)}">View migration over time &rarr;</a></p>
+  </section>`;
+}
+
+function softwareIntelligenceVersionsPage() {
+  const guard = softwareIntelligenceGuard();
+  if (guard) return guard;
+  const entries = Object.entries(asObject(softwareIntelligence.versions)).sort(([a], [b]) => a.localeCompare(b));
+  return `
+    <div class="stack">
+      ${softwareIntelligenceStatusBar()}
+      <section class="section">
+        <div class="section-head"><h2>Version Adoption</h2><span class="subtle">${fmt(entries.length)} module(s) with version history</span></div>
+      </section>
+      ${entries.length ? entries.map(([name, info]) => versionAdoptionRow(name, info)).join('') : '<div class="empty-state">No version data available yet.</div>'}
+    </div>`;
+}
+
+// --- Relationships ---------------------------------------------------------
+
+function relationshipStrengthLabel(lift) {
+  if (lift === null || lift === undefined) return '<span class="pill muted">Unknown</span>';
+  if (lift > 1.5) return '<span class="pill good">Strong</span>';
+  if (lift > 1) return '<span class="pill info">Moderate</span>';
+  return '<span class="pill muted">Weak</span>';
+}
+
+function softwareIntelligenceRelationshipsPage(presetModule) {
+  const guard = softwareIntelligenceGuard();
+  if (guard) return guard;
+  const moduleNames = Object.keys(asObject(softwareIntelligence.versions)).sort();
+  if (!moduleNames.length) {
+    return `<div class="stack">${softwareIntelligenceStatusBar()}<div class="empty-state">No modules available to explore relationships for yet.</div></div>`;
+  }
+  const allTimeByJobs = asArray(softwareIntelligence.topModules.all_time);
+  const defaultModule = allTimeByJobs.length ? allTimeByJobs[0].moduleName : moduleNames[0];
+  const selected = (presetModule && moduleNames.includes(presetModule))
+    ? presetModule
+    : (moduleNames.includes(state.softwareIntelligenceRelationshipsModule) ? state.softwareIntelligenceRelationshipsModule : defaultModule);
+  state.softwareIntelligenceRelationshipsModule = selected;
+
+  const related = asArray(asObject(softwareIntelligence.relationships)[selected]);
+  const options = moduleNames.map((name) => `<option value="${escapeHtml(name)}" ${name === selected ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
+  const rows = related.length
+    ? related.map((r) => `<tr>
+        <td>${softwareIntelligenceModuleLink(r.module)}</td>
+        <td>${fmt(r.count)}</td>
+        <td>${r.confidence === null ? '-' : pct(r.confidence, 1)}</td>
+        <td>${relationshipStrengthLabel(r.lift)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="4">No co-occurring modules recorded for ${escapeHtml(selected)} yet.</td></tr>`;
+
+  return `
+    <div class="stack">
+      ${softwareIntelligenceStatusBar()}
+      <section class="section">
+        <div class="section-head"><h2>Relationships</h2><span class="subtle">Users who use this module also use...</span></div>
+        <div class="table-toolbar">
+          <select data-action="set-relationship-module" aria-label="Select module">${options}</select>
+        </div>
+        <div class="table-card"><table><thead><tr><th>Module</th><th>Observed Together</th><th>Confidence</th><th>Strength</th></tr></thead><tbody>${rows}</tbody></table></div>
+      </section>
+    </div>`;
+}
+
+// --- Timeline ---------------------------------------------------------
+
+function isoWeekKey(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  const target = new Date(d.getTime());
+  target.setUTCDate(d.getUTCDate() + 3 - ((d.getUTCDay() + 6) % 7));
+  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((target - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return `${target.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+function buildWeeklyUsage(dailyUsage) {
+  const byWeek = new Map();
+  asArray(dailyUsage).forEach((row) => {
+    const key = isoWeekKey(row.date);
+    const existing = byWeek.get(key) || { week: key, jobs: 0, cpuHours: 0 };
+    existing.jobs += row.jobs || 0;
+    existing.cpuHours += row.cpuHours || 0;
+    byWeek.set(key, existing);
+  });
+  return Array.from(byWeek.values()).sort((a, b) => a.week.localeCompare(b.week));
+}
+
+const TIMELINE_GRANULARITIES = ['daily', 'weekly', 'monthly'];
+
+function softwareIntelligenceTimelinePage() {
+  const guard = softwareIntelligenceGuard();
+  if (guard) return guard;
+  const moduleNames = Object.keys(asObject(softwareIntelligence.versions)).sort();
+  const selectedModule = state.softwareIntelligenceTimelineModule;
+  const granularity = state.softwareIntelligenceTimelineGranularity;
+
+  let series;
+  let categories;
+  if (selectedModule === 'all') {
+    if (granularity === 'monthly') {
+      const rows = asArray(softwareIntelligence.monthlyUsage);
+      categories = rows.map((r) => r.month);
+      series = rows.map((r) => r.jobs);
+    } else if (granularity === 'weekly') {
+      const rows = buildWeeklyUsage(softwareIntelligence.dailyUsage);
+      categories = rows.map((r) => r.week);
+      series = rows.map((r) => r.jobs);
+    } else {
+      const rows = asArray(softwareIntelligence.dailyUsage);
+      categories = rows.map((r) => r.date);
+      series = rows.map((r) => r.jobs);
+    }
+  } else {
+    requestSoftwareIntelligenceModuleDetail(selectedModule);
+    const detail = softwareIntelligenceModuleCache.get(selectedModule);
+    if (!detail) {
+      categories = [];
+      series = [];
+    } else if (granularity === 'monthly' || granularity === 'weekly') {
+      const rows = granularity === 'weekly' ? buildWeeklyUsage(detail.dailyHistory) : (() => {
+        const byMonth = new Map();
+        detail.dailyHistory.forEach((r) => {
+          const key = String(r.date || '').slice(0, 7);
+          const existing = byMonth.get(key) || { month: key, jobs: 0 };
+          existing.jobs += r.jobs || 0;
+          byMonth.set(key, existing);
+        });
+        return Array.from(byMonth.values()).sort((a, b) => a.month.localeCompare(b.month));
+      })();
+      categories = rows.map((r) => r.week || r.month);
+      series = rows.map((r) => r.jobs);
+    } else {
+      categories = detail.dailyHistory.map((r) => r.date);
+      series = detail.dailyHistory.map((r) => r.jobs);
+    }
+  }
+
+  const chartRows = categories.map((c, i) => ({ report_date: c, jobs: series[i] }));
+  const chart = createLineChart(
+    selectedModule === 'all' ? 'Cluster-wide Usage' : `${selectedModule} Usage`,
+    chartRows,
+    [{ label: 'Jobs', color: 'var(--blue)', values: series }],
+    (v) => fmt(v),
+    { label: 'Software Intelligence timeline', csv: true, emptyMessage: selectedModule === 'all' ? undefined : 'Loading module history...' },
+  );
+
+  const moduleOptions = [`<option value="all" ${selectedModule === 'all' ? 'selected' : ''}>All Modules</option>`]
+    .concat(moduleNames.map((name) => `<option value="${escapeHtml(name)}" ${name === selectedModule ? 'selected' : ''}>${escapeHtml(name)}</option>`))
+    .join('');
+  const granularityButtons = TIMELINE_GRANULARITIES.map((g) => `<button type="button" class="quick-filter-button" data-action="set-timeline-granularity" data-granularity="${g}" aria-pressed="${granularity === g}">${g.charAt(0).toUpperCase()}${g.slice(1)}</button>`).join('');
+
+  return `
+    <div class="stack">
+      ${softwareIntelligenceStatusBar()}
+      <section class="section">
+        <div class="section-head"><h2>Timeline</h2><span class="subtle">Historical usage, daily/weekly/monthly</span></div>
+        <div class="table-toolbar">
+          <select data-action="set-timeline-module" aria-label="Filter by module">${moduleOptions}</select>
+          <div class="quick-filter-bar" role="group" aria-label="Granularity">${granularityButtons}</div>
+        </div>
+        ${typeof chart === 'string' ? chart : chart.html}
+      </section>
+    </div>`;
+}
+
+// --- Module Detail -----------------------------------------------------
+
+function softwareIntelligenceModuleDetailPage(moduleName) {
+  const guard = softwareIntelligenceGuard();
+  if (guard) return guard;
+  if (!moduleName || !asObject(softwareIntelligence.versions)[moduleName]) {
+    return `<div class="stack"><section class="section"><div class="section-head"><h2>Module not found</h2><span class="pill warn">Unknown module</span></div><div class="empty-state">No Software Intelligence usage data matches this module name. <a href="#/si-most-used">Back to Most Used Software</a></div></section></div>`;
+  }
+  requestSoftwareIntelligenceModuleDetail(moduleName);
+  const detail = softwareIntelligenceModuleCache.get(moduleName);
+  if (!detail) {
+    return `<div class="stack">
+      <p class="breadcrumb"><a href="#/si-most-used">Most Used Software</a> &rsaquo; ${escapeHtml(moduleName)}</p>
+      ${softwareIntelligenceStatusBar()}
+      <section class="section"><div class="section-head"><h2>${escapeHtml(moduleName)}</h2></div><div class="empty-state">Loading module detail...</div></section>
+    </div>`;
+  }
+
+  const historyRows = detail.dailyHistory.map((r) => ({ report_date: r.date, jobs: r.jobs }));
+  const historyChart = createLineChart(
+    'Usage History',
+    historyRows,
+    [{ label: 'Jobs', color: 'var(--blue)', values: historyRows.map((r) => r.jobs) }],
+    (v) => fmt(v),
+    { label: `${moduleName} usage history`, csv: true },
+  );
+
+  const versionNames = Array.from(new Set(detail.versionDailyHistory.map((r) => r.version))).sort();
+  const datesSet = Array.from(new Set(detail.versionDailyHistory.map((r) => r.date))).sort();
+  const migrationSeries = versionNames.map((version, i) => {
+    const byDate = new Map(detail.versionDailyHistory.filter((r) => r.version === version).map((r) => [r.date, r.jobs]));
+    const palette = ['var(--blue)', 'var(--teal)', 'var(--amber)', 'var(--green)', 'var(--red)', 'var(--cyan)'];
+    return { label: version, color: palette[i % palette.length], values: datesSet.map((d) => byDate.get(d) ?? 0) };
+  });
+  const migrationChart = createLineChart(
+    'Version Migration Over Time',
+    datesSet.map((d) => ({ report_date: d })),
+    migrationSeries,
+    (v) => fmt(v),
+    { area: true, label: `${moduleName} version migration`, csv: true, emptyMessage: 'No per-version history recorded yet.' },
+  );
+
+  const versionRows = asArray(detail.versionInfo.versions).map((v) => [
+    v.moduleVersion, fmt(v.jobs), fmt(v.users), formatLocalDateTime(v.firstSeen, '-'), formatLocalDateTime(v.lastSeen, '-'),
+  ]);
+
+  const relatedRows = detail.relatedModules.length
+    ? detail.relatedModules.map((r) => `<tr>
+        <td>${softwareIntelligenceModuleLink(r.module)}</td>
+        <td>${fmt(r.count)}</td>
+        <td>${r.confidence === null ? '-' : pct(r.confidence, 1)}</td>
+        <td>${relationshipStrengthLabel(r.lift)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="4">No related modules recorded yet.</td></tr>';
+
+  // Cross-link to Software Explorer (zero new fetch - softwareInventory is
+  // already loaded globally). Software Intelligence only knows module_name;
+  // Software Explorer's route key is the modulefile path, looked up via the
+  // family the two modules share by name.
+  const inventoryFamily = asObject(softwareInventory?.moduleFamilies)[moduleName];
+  const inventoryPath = inventoryFamily?.defaultModulefilePath || inventoryFamily?.versions?.[0]?.modulefilePath;
+  const explorerLink = inventoryPath
+    ? `<p class="subtle"><a href="#/module/${encodeURIComponent(inventoryPath)}">View in Software Inventory (what is this software?) &rarr;</a></p>`
+    : '';
+
+  return `
+    <div class="stack">
+      <p class="breadcrumb"><a href="#/si-most-used">Most Used Software</a> &rsaquo; ${escapeHtml(moduleName)}</p>
+      ${softwareIntelligenceStatusBar()}
+      <section class="section">
+        <div class="section-head"><h2>${escapeHtml(moduleName)}</h2>${trendBadge(detail.trendDirection || 'flat')}</div>
+        ${explorerLink}
+        <div class="cards-grid">${[
+          statBlock('Total Jobs', fmt(detail.totalJobs), 'All-time, this module'),
+          statBlock('Total Users', fmt(detail.totalUsers), 'Summed across versions'),
+          statBlock('Total CPU Hours', fmt(detail.totalCpuHours), 'All-time, this module'),
+          statBlock('Jobs Today', fmt(detail.jobsToday ?? 0), 'Most recent ingested date'),
+          statBlock('First Seen', formatLocalDateTime(detail.versionInfo.versions?.[detail.versionInfo.versions.length - 1]?.firstSeen, '-'), 'Earliest version first_seen'),
+          statBlock('Last Seen', formatLocalDateTime(detail.versionInfo.versions?.[0]?.lastSeen, '-'), 'Most recent version last_seen'),
+        ].join('')}</div>
+      </section>
+      <section class="section"><div class="section-head"><h2>Usage History</h2></div>${typeof historyChart === 'string' ? historyChart : historyChart.html}</section>
+      <section class="section"><div class="section-head"><h2>Version Migration Over Time</h2></div>${typeof migrationChart === 'string' ? migrationChart : migrationChart.html}</section>
+      <section class="section">
+        <div class="section-head"><h2>Version Timeline</h2><span class="subtle">Latest: ${escapeHtml(detail.versionInfo.latestVersion || '-')} &middot; Most used: ${escapeHtml(detail.versionInfo.mostUsedVersion || '-')}</span></div>
+        ${tableFromRows(['Version', 'Jobs', 'Users', 'First Seen', 'Last Seen'], versionRows)}
+      </section>
+      <section class="section">
+        <div class="section-head"><h2>Top Relationships</h2><span class="subtle"><a href="#/si-relationships/${encodeURIComponent(moduleName)}">Open in Relationships explorer &rarr;</a></span></div>
+        <div class="table-card"><table><thead><tr><th>Module</th><th>Observed Together</th><th>Confidence</th><th>Strength</th></tr></thead><tbody>${relatedRows}</tbody></table></div>
+      </section>
+      <p class="subtle"><a href="#/si-most-used">&larr; Back to Most Used Software</a></p>
+    </div>`;
+}
+
 function recommendationCards(limit = 3) {
   const groups = asArray(data?.recommendationSummary);
   return groups.slice(0, limit).map((item) => recCard(
@@ -2631,7 +3261,7 @@ function render() {
   // the Capacity Report's wide utilization tables need it today.
   document.body.classList.toggle('report-landscape', state.route === 'reports-capacity');
   resetChartRegistry();
-  platformRegistry = buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory });
+  platformRegistry = buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory, softwareIntelligence });
   warehouseSummary = buildWarehouseSummary({ slurmAnalyticsPipeline, nodeInsights });
   const renderers = {
     landing: landingPage,
@@ -2661,6 +3291,11 @@ function render() {
     methodology: methodologyPage,
     'platform-status': platformStatusPage,
     'software-inventory': softwareInventoryPage,
+    'si-overview': softwareIntelligenceOverviewPage,
+    'si-most-used': softwareIntelligenceMostUsedPage,
+    'si-trending': softwareIntelligenceTrendingPage,
+    'si-versions': softwareIntelligenceVersionsPage,
+    'si-timeline': softwareIntelligenceTimelinePage,
     'reports-executive': () => executiveReportPage({ data, nodeInsights, queueInsights, slurmAnalyticsPipeline, warehouseSummary }),
     'reports-weekly': () => weeklyReportPage({ data, queueInsights, nodeInsightsHistory, warehouseSummary }),
     'reports-queue': () => queueReportPage(queueInsights),
@@ -2676,9 +3311,13 @@ function render() {
           ? nodeDetailPage(nodeDetailRouteName(state.route))
           : isSoftwareModuleDetailRoute(state.route)
             ? moduleDetailPage(softwareModuleDetailKey(state.route))
-            : isHierarchyDetailRoute(state.route)
-              ? hierarchyDetailPage(detailRouteParts(state.route).type, detailRouteParts(state.route).id)
-              : (renderers[state.route] || renderers.landing)();
+            : isSoftwareIntelligenceModuleDetailRoute(state.route)
+              ? softwareIntelligenceModuleDetailPage(softwareIntelligenceModuleDetailKey(state.route))
+              : isSoftwareIntelligenceRelationshipsRoute(state.route)
+                ? softwareIntelligenceRelationshipsPage(softwareIntelligenceRelationshipsModuleKey(state.route))
+                : isHierarchyDetailRoute(state.route)
+                  ? hierarchyDetailPage(detailRouteParts(state.route).type, detailRouteParts(state.route).id)
+                  : (renderers[state.route] || renderers.landing)();
   app.innerHTML = renderShell(content);
   wireEvents();
   mountCharts();
@@ -2691,7 +3330,7 @@ function render() {
 // module-level data variables above, and re-render without disturbing what
 // the viewer is currently doing (route, scroll position, open <details>).
 function currentDataBundle() {
-  return { data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory };
+  return { data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory, softwareIntelligence };
 }
 
 function applyDataUpdate(next) {
@@ -2701,6 +3340,7 @@ function applyDataUpdate(next) {
   slurmAnalyticsPipeline = next.slurmAnalyticsPipeline;
   queueInsights = next.queueInsights;
   softwareInventory = next.softwareInventory;
+  softwareIntelligence = next.softwareIntelligence;
 }
 
 // <details> elements (the "Why are there fewer unique jobs..." /
@@ -2888,6 +3528,63 @@ function wireEvents() {
       render();
     });
   });
+  // Software Intelligence: same search/sort/page wiring pattern as
+  // Software Inventory above, namespaced for the Most Used Software table.
+  document.querySelector('[data-action="search-software-intelligence"]')?.addEventListener('input', (event) => {
+    const cursor = event.currentTarget.selectionStart;
+    state.softwareIntelligenceFilters.search = event.currentTarget.value;
+    state.softwareIntelligenceFilters.page = 1;
+    render();
+    const refocused = document.querySelector('[data-action="search-software-intelligence"]');
+    if (refocused) {
+      refocused.focus();
+      refocused.setSelectionRange(cursor, cursor);
+    }
+  });
+  document.querySelectorAll('[data-action="sort-software-intelligence"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      const key = event.currentTarget.dataset.key;
+      if (state.softwareIntelligenceFilters.sortKey === key) {
+        state.softwareIntelligenceFilters.sortDir = state.softwareIntelligenceFilters.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.softwareIntelligenceFilters.sortKey = key;
+        state.softwareIntelligenceFilters.sortDir = 'asc';
+      }
+      state.softwareIntelligenceFilters.page = 1;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="page-software-intelligence"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      const direction = event.currentTarget.dataset.direction;
+      state.softwareIntelligenceFilters.page += direction === 'prev' ? -1 : 1;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="set-trending-window"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      state.softwareIntelligenceTrendingWindow = event.currentTarget.dataset.window;
+      render();
+    });
+  });
+  document.querySelector('[data-action="set-relationship-module"]')?.addEventListener('change', (event) => {
+    state.softwareIntelligenceRelationshipsModule = event.currentTarget.value;
+    if (state.route === 'si-relationships' || isSoftwareIntelligenceRelationshipsRoute(state.route)) {
+      location.hash = `#/si-relationships/${encodeURIComponent(event.currentTarget.value)}`;
+    } else {
+      render();
+    }
+  });
+  document.querySelector('[data-action="set-timeline-module"]')?.addEventListener('change', (event) => {
+    state.softwareIntelligenceTimelineModule = event.currentTarget.value;
+    render();
+  });
+  document.querySelectorAll('[data-action="set-timeline-granularity"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      state.softwareIntelligenceTimelineGranularity = event.currentTarget.dataset.granularity;
+      render();
+    });
+  });
   document.querySelector('[data-recovery-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -2968,13 +3665,14 @@ function handleRoute() {
 window.addEventListener('hashchange', handleRoute);
 
 async function init() {
-  [data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory] = await Promise.all([
+  [data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory, softwareIntelligence] = await Promise.all([
     loadMjolnirData(),
     loadNodeInsightsData(),
     loadNodeInsightsHistory(),
     loadSlurmAnalyticsPipelineStatus(),
     loadQueueInsightsData(),
     loadSoftwareInventoryData(),
+    loadSoftwareIntelligenceData(),
   ]);
   setLastUpdatedFromBundle(currentDataBundle());
   render();

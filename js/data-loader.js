@@ -28,6 +28,13 @@ const QUEUE_INSIGHTS_BASE = `${NODE_INSIGHTS_HISTORY_BASE}queue_insights/`;
 // publishes Queue Insights' historical half above, just one more
 // subdirectory over.
 const SOFTWARE_INVENTORY_BASE = `${NODE_INSIGHTS_HISTORY_BASE}software_inventory/`;
+// Software Intelligence (private repo's
+// docs/architecture/SOFTWARE_INTELLIGENCE_ARCHITECTURE.md) - "what software
+// is actually being used," a separate module from Software Inventory above
+// ("what software exists"). The export is documented as the complete
+// public API for this module (no server-side Top-N truncation) - one
+// subdirectory over from Software Inventory, same dashboard-data base.
+const SOFTWARE_INTELLIGENCE_BASE = `${NODE_INSIGHTS_HISTORY_BASE}software_intelligence/`;
 // Analytics module (Version 1.2 migration, see private repo's
 // docs/architecture/ANALYTICS_WAREHOUSE.md Section 10): replaces the old
 // locally-committed 90-day frozen snapshot below this comment used to read
@@ -962,6 +969,295 @@ export async function loadSoftwareInventoryData() {
     };
   } catch (error) {
     return emptySoftwareInventory(error);
+  }
+}
+
+// --- Software Intelligence (private repo's export_software_intelligence.py) ---
+// Unlike Software Inventory (one file), this module publishes many small
+// files - all fetched in parallel via tryOptionalJson() so one missing/
+// malformed file degrades only its own block to an empty shape, not the
+// whole module. `available` (the "do we have anything to show at all" gate
+// every page checks first) is true iff overview.json itself loaded; every
+// other field independently falls back to {}/[] the same way
+// emptySoftwareInventory() does for its single file.
+
+function emptySoftwareIntelligence(error) {
+  return {
+    available: false,
+    error: error ? String(error) : null,
+    generatedAt: null,
+    schemaVersion: null,
+    collectorName: null,
+    collectorStatus: 'failed',
+    platformModule: null,
+    failureMessage: null,
+    expectedRefreshSeconds: null,
+    warningAfterIntervals: null,
+    criticalAfterIntervals: null,
+    overview: {},
+    topModules: { all_time: [], rolling_7d: [], rolling_30d: [] },
+    trending: { asOf: null, modules: [] },
+    growthDecline: { growing: [], declining: [] },
+    versions: {},
+    relationships: {},
+    dailyUsage: [],
+    monthlyUsage: [],
+    topByAccount: {},
+    topByPartition: {},
+  };
+}
+
+function normalizeCollectorStats(raw) {
+  const s = asObject(raw);
+  return {
+    filesDiscovered: s.files_discovered ?? null,
+    filesProcessed: s.files_processed ?? null,
+    filesInvalid: s.files_invalid ?? null,
+    filesFailed: s.files_failed ?? null,
+    jobsImported: s.jobs_imported ?? null,
+    lastImportAt: s.last_import_at ?? null,
+    lastMaterializedAt: s.last_materialized_at ?? null,
+    dropZoneHasData: Boolean(s.drop_zone_has_data),
+  };
+}
+
+function normalizeOverview(raw) {
+  const o = asObject(raw);
+  const range = asObject(o.date_range);
+  return {
+    totalJobsIngested: o.total_jobs_ingested ?? 0,
+    distinctModules: o.distinct_modules ?? 0,
+    distinctModuleVersions: o.distinct_module_versions ?? 0,
+    uniqueUsers: o.unique_users ?? 0,
+    uniqueAccounts: o.unique_accounts ?? 0,
+    totalCpuHours: o.total_cpu_hours ?? 0,
+    dateRange: { firstDate: range.first_date ?? null, lastDate: range.last_date ?? null },
+    collectorStats: normalizeCollectorStats(o.collector_stats),
+  };
+}
+
+// Each top_modules.json window entry already carries jobs/unique_users/
+// cpu_hours/first_seen/last_seen together (uncapped, every module) - the
+// frontend sorts/paginates this one list client-side rather than reading
+// three separately-Top-N-ranked arrays the export used to publish.
+function normalizeTopModuleEntry(raw) {
+  const m = asObject(raw);
+  return {
+    moduleName: m.module_name || '',
+    jobs: m.jobs ?? 0,
+    uniqueUsers: m.unique_users ?? 0,
+    cpuHours: m.cpu_hours ?? 0,
+    firstSeen: m.first_seen || null,
+    lastSeen: m.last_seen || null,
+  };
+}
+
+function normalizeTopModules(raw) {
+  const t = asObject(raw);
+  return {
+    all_time: asArray(t.all_time).map(normalizeTopModuleEntry),
+    rolling_7d: asArray(t.rolling_7d).map(normalizeTopModuleEntry),
+    rolling_30d: asArray(t.rolling_30d).map(normalizeTopModuleEntry),
+  };
+}
+
+function normalizeTrendingModule(raw) {
+  const m = asObject(raw);
+  return {
+    moduleName: m.module_name || '',
+    jobsToday: m.jobs_today ?? 0,
+    avgJobsPerDayLast7d: m.avg_jobs_per_day_last_7d ?? 0,
+    avgJobsPerDayLast30d: m.avg_jobs_per_day_last_30d ?? 0,
+    changeVsWeekAvgPct: m.change_vs_week_avg_pct ?? null,
+    changeVsMonthAvgPct: m.change_vs_month_avg_pct ?? null,
+    trendDirection: m.trend_direction || 'flat',
+  };
+}
+
+function normalizeTrending(raw) {
+  const t = asObject(raw);
+  return { asOf: t.as_of || null, modules: asArray(t.modules).map(normalizeTrendingModule) };
+}
+
+function normalizeGrowthDeclineEntry(raw) {
+  const e = asObject(raw);
+  return {
+    moduleName: e.module_name || '',
+    jobsLast30d: e.jobs_last_30d ?? 0,
+    jobsPrior30d: e.jobs_prior_30d ?? 0,
+    changePct: e.change_pct ?? null,
+  };
+}
+
+function normalizeGrowthDecline(raw) {
+  const g = asObject(raw);
+  return {
+    growing: asArray(g.growing).map(normalizeGrowthDeclineEntry),
+    declining: asArray(g.declining).map(normalizeGrowthDeclineEntry),
+  };
+}
+
+function normalizeVersionEntry(raw) {
+  const v = asObject(raw);
+  return {
+    moduleName: v.module_name || '',
+    moduleVersion: v.module_version || '',
+    jobs: v.jobs ?? 0,
+    users: v.users ?? 0,
+    firstSeen: v.first_seen || null,
+    lastSeen: v.last_seen || null,
+  };
+}
+
+function normalizeVersionsEntry(raw) {
+  const v = asObject(raw);
+  return {
+    latestVersion: v.latest_version || null,
+    mostUsedVersion: v.most_used_version || null,
+    versions: asArray(v.versions).map(normalizeVersionEntry),
+  };
+}
+
+function normalizeVersions(raw) {
+  const obj = asObject(raw);
+  const out = {};
+  for (const [name, entry] of Object.entries(obj)) out[name] = normalizeVersionsEntry(entry);
+  return out;
+}
+
+function normalizeRelationshipEntry(raw) {
+  const r = asObject(raw);
+  return { module: r.module || '', count: r.count ?? 0, confidence: r.confidence ?? null, lift: r.lift ?? null };
+}
+
+function normalizeRelationships(raw) {
+  const obj = asObject(raw);
+  const out = {};
+  for (const [name, entries] of Object.entries(obj)) out[name] = asArray(entries).map(normalizeRelationshipEntry);
+  return out;
+}
+
+function normalizeDailyUsage(raw) {
+  return asArray(raw).map((r) => {
+    const row = asObject(r);
+    return { date: row.date || null, jobs: row.jobs ?? 0, cpuHours: row.cpu_hours ?? 0, distinctModules: row.distinct_modules ?? 0 };
+  });
+}
+
+function normalizeMonthlyUsage(raw) {
+  return asArray(raw).map((r) => {
+    const row = asObject(r);
+    return { month: row.month || null, jobs: row.jobs ?? 0, cpuHours: row.cpu_hours ?? 0, distinctModules: row.distinct_modules ?? 0 };
+  });
+}
+
+function normalizeTopByAccount(raw) {
+  const obj = asObject(raw);
+  const out = {};
+  for (const [publicAccountId, entry] of Object.entries(obj)) {
+    const e = asObject(entry);
+    out[publicAccountId] = {
+      accountLabel: e.account_label || publicAccountId,
+      topModules: asArray(e.top_modules).map((m) => {
+        const row = asObject(m);
+        return { moduleName: row.module_name || '', jobs: row.jobs ?? 0, cpuHours: row.cpu_hours ?? 0 };
+      }),
+    };
+  }
+  return out;
+}
+
+function normalizeTopByPartition(raw) {
+  const obj = asObject(raw);
+  const out = {};
+  for (const [partitionName, entries] of Object.entries(obj)) {
+    out[partitionName] = asArray(entries).map((m) => {
+      const row = asObject(m);
+      return { moduleName: row.module_name || '', jobs: row.jobs ?? 0, cpuHours: row.cpu_hours ?? 0 };
+    });
+  }
+  return out;
+}
+
+export async function loadSoftwareIntelligenceData() {
+  try {
+    const [overview, topModules, trending, versions, relationships, dailyUsage, monthlyUsage, topByAccount, topByPartition] = await Promise.all([
+      tryOptionalJson(`${SOFTWARE_INTELLIGENCE_BASE}overview.json`),
+      tryOptionalJson(`${SOFTWARE_INTELLIGENCE_BASE}top_modules.json`),
+      tryOptionalJson(`${SOFTWARE_INTELLIGENCE_BASE}trending.json`),
+      tryOptionalJson(`${SOFTWARE_INTELLIGENCE_BASE}versions.json`),
+      tryOptionalJson(`${SOFTWARE_INTELLIGENCE_BASE}relationships.json`),
+      tryOptionalJson(`${SOFTWARE_INTELLIGENCE_BASE}daily_usage.json`),
+      tryOptionalJson(`${SOFTWARE_INTELLIGENCE_BASE}monthly_usage.json`),
+      tryOptionalJson(`${SOFTWARE_INTELLIGENCE_BASE}top_by_account.json`),
+      tryOptionalJson(`${SOFTWARE_INTELLIGENCE_BASE}top_by_partition.json`),
+    ]);
+    if (!overview) return emptySoftwareIntelligence(null);
+    return {
+      available: true,
+      error: null,
+      generatedAt: overview.generated_at || null,
+      schemaVersion: overview.schema_version || null,
+      collectorName: overview.collector || 'software_intelligence_export',
+      collectorStatus: overview.collector_status || null,
+      platformModule: overview.platform_module || 'Software Intelligence',
+      failureMessage: overview.failure_message || null,
+      expectedRefreshSeconds: overview.expected_refresh_seconds ?? null,
+      warningAfterIntervals: overview.warning_after_intervals ?? null,
+      criticalAfterIntervals: overview.critical_after_intervals ?? null,
+      overview: normalizeOverview(overview.overview),
+      topModules: normalizeTopModules(topModules?.top_modules),
+      trending: normalizeTrending(trending?.trending),
+      growthDecline: normalizeGrowthDecline(trending?.growth_decline),
+      versions: normalizeVersions(versions?.versions),
+      relationships: normalizeRelationships(relationships?.relationships),
+      dailyUsage: normalizeDailyUsage(dailyUsage?.daily_usage),
+      monthlyUsage: normalizeMonthlyUsage(monthlyUsage?.monthly_usage),
+      topByAccount: normalizeTopByAccount(topByAccount?.top_by_account),
+      topByPartition: normalizeTopByPartition(topByPartition?.top_by_partition),
+    };
+  } catch (error) {
+    return emptySoftwareIntelligence(error);
+  }
+}
+
+// Same slug rule as export_software_intelligence.py's safe_module_filename()
+// (non [A-Za-z0-9_.+-] -> "_") so a module name with an unusual character
+// resolves to the exact file the exporter actually wrote.
+function safeModuleFilename(moduleName) {
+  return String(moduleName || '').replace(/[^A-Za-z0-9_.+-]/g, '_');
+}
+
+function normalizeVersionDailyHistoryEntry(raw) {
+  const r = asObject(raw);
+  return { date: r.date || null, version: r.version || '', jobs: r.jobs ?? 0 };
+}
+
+// Lazy, per-module fetch - deliberately NOT part of loadSoftwareIntelligenceData()/
+// the init() Promise.all bundle. Called only when a module detail route, or
+// a module-filtered Timeline/Relationships view, actually needs this one
+// file - this is what makes "support thousands of modules" and "lazy-load
+// large module pages" true rather than aspirational (see
+// docs/architecture/SOFTWARE_INTELLIGENCE_ARCHITECTURE.md in the private repo).
+export async function loadSoftwareIntelligenceModuleDetail(moduleName) {
+  try {
+    const doc = await tryOptionalJson(`${SOFTWARE_INTELLIGENCE_BASE}module/${safeModuleFilename(moduleName)}.json`);
+    if (!doc || !doc.module) return null;
+    const m = asObject(doc.module);
+    return {
+      moduleName: m.module_name || moduleName,
+      totalJobs: m.total_jobs ?? 0,
+      totalUsers: m.total_users ?? 0,
+      totalCpuHours: m.total_cpu_hours ?? 0,
+      trendDirection: m.trend_direction || null,
+      jobsToday: m.jobs_today ?? null,
+      versionInfo: normalizeVersionsEntry(m.version_info),
+      relatedModules: asArray(m.related_modules).map(normalizeRelationshipEntry),
+      dailyHistory: normalizeDailyUsage(m.daily_history),
+      versionDailyHistory: asArray(m.version_daily_history).map(normalizeVersionDailyHistoryEntry),
+    };
+  } catch (error) {
+    return null;
   }
 }
 
