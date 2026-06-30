@@ -1,16 +1,21 @@
 from pathlib import Path
 import json, os, sys, re
 root = Path(__file__).resolve().parents[1]
+# mock-token-alex.json lives under test-fixtures/, not private-user-data/users/ -
+# the latter is rsync -a --delete'd wholesale by publish_analytics_data.sh on every
+# real Analytics publish (it must contain only real generated personal bundles),
+# so a fixture placed there gets silently deleted by the very next nightly run.
+MOCK_FIXTURE_PATH = root / 'test-fixtures' / 'personal-analytics' / 'mock-token-alex.json'
 paths = [
     root / 'sample-data' / 'index.json',
     root / 'sample-data' / 'global' / 'cluster_summary.json',
     root / 'sample-data' / 'global' / 'percentiles.json',
-    root / 'private-user-data' / 'users' / 'mock-token-alex.json',
+    MOCK_FIXTURE_PATH,
 ]
 for path in paths:
     json.loads(path.read_text())
 
-personal = json.loads((root / 'private-user-data' / 'users' / 'mock-token-alex.json').read_text())
+personal = json.loads(MOCK_FIXTURE_PATH.read_text())
 assert personal['username'] == 'alex_mjolnir'
 assert 'peer_comparisons' in personal
 for peer in personal['peer_comparisons']:
