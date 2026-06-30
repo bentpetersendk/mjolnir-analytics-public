@@ -13,6 +13,13 @@ import {
   annotateTimeline,
 } from './charts.js';
 import { OPERATIONAL_EVENTS } from './events.js';
+import { num, fmt, pct, money, escapeHtml, statBlock, tableFromRows } from './ui-helpers.js';
+import {
+  executiveReportPage, weeklyReportPage, piReportPage as piReportPageImpl,
+  userReportPage as userReportPageImpl, queueReportPage, capacityReportPage,
+  getCurrentReportModel, getCurrentReportMarkdown,
+} from './reporting/pages.js';
+import { downloadReportPdf, downloadReportMarkdown } from './reporting/print.js';
 
 const app = document.querySelector('#app');
 
@@ -72,6 +79,15 @@ const navGroups = [
     items: [
       { id: 'users', label: 'Community Comparison', icon: 'users' },
       { id: 'recovery', label: 'View My Analytics', icon: 'key' },
+    ],
+  },
+  {
+    heading: 'Reports',
+    items: [
+      { id: 'reports-executive', label: 'Executive Report', icon: 'spark' },
+      { id: 'reports-weekly', label: 'Weekly Operational Report', icon: 'chart' },
+      { id: 'reports-queue', label: 'Queue Report', icon: 'gauge' },
+      { id: 'reports-capacity', label: 'Capacity Report', icon: 'cluster' },
     ],
   },
   {
@@ -161,10 +177,6 @@ function icon(name) {
 
 function asArray(value) { return Array.isArray(value) ? value : []; }
 function asObject(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
-function num(value) { const n = Number(value); return Number.isFinite(n) ? n : 0; }
-function pct(value, digits = 0) { return value === null || value === undefined || Number.isNaN(Number(value)) ? '-' : `${(Number(value) * 100).toFixed(digits)}%`; }
-function money(value, digits = 0) { return value === null || value === undefined || Number.isNaN(Number(value)) ? '-' : `${Number(value).toLocaleString('en-US', { maximumFractionDigits: digits })} DKK`; }
-function fmt(value, digits = 0) { return value === null || value === undefined || Number.isNaN(Number(value)) ? '-' : Number(value).toLocaleString('en-US', { maximumFractionDigits: digits }); }
 function annualized(value) { return num(value) * (365 / 90); }
 function bytesLabel(value) {
   if (value === null || value === undefined) return '-';
@@ -241,11 +253,21 @@ function coverageCards(coverage) {
   ];
   return `<div class="cards-grid">${cards.join('')}</div>`;
 }
-function escapeHtml(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
-function isPersonalRoute(route) { return /^u\/[A-Za-z0-9_-]+$/.test(route || ''); }
+// Version 1.3 (Reporting & Executive Briefings): the User Report is just a
+// different VIEW of the exact same per-token personal bundle Personal
+// Analytics already fetches - same privacy-sensitive capability-link model
+// (docs/architecture/ANALYTICS_WAREHOUSE.md's identity model), so it reuses
+// loadPersonalRoute()/state.personalViewModel rather than a second fetch.
+// Extending isPersonalRoute()'s own regex (instead of a parallel check)
+// means handleRoute()'s existing "isPersonalRoute -> loadPersonalRoute()"
+// trigger fires for the report route automatically, no further wiring.
+function isPersonalRoute(route) { return /^u\/[A-Za-z0-9_-]+(\/report)?$/.test(route || ''); }
+function isUserReportRoute(route) { return /^u\/[A-Za-z0-9_-]+\/report$/.test(route || ''); }
 function personalRouteToken(route) { return isPersonalRoute(route) ? route.split('/')[1] : null; }
 function isHierarchyDetailRoute(route) { return /^(project|pi|group|section)\/[A-Za-z0-9_-]+$/.test(route || ''); }
 function detailRouteParts(route) { const parts = String(route || '').split('/'); return { type: parts[0], id: parts[1] }; }
+function isPiReportRoute(route) { return /^reports\/pi\/[A-Za-z0-9_-]+$/.test(route || ''); }
+function piReportRouteId(route) { return String(route || '').split('/')[2] || null; }
 function isNodeDetailRoute(route) { return /^node\/[A-Za-z0-9_.-]+$/.test(route || ''); }
 function nodeDetailRouteName(route) { return isNodeDetailRoute(route) ? route.split('/')[1] : null; }
 // Software module detail route: #/module/<encoded modulefile_path>. A plain
@@ -262,7 +284,9 @@ function softwareModuleDetailKey(route) {
   return isSoftwareModuleDetailRoute(route) ? decodeURIComponent(route.slice('module/'.length)) : null;
 }
 function pageTitle(route) {
+  if (isUserReportRoute(route)) return 'My Analytics Report';
   if (isPersonalRoute(route)) return 'My Analytics';
+  if (isPiReportRoute(route)) return 'PI Report';
   if (isHierarchyDetailRoute(route)) {
     const part = detailRouteParts(route).type;
     return part === 'pi' ? 'PI Detail' : `${part.charAt(0).toUpperCase()}${part.slice(1)} Detail`;
@@ -431,10 +455,6 @@ function warehouseStatusCard(w) {
   </section>`;
 }
 
-function statBlock(label, value, trend, tone = '') {
-  return `<article class="stat-card ${tone}"><div class="label">${label}</div><div class="value">${value}</div><div class="subtle">${trend}</div></article>`;
-}
-
 // Clickable summary cards (Software Explorer Milestone 4, Part 1): same
 // markup as statBlock() above, as a real <button> instead of an <article>
 // so it's keyboard-accessible, wired to the exact same QUICK_FILTERS
@@ -449,13 +469,6 @@ function clickableStatBlock(label, value, trend, filterId, tone = '') {
 
 function percentileCard(label, value, status, tone) {
   return `<article class="percentile-card"><span class="pill ${tone}">${label}</span><strong>${value}</strong><div class="subtle">${status}</div></article>`;
-}
-
-function tableFromRows(headers, rows) {
-  const body = rows.length
-    ? rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')
-    : `<tr><td colspan="${headers.length}">No data available.</td></tr>`;
-  return `<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
 // Node Insights: live Slurm fleet state (sinfo / scontrol -d / squeue).
@@ -2313,7 +2326,7 @@ function hierarchyDetailPage(type, id) {
     : `<section class="section"><div class="section-head"><h2>Top projects</h2><span class="subtle">Portfolio contributors</span></div>${linkList(entity.topProjects, 'project', 'project_id', 'project_label')}</section>`;
   return `
     <div class="stack">
-      <section class="section"><div class="section-head"><h2>${escapeHtml(entity.label)}</h2><span class="subtle">${title}</span></div>${metricSummaryCards(entity)}</section>
+      <section class="section"><div class="section-head"><h2>${escapeHtml(entity.label)}</h2><span class="subtle">${title}</span>${type === 'pi' ? `<a class="btn" href="#/reports/pi/${escapeHtml(id)}">View PI Report</a>` : ''}</div>${metricSummaryCards(entity)}</section>
       ${lineChart(`${escapeHtml(entity.label)} efficiency trend`, entity.dailyTrends, [chartSeries(entity.dailyTrends, 'avg_cpu_efficiency', 'CPU', '#3e8cff'), chartSeries(entity.dailyTrends, 'avg_memory_efficiency', 'Memory', '#53d88a')], pct, { zeroBase: true })}
       ${lineChart(`${escapeHtml(entity.label)} cost trend`, entity.dailyTrends, [chartSeries(entity.dailyTrends, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(entity.dailyTrends, 'underutilized_cost_dkk', 'Opportunity', '#ff6b7a')], money, { zeroBase: true })}
       ${related}
@@ -2493,6 +2506,7 @@ function personalAnalyticsPage() {
         <div class="context-label">Personal Decision Support</div>
         <h1>Do this next: ${escapeHtml(topAction?.title || 'review your resource requests')}</h1>
         <p class="subtle">Public pseudonym <strong>${escapeHtml(vm.displayPseudonym)}</strong>. This view favors action and savings over raw monitoring.</p>
+        <a class="btn" href="#/u/${escapeHtml(vm.routeToken)}/report">View Full Report</a>
       </div>
       <div class="decision-summary">
         <span class="subtle">How you compare</span>
@@ -2511,6 +2525,23 @@ function personalAnalyticsPage() {
       <section class="section"><div class="section-head"><h2>Keep perspective: anonymous peers</h2><span class="subtle">Peer comparison stays pseudonymous</span></div>${peerComparisonTable(vm.peerComparisons)}</section>
       <section class="section"><div class="section-head"><h2>Highest-Impact Jobs to Review</h2><span class="subtle">Which jobs offer the most room to improve?</span></div><p class="subtle" style="line-height:1.7">These jobs are shown because they combine cost with low CPU or memory use. Reviewing them can help you adjust similar submissions in the future.</p>${personalJobsTable(vm.topInefficientJobs)}</section>
     </div>`;
+}
+
+// Version 1.3 (Reporting & Executive Briefings): thin wrappers handing
+// app.js's own module-private state to js/reporting/pages.js's report
+// functions, keeping that module decoupled from app.js's private `data`/
+// `state` singletons (see js/reporting/pages.js's userReportPage()/
+// piReportPage() docstrings).
+function piReportPage(piId) {
+  return piReportPageImpl(piId, { data });
+}
+function userReportPage() {
+  return userReportPageImpl({
+    loading: state.personalLoading,
+    error: state.personalError,
+    token: state.personalToken,
+    viewModel: state.personalViewModel,
+  });
 }
 
 function methodologyPage() {
@@ -2594,6 +2625,11 @@ function renderShell(content) {
 
 function render() {
   document.documentElement.dataset.theme = state.theme;
+  // Version 1.3 (Reporting & Executive Briefings): A4 landscape is a
+  // whole-document print variant (css/reporting-print.css), not mixed
+  // per-page orientation - see that file's header comment for why. Only
+  // the Capacity Report's wide utilization tables need it today.
+  document.body.classList.toggle('report-landscape', state.route === 'reports-capacity');
   resetChartRegistry();
   platformRegistry = buildPlatformRegistry({ data, nodeInsights, nodeInsightsHistory, slurmAnalyticsPipeline, queueInsights, softwareInventory });
   warehouseSummary = buildWarehouseSummary({ slurmAnalyticsPipeline, nodeInsights });
@@ -2625,16 +2661,24 @@ function render() {
     methodology: methodologyPage,
     'platform-status': platformStatusPage,
     'software-inventory': softwareInventoryPage,
+    'reports-executive': () => executiveReportPage({ data, nodeInsights, queueInsights, slurmAnalyticsPipeline, warehouseSummary }),
+    'reports-weekly': () => weeklyReportPage({ data, queueInsights, nodeInsightsHistory, warehouseSummary }),
+    'reports-queue': () => queueReportPage(queueInsights),
+    'reports-capacity': () => capacityReportPage({ nodeInsights, nodeInsightsHistory, warehouseSummary }),
   };
-  const content = isPersonalRoute(state.route)
-    ? personalAnalyticsPage()
-    : isNodeDetailRoute(state.route)
-      ? nodeDetailPage(nodeDetailRouteName(state.route))
-      : isSoftwareModuleDetailRoute(state.route)
-        ? moduleDetailPage(softwareModuleDetailKey(state.route))
-        : isHierarchyDetailRoute(state.route)
-          ? hierarchyDetailPage(detailRouteParts(state.route).type, detailRouteParts(state.route).id)
-          : (renderers[state.route] || renderers.landing)();
+  const content = isUserReportRoute(state.route)
+    ? userReportPage()
+    : isPersonalRoute(state.route)
+      ? personalAnalyticsPage()
+      : isPiReportRoute(state.route)
+        ? piReportPage(piReportRouteId(state.route))
+        : isNodeDetailRoute(state.route)
+          ? nodeDetailPage(nodeDetailRouteName(state.route))
+          : isSoftwareModuleDetailRoute(state.route)
+            ? moduleDetailPage(softwareModuleDetailKey(state.route))
+            : isHierarchyDetailRoute(state.route)
+              ? hierarchyDetailPage(detailRouteParts(state.route).type, detailRouteParts(state.route).id)
+              : (renderers[state.route] || renderers.landing)();
   app.innerHTML = renderShell(content);
   wireEvents();
   mountCharts();
@@ -2751,6 +2795,13 @@ function wireEvents() {
   document.querySelector('[data-action="close-menu"]')?.addEventListener('click', () => {
     state.menuOpen = false;
     render();
+  });
+  document.querySelector('[data-action="report-download-pdf"]')?.addEventListener('click', () => {
+    downloadReportPdf();
+  });
+  document.querySelector('[data-action="report-download-markdown"]')?.addEventListener('click', () => {
+    const model = getCurrentReportModel();
+    if (model) downloadReportMarkdown(model, getCurrentReportMarkdown());
   });
   document.querySelectorAll('[data-action="filter-nodes"]').forEach((el) => {
     el.addEventListener('change', (event) => {

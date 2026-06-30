@@ -1,0 +1,113 @@
+/* Version 1.3 (Reporting & Executive Briefings) - print/PDF render target.
+   This is NOT a separate rendering pass: it's the same report route's
+   already-rendered DOM (see js/reporting/render.js's reportShellHtml()),
+   shown through print CSS. PDF generation is the browser's own
+   print-to-PDF, triggered interactively via window.print() (js/reporting/
+   print.js) or headlessly via Chrome's --print-to-pdf flag (scripts/
+   generate_report_pdf.py) - same artifact either way, see
+   docs/architecture/REPORTING_ARCHITECTURE.md.
+
+   A4 landscape is a WHOLE-DOCUMENT variant (.report-landscape on
+   <body>), not mixed per-page orientation - cross-browser support for
+   switching orientation mid-document is unreliable. Capacity Report uses
+   the landscape variant for its wide utilization tables; every other
+   report is portrait. */
+
+@page {
+  size: A4 portrait;
+  margin: 18mm 14mm;
+}
+
+body.report-landscape {
+  /* Chrome reads the @page rule below when this class is present; other
+     browsers fall back to whatever orientation the user picks in their
+     print dialog, which is an acceptable degradation - not every browser
+     needs to get this exactly right, Chrome (interactive + headless) does. */
+}
+
+@page report-landscape-page {
+  size: A4 landscape;
+  margin: 14mm 18mm;
+}
+
+body.report-landscape {
+  page: report-landscape-page;
+}
+
+/* Screen-only: keep the action buttons and live-dashboard chrome out of
+   the way while still showing the report normally in-app. No visual
+   change outside of @media print below. */
+.report-shell { max-width: 960px; margin: 0 auto; }
+.report-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.report-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.report-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+
+@media print {
+  /* Hide every piece of dashboard chrome that isn't the report itself. */
+  .sidebar,
+  .sidebar-backdrop,
+  .sticky-header,
+  .load-banner,
+  .refresh-toast,
+  .report-actions,
+  .chart-toolbar {
+    display: none !important;
+  }
+
+  body.report-print-mode .main { margin: 0; padding: 0; }
+  body.report-print-mode .page { padding: 0; }
+
+  /* Print in light mode regardless of the active theme toggle - dark
+     backgrounds waste toner/ink and most printed/PDF reports are read on
+     a screen anyway, where light mode reads better against a white PDF
+     viewer background. */
+  body.report-print-mode {
+    background: #ffffff;
+    color: #1a1a1a;
+  }
+
+  .report-shell {
+    max-width: none;
+  }
+
+  .report-header {
+    /* position:fixed on the header/footer repeats them on every printed
+       page in Chrome (the documented, reliable approach given @page
+       margin boxes don't support arbitrary HTML content across browsers -
+       see the v1.3 architecture doc). */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border-bottom: 1px solid #d0d0d0;
+    padding-bottom: 8px;
+  }
+
+  .report-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border-top: 1px solid #d0d0d0;
+  }
+
+  .report-shell .stack {
+    margin-top: 28mm; /* clears the fixed header */
+    margin-bottom: 14mm; /* clears the fixed footer */
+  }
+
+  /* Automatic page breaks: never split a section's heading from its first
+     line of content, and prefer not to split a stat-grid/table/chart
+     across a page boundary at all. */
+  .report-shell .section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .report-shell .chart-container {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
