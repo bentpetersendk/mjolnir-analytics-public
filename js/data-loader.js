@@ -293,7 +293,6 @@ function normalizePersonalUserViewModel(bundle, routeToken) {
   const percentile = asObject(root.percentile_position || root.percentiles);
   const trends = asArray(root.daily_trends || root.historical_trends);
   const publicIdentity = asObject(root.public_identity);
-  const username = root.username || root.real_username || '';
   const displayPseudonym = root.display_pseudonym || publicIdentity.display_pseudonym || root.public_pseudonym || '';
   const publicUserId = root.public_user_id || publicIdentity.public_user_id || '';
 
@@ -302,7 +301,6 @@ function normalizePersonalUserViewModel(bundle, routeToken) {
     schemaVersion: root.schema_version || null,
     generatedAt: root.generated_at || null,
     routeToken,
-    username,
     publicUserId,
     displayPseudonym,
     metrics: {

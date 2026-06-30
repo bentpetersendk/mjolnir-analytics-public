@@ -2277,7 +2277,7 @@ function personalAnalyticsPage() {
       <div>
         <div class="context-label">Personal Decision Support</div>
         <h1>Do this next: ${escapeHtml(topAction?.title || 'review your resource requests')}</h1>
-        <p class="subtle">For <strong>${escapeHtml(vm.username)}</strong>, public pseudonym <strong>${escapeHtml(vm.displayPseudonym)}</strong>. This view favors action and savings over raw monitoring.</p>
+        <p class="subtle">Public pseudonym <strong>${escapeHtml(vm.displayPseudonym)}</strong>. This view favors action and savings over raw monitoring.</p>
       </div>
       <div class="decision-summary">
         <span class="subtle">How you compare</span>
