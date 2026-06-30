@@ -1,4 +1,3 @@
-const REAL_BASE = './data/efficiency_v3/site_data_90d_validation/';
 const SAMPLE_BASE = './sample-data/';
 const PERSONAL_DATA_BASE = window.MJOLNIR_PERSONAL_DATA_BASE || './private-user-data/';
 // Generated Node Insights JSON (both the latest snapshot and history) lives
@@ -29,14 +28,23 @@ const QUEUE_INSIGHTS_BASE = `${NODE_INSIGHTS_HISTORY_BASE}queue_insights/`;
 // publishes Queue Insights' historical half above, just one more
 // subdirectory over.
 const SOFTWARE_INVENTORY_BASE = `${NODE_INSIGHTS_HISTORY_BASE}software_inventory/`;
+// Analytics module (Version 1.2 migration, see private repo's
+// docs/architecture/ANALYTICS_WAREHOUSE.md Section 10): replaces the old
+// locally-committed 90-day frozen snapshot below this comment used to read
+// from with a live nightly export from the warehouse, published to
+// dashboard-data the same way as every other module above.
+const REAL_BASE = `${NODE_INSIGHTS_HISTORY_BASE}analytics/`;
 
-const LEGACY_EXPORT_ROW_COUNTS = {
-  jobs: 2364601,
-  job_metrics: 1218881,
-  daily_user_summary: 3411,
-  daily_account_summary: 128,
-  daily_cluster_summary: 90,
-};
+function liveRowCounts(allTime, reportDayCount) {
+  const a = asObject(allTime);
+  return {
+    jobs: a.jobs ?? 0,
+    job_metrics: a.jobs_with_measured_cpu ?? 0,
+    daily_user_summary: a.unique_users ?? 0,
+    daily_account_summary: a.unique_accounts ?? 0,
+    daily_cluster_summary: reportDayCount ?? 0,
+  };
+}
 
 async function loadJson(path) {
   const response = await fetch(path, { cache: 'no-store' });
@@ -132,7 +140,7 @@ async function tryLoadTree(base) {
     globalIndex.sections ? tryOptionalJson(`${base}${globalIndex.sections}`) : null,
   ]);
 
-  const userTokens = usersIndex.map((item) => asObject(item).user_token).filter(Boolean);
+  const userTokens = usersIndex.map((item) => asObject(item).public_user_id).filter(Boolean);
   const userBundles = await Promise.allSettled(
     userTokens.map((token) => loadJson(`${base}users/${token}.json`))
   );
@@ -285,7 +293,6 @@ function normalizePersonalUserViewModel(bundle, routeToken) {
   const percentile = asObject(root.percentile_position || root.percentiles);
   const trends = asArray(root.daily_trends || root.historical_trends);
   const publicIdentity = asObject(root.public_identity);
-  const username = root.username || root.real_username || '';
   const displayPseudonym = root.display_pseudonym || publicIdentity.display_pseudonym || root.public_pseudonym || '';
   const publicUserId = root.public_user_id || publicIdentity.public_user_id || '';
 
@@ -294,7 +301,6 @@ function normalizePersonalUserViewModel(bundle, routeToken) {
     schemaVersion: root.schema_version || null,
     generatedAt: root.generated_at || null,
     routeToken,
-    username,
     publicUserId,
     displayPseudonym,
     metrics: {
@@ -496,12 +502,12 @@ function buildDerivedData(tree) {
     sections: hierarchy.sections,
     hierarchyCoverage: hierarchy.coverage,
     datasetMeta: {
-      sourceDatabase: 'efficiency_v3/data/mjolnir_efficiency.sqlite',
+      sourceDatabase: 'mjolnir-analytics/data/mjolnir_analytics.sqlite',
       coverageWindow: reportDates.length ? `${reportDates[0]} to ${reportDates[reportDates.length - 1]}` : 'Unavailable',
       dateRange: reportDates.length ? { start: reportDates[0], end: reportDates[reportDates.length - 1] } : { start: null, end: null },
       exportDate: cluster.generated_at || tree.index.generated_at || null,
       importedRows: dailyTrends.length,
-      rowCounts: LEGACY_EXPORT_ROW_COUNTS,
+      rowCounts: liveRowCounts(allTime, dailyTrends.length),
       userCount: users.length,
       projectCount: projects.length,
       piCount: hierarchy.pis.length,
@@ -1000,7 +1006,7 @@ export async function loadMjolnirData() {
           dateRange: { start: null, end: null },
           exportDate: null,
           importedRows: 0,
-          rowCounts: LEGACY_EXPORT_ROW_COUNTS,
+          rowCounts: {},
           userCount: 0,
           projectCount: 0,
           piCount: 0,

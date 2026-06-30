@@ -145,4 +145,24 @@ for filter_id in (
     "deprecated-versions", "missing-homepage", "missing-repository", "missing-license",
 ):
     assert f"'{filter_id}'" in app, f"missing quick filter id: {filter_id}"
+
+# Analytics module migration (Version 1.2, private repo's
+# docs/architecture/ANALYTICS_WAREHOUSE.md Section 10): retires the
+# locally-committed efficiency_v3 90-day snapshot for the eight pages that
+# still depended on it, in favor of the same dashboard-data CDN pattern
+# every other module above already uses.
+assert "data/efficiency_v3/site_data_90d_validation" not in loader, \
+    "loader must no longer read the retired efficiency_v3 snapshot path"
+assert "public_user_id" in loader, "loader must read public_user_id, not the legacy user_token"
+for fn in (
+    "clusterPage", "clusterHealthPage", "rankingsPage", "benchmarkPage",
+    "recommendationsPage", "inefficientJobsPage", "costPage", "personalAnalyticsPage",
+):
+    assert fn in app, f"missing Analytics page renderer: {fn}"
+for route_id in (
+    "cluster", "cluster-health", "rankings", "benchmarks",
+    "recommendations", "inefficient-jobs", "cost",
+):
+    assert f"id: '{route_id}'" in app, f"missing Analytics nav route: {route_id}"
+
 print('ui checks passed')
