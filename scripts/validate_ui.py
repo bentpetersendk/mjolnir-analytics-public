@@ -165,4 +165,61 @@ for route_id in (
 ):
     assert f"id: '{route_id}'" in app, f"missing Analytics nav route: {route_id}"
 
+# Version 1.3 (Reporting & Executive Briefings,
+# docs/architecture/REPORTING_ARCHITECTURE.md): a presentation-only layer
+# on top of the existing exports - reports must never recalculate a metric
+# or duplicate the server-side business logic already in the admin repo's
+# export_analytics_data.py.
+ui_helpers = (root / 'js' / 'ui-helpers.js').read_text()
+reporting_dir = root / 'js' / 'reporting'
+reporting_files = {p: p.read_text() for p in reporting_dir.rglob('*.js')}
+reporting_src = '\n'.join(reporting_files.values())
+
+assert "report-shell" in reporting_src, "missing report shell wrapper (render.js's reportShellHtml())"
+assert "sectionsToMarkdown" in reporting_src, "missing Markdown render target"
+assert "chartsReady" in reporting_src, "missing chart-readiness signal usage in print.js"
+assert "document.body.dataset.chartsReady" in app or "document.body.dataset.chartsReady" in reporting_src, \
+    "missing chart-readiness signal (charts.js's mountCharts() must set this)"
+
+for fn in (
+    "buildExecutiveReportModel", "buildWeeklyReportModel", "buildPiReportModel",
+    "buildUserReportModel", "buildQueueReportModel", "buildCapacityReportModel",
+):
+    assert fn in reporting_src, f"missing report data assembler: {fn}"
+for fn in (
+    "executiveReportPage", "weeklyReportPage", "piReportPage",
+    "userReportPage", "queueReportPage", "capacityReportPage",
+):
+    assert fn in reporting_src, f"missing report page function: {fn}"
+for route_id in ("reports-executive", "reports-weekly", "reports-queue", "reports-capacity"):
+    assert f"id: '{route_id}'" in app, f"missing Reports nav route: {route_id}"
+assert "isUserReportRoute" in app, "missing User Report route matcher"
+assert "isPiReportRoute" in app, "missing PI Report route matcher"
+
+# Shared-helper extraction: statBlock/tableFromRows/pct/money/fmt/escapeHtml
+# must be defined exactly once (ui-helpers.js), imported by both app.js and
+# the reporting layer - not redefined locally in either.
+for helper in ("statBlock", "tableFromRows", "pct", "money", "fmt", "escapeHtml", "num"):
+    assert f"export function {helper}(" in ui_helpers, f"missing shared helper in ui-helpers.js: {helper}"
+for helper in ("statBlock", "tableFromRows", "pct", "money", "escapeHtml"):
+    assert f"\nfunction {helper}(" not in app, f"{helper} must not be redefined locally in app.js - it lives in ui-helpers.js"
+
+# Mechanical "no duplicated business logic" check: the specific cost-model/
+# recommendation-threshold constants and arithmetic the admin repo's
+# export_analytics_data.py already owns must never reappear in the
+# reporting layer. This doesn't prove correctness, but it catches the
+# concrete failure mode of someone copy-pasting a formula instead of
+# reading the already-exported field.
+FORBIDDEN_RECALCULATION_PATTERNS = (
+    "LOW_EFFICIENCY_THRESHOLD",
+    "MIN_JOBS_FOR_RECOMMENDATION",
+    "measured_cpu_hours /",
+    "measured_mem_gb_max_sum /",
+    "cpu_hours_allocated /",
+    "requested_mem_gb_hours /",
+)
+for pattern in FORBIDDEN_RECALCULATION_PATTERNS:
+    for path, src in reporting_files.items():
+        assert pattern not in src, f"possible duplicated business logic in {path.name}: found '{pattern}'"
+
 print('ui checks passed')
