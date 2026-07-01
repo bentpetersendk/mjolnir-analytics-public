@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-07-01T13:09:43Z",
+  "generated_at": "2026-07-01T15:37:40Z",
   "all_time_summary": {
     "jobs": 23122,
     "completed_jobs": 15451,
@@ -22,7 +22,24 @@
     "cost_bearer": "memory",
     "cost_bearer_cost_dkk": 24835.492251,
     "cost_bearer_efficiency": 0.049922,
-    "cost_bearer_waste_dkk": 614.083881
+    "cost_bearer_waste_dkk": 614.083881,
+    "leaf_index": 8,
+    "leaf_index_components": [
+      {
+        "id": "cpu",
+        "label": "CPU efficiency",
+        "value": 0.1051,
+        "weight": 0.6,
+        "contribution": 0.063
+      },
+      {
+        "id": "memory",
+        "label": "Memory efficiency",
+        "value": 0.0499,
+        "weight": 0.4,
+        "contribution": 0.02
+      }
+    ]
   },
   "rolling_summaries": {
     "7d": {
@@ -46,7 +63,9 @@
       "cost_bearer": "cpu",
       "cost_bearer_cost_dkk": 0.0,
       "cost_bearer_efficiency": null,
-      "cost_bearer_waste_dkk": 0.0
+      "cost_bearer_waste_dkk": 0.0,
+      "leaf_index": null,
+      "leaf_index_components": []
     },
     "30d": {
       "jobs": 0,
@@ -69,7 +88,9 @@
       "cost_bearer": "cpu",
       "cost_bearer_cost_dkk": 0.0,
       "cost_bearer_efficiency": null,
-      "cost_bearer_waste_dkk": 0.0
+      "cost_bearer_waste_dkk": 0.0,
+      "leaf_index": null,
+      "leaf_index_components": []
     },
     "90d": {
       "jobs": 3,
@@ -92,7 +113,24 @@
       "cost_bearer": "cpu",
       "cost_bearer_cost_dkk": 0.452906,
       "cost_bearer_efficiency": 0.237325,
-      "cost_bearer_waste_dkk": 0.342893
+      "cost_bearer_waste_dkk": 0.342893,
+      "leaf_index": 21,
+      "leaf_index_components": [
+        {
+          "id": "cpu",
+          "label": "CPU efficiency",
+          "value": 0.2373,
+          "weight": 0.6,
+          "contribution": 0.1424
+        },
+        {
+          "id": "memory",
+          "label": "Memory efficiency",
+          "value": 0.1758,
+          "weight": 0.4,
+          "contribution": 0.0703
+        }
+      ]
     }
   },
   "daily_trends": [

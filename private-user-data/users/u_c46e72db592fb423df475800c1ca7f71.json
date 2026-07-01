@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-07-01T13:10:13Z",
+  "generated_at": "2026-07-01T15:38:02Z",
   "all_time_summary": {
     "jobs": 445,
     "completed_jobs": 249,
@@ -22,7 +22,24 @@
     "cost_bearer": "memory",
     "cost_bearer_cost_dkk": 9594.584391,
     "cost_bearer_efficiency": 0.008307,
-    "cost_bearer_waste_dkk": 4.263338
+    "cost_bearer_waste_dkk": 4.263338,
+    "leaf_index": 7,
+    "leaf_index_components": [
+      {
+        "id": "cpu",
+        "label": "CPU efficiency",
+        "value": 0.1059,
+        "weight": 0.6,
+        "contribution": 0.0635
+      },
+      {
+        "id": "memory",
+        "label": "Memory efficiency",
+        "value": 0.0083,
+        "weight": 0.4,
+        "contribution": 0.0033
+      }
+    ]
   },
   "rolling_summaries": {
     "7d": {
@@ -46,7 +63,9 @@
       "cost_bearer": "cpu",
       "cost_bearer_cost_dkk": 0.0,
       "cost_bearer_efficiency": null,
-      "cost_bearer_waste_dkk": 0.0
+      "cost_bearer_waste_dkk": 0.0,
+      "leaf_index": null,
+      "leaf_index_components": []
     },
     "30d": {
       "jobs": 1,
@@ -69,7 +88,24 @@
       "cost_bearer": "memory",
       "cost_bearer_cost_dkk": 0.26065,
       "cost_bearer_efficiency": 0.00054,
-      "cost_bearer_waste_dkk": 0.260509
+      "cost_bearer_waste_dkk": 0.260509,
+      "leaf_index": 0,
+      "leaf_index_components": [
+        {
+          "id": "cpu",
+          "label": "CPU efficiency",
+          "value": 0.0,
+          "weight": 0.6,
+          "contribution": 0.0
+        },
+        {
+          "id": "memory",
+          "label": "Memory efficiency",
+          "value": 0.0005,
+          "weight": 0.4,
+          "contribution": 0.0002
+        }
+      ]
     },
     "90d": {
       "jobs": 2,
@@ -92,7 +128,24 @@
       "cost_bearer": "memory",
       "cost_bearer_cost_dkk": 1.041878,
       "cost_bearer_efficiency": 0.000319,
-      "cost_bearer_waste_dkk": 1.04166
+      "cost_bearer_waste_dkk": 1.04166,
+      "leaf_index": 0,
+      "leaf_index_components": [
+        {
+          "id": "cpu",
+          "label": "CPU efficiency",
+          "value": 0.0,
+          "weight": 0.6,
+          "contribution": 0.0
+        },
+        {
+          "id": "memory",
+          "label": "Memory efficiency",
+          "value": 0.0003,
+          "weight": 0.4,
+          "contribution": 0.0001
+        }
+      ]
     }
   },
   "daily_trends": [

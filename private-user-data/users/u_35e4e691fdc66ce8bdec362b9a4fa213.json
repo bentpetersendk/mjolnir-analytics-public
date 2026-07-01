@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-07-01T13:10:11Z",
+  "generated_at": "2026-07-01T15:38:00Z",
   "all_time_summary": {
     "jobs": 5990,
     "completed_jobs": 3477,
@@ -22,7 +22,24 @@
     "cost_bearer": "memory",
     "cost_bearer_cost_dkk": 5134.267983,
     "cost_bearer_efficiency": 0.691103,
-    "cost_bearer_waste_dkk": 203.746063
+    "cost_bearer_waste_dkk": 203.746063,
+    "leaf_index": 69,
+    "leaf_index_components": [
+      {
+        "id": "cpu",
+        "label": "CPU efficiency",
+        "value": 0.694,
+        "weight": 0.6,
+        "contribution": 0.4164
+      },
+      {
+        "id": "memory",
+        "label": "Memory efficiency",
+        "value": 0.6911,
+        "weight": 0.4,
+        "contribution": 0.2764
+      }
+    ]
   },
   "rolling_summaries": {
     "7d": {
@@ -46,7 +63,9 @@
       "cost_bearer": "cpu",
       "cost_bearer_cost_dkk": 0.0,
       "cost_bearer_efficiency": null,
-      "cost_bearer_waste_dkk": 0.0
+      "cost_bearer_waste_dkk": 0.0,
+      "leaf_index": null,
+      "leaf_index_components": []
     },
     "30d": {
       "jobs": 0,
@@ -69,7 +88,9 @@
       "cost_bearer": "cpu",
       "cost_bearer_cost_dkk": 0.0,
       "cost_bearer_efficiency": null,
-      "cost_bearer_waste_dkk": 0.0
+      "cost_bearer_waste_dkk": 0.0,
+      "leaf_index": null,
+      "leaf_index_components": []
     },
     "90d": {
       "jobs": 1,
@@ -92,7 +113,24 @@
       "cost_bearer": "memory",
       "cost_bearer_cost_dkk": 0.000181,
       "cost_bearer_efficiency": 4.3e-05,
-      "cost_bearer_waste_dkk": 0.000181
+      "cost_bearer_waste_dkk": 0.000181,
+      "leaf_index": 0,
+      "leaf_index_components": [
+        {
+          "id": "cpu",
+          "label": "CPU efficiency",
+          "value": 0.0,
+          "weight": 0.6,
+          "contribution": 0.0
+        },
+        {
+          "id": "memory",
+          "label": "Memory efficiency",
+          "value": 0.0,
+          "weight": 0.4,
+          "contribution": 0.0
+        }
+      ]
     }
   },
   "daily_trends": [
