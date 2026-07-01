@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-07-01T15:37:41Z",
+  "generated_at": "2026-07-01T16:47:07Z",
   "all_time_summary": {
     "jobs": 34,
     "completed_jobs": 7,
@@ -131,6 +131,46 @@
           "contribution": 0.0072
         }
       ]
+    },
+    "180d": {
+      "jobs": 34,
+      "completed_jobs": 7,
+      "failed_jobs": 27,
+      "cpu_hours_allocated": 38.286944,
+      "measured_cpu_hours": 27.755556,
+      "avg_cpu_efficiency": 0.250283,
+      "jobs_with_measured_cpu": 24,
+      "requested_mem_gb_hours": 334.526667,
+      "measured_mem_gb_max_sum": 65.831717,
+      "avg_memory_efficiency": 0.01811,
+      "jobs_with_measured_memory": 30,
+      "estimated_cost_dkk": 5.436058,
+      "underutilized_cost_dkk": 5.120486,
+      "gpu_hours": 0.0,
+      "cpu_cost_dkk": 2.488651,
+      "mem_cost_dkk": 5.436058,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 5.436058,
+      "cost_bearer_efficiency": 0.01811,
+      "cost_bearer_waste_dkk": 5.120486,
+      "leaf_index": 16,
+      "leaf_index_components": [
+        {
+          "id": "cpu",
+          "label": "CPU efficiency",
+          "value": 0.2503,
+          "weight": 0.6,
+          "contribution": 0.1502
+        },
+        {
+          "id": "memory",
+          "label": "Memory efficiency",
+          "value": 0.0181,
+          "weight": 0.4,
+          "contribution": 0.0072
+        }
+      ]
     }
   },
   "daily_trends": [
@@ -140,7 +180,14 @@
       "avg_memory_efficiency": 0.017813492380628838,
       "estimated_cost_dkk": 0.30336944444444447,
       "underutilized_cost_dkk": 0.29497361111111114,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 15,
+      "jobs_with_measured_cpu": 9,
+      "jobs_with_measured_memory": 11,
+      "cpu_hours_allocated": 4.667222222222223,
+      "measured_cpu_hours": 0.12916666666666665,
+      "requested_mem_gb_hours": 18.66888888888889,
+      "measured_mem_gb_max_sum": 24.297603607177734
     },
     {
       "report_date": "2026-05-04",
@@ -148,7 +195,14 @@
       "avg_memory_efficiency": 0.022359843198513925,
       "estimated_cost_dkk": 4.934980555555555,
       "underutilized_cost_dkk": 4.638974689192905,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 13,
+      "jobs_with_measured_cpu": 13,
+      "jobs_with_measured_memory": 13,
+      "cpu_hours_allocated": 32.40305555555556,
+      "measured_cpu_hours": 26.74222222222222,
+      "requested_mem_gb_hours": 303.69111111111107,
+      "measured_mem_gb_max_sum": 35.86638641357422
     },
     {
       "report_date": "2026-05-05",
@@ -156,7 +210,14 @@
       "avg_memory_efficiency": 0.009446212450663249,
       "estimated_cost_dkk": 0.19770833333333335,
       "underutilized_cost_dkk": 0.18653785069286827,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 6,
+      "jobs_with_measured_cpu": 2,
+      "jobs_with_measured_memory": 6,
+      "cpu_hours_allocated": 1.2166666666666668,
+      "measured_cpu_hours": 0.8841666666666667,
+      "requested_mem_gb_hours": 12.166666666666668,
+      "measured_mem_gb_max_sum": 5.667727470397949
     }
   ],
   "recommendations": [
@@ -364,6 +425,36 @@
       "cost_bearer_waste_dkk": 0.03755555555555556
     }
   ],
+  "leaf": {
+    "version": "2.0",
+    "window_days": 180,
+    "leaf_index": 16,
+    "leaf_index_components": [
+      {
+        "id": "cpu",
+        "label": "CPU efficiency",
+        "value": 0.2503,
+        "weight": 0.6,
+        "contribution": 0.1502
+      },
+      {
+        "id": "memory",
+        "label": "Memory efficiency",
+        "value": 0.0181,
+        "weight": 0.4,
+        "contribution": 0.0072
+      }
+    ],
+    "confidence": "medium",
+    "measurement_coverage": {
+      "jobs_measured": 30,
+      "jobs_excluded": 4,
+      "jobs_measured_pct": 88.24,
+      "cpu_hours_measured_pct": 72.49,
+      "memory_measured_pct": 19.68
+    },
+    "percentile": 49.6
+  },
   "public_user_id": "usr_fb05244a5d16",
   "display_pseudonym": "Indigo Juniper",
   "personal_route_token": "u_c7ad03f7ebd3f0500c72873bb6954d56",

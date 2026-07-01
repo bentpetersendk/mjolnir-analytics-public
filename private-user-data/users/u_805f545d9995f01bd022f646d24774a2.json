@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-07-01T15:37:41Z",
+  "generated_at": "2026-07-01T16:47:06Z",
   "all_time_summary": {
     "jobs": 38,
     "completed_jobs": 14,
@@ -131,6 +131,46 @@
           "contribution": 0.0156
         }
       ]
+    },
+    "180d": {
+      "jobs": 38,
+      "completed_jobs": 14,
+      "failed_jobs": 24,
+      "cpu_hours_allocated": 20.795,
+      "measured_cpu_hours": 13.792778,
+      "avg_cpu_efficiency": 0.280504,
+      "jobs_with_measured_cpu": 15,
+      "requested_mem_gb_hours": 153.388889,
+      "measured_mem_gb_max_sum": 85.398878,
+      "avg_memory_efficiency": 0.03906,
+      "jobs_with_measured_memory": 26,
+      "estimated_cost_dkk": 2.492569,
+      "underutilized_cost_dkk": 1.96463,
+      "gpu_hours": 0.0,
+      "cpu_cost_dkk": 1.351675,
+      "mem_cost_dkk": 2.492569,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 2.492569,
+      "cost_bearer_efficiency": 0.03906,
+      "cost_bearer_waste_dkk": 1.96463,
+      "leaf_index": 18,
+      "leaf_index_components": [
+        {
+          "id": "cpu",
+          "label": "CPU efficiency",
+          "value": 0.2805,
+          "weight": 0.6,
+          "contribution": 0.1683
+        },
+        {
+          "id": "memory",
+          "label": "Memory efficiency",
+          "value": 0.0391,
+          "weight": 0.4,
+          "contribution": 0.0156
+        }
+      ]
     }
   },
   "daily_trends": [
@@ -140,7 +180,14 @@
       "avg_memory_efficiency": 0.04476173122723897,
       "estimated_cost_dkk": 2.2800555555555557,
       "underutilized_cost_dkk": 1.9006051624212001,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 23,
+      "jobs_with_measured_cpu": 12,
+      "jobs_with_measured_memory": 20,
+      "cpu_hours_allocated": 17.529722222222222,
+      "measured_cpu_hours": 11.520833333333332,
+      "requested_mem_gb_hours": 140.3111111111111,
+      "measured_mem_gb_max_sum": 73.3652400970459
     },
     {
       "report_date": "2026-05-04",
@@ -148,7 +195,14 @@
       "avg_memory_efficiency": 5.931854248046875e-06,
       "estimated_cost_dkk": 0.0,
       "underutilized_cost_dkk": 0.0,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 4,
+      "jobs_with_measured_cpu": 0,
+      "jobs_with_measured_memory": 4,
+      "cpu_hours_allocated": 0.0,
+      "measured_cpu_hours": 0.0,
+      "requested_mem_gb_hours": 0.0,
+      "measured_mem_gb_max_sum": 0.003559112548828125
     },
     {
       "report_date": "2026-05-05",
@@ -156,7 +210,14 @@
       "avg_memory_efficiency": 0.06015039443969727,
       "estimated_cost_dkk": 0.2125138888888889,
       "underutilized_cost_dkk": 0.06402500000000001,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 11,
+      "jobs_with_measured_cpu": 3,
+      "jobs_with_measured_memory": 2,
+      "cpu_hours_allocated": 3.2652777777777775,
+      "measured_cpu_hours": 2.2719444444444443,
+      "requested_mem_gb_hours": 13.077777777777778,
+      "measured_mem_gb_max_sum": 12.030078887939453
     }
   ],
   "recommendations": [
@@ -364,6 +425,36 @@
       "cost_bearer_waste_dkk": 0.014877777777777778
     }
   ],
+  "leaf": {
+    "version": "2.0",
+    "window_days": 180,
+    "leaf_index": 18,
+    "leaf_index_components": [
+      {
+        "id": "cpu",
+        "label": "CPU efficiency",
+        "value": 0.2805,
+        "weight": 0.6,
+        "contribution": 0.1683
+      },
+      {
+        "id": "memory",
+        "label": "Memory efficiency",
+        "value": 0.0391,
+        "weight": 0.4,
+        "contribution": 0.0156
+      }
+    ],
+    "confidence": "medium",
+    "measurement_coverage": {
+      "jobs_measured": 26,
+      "jobs_excluded": 12,
+      "jobs_measured_pct": 68.42,
+      "cpu_hours_measured_pct": 66.33,
+      "memory_measured_pct": 55.67
+    },
+    "percentile": 54.1
+  },
   "public_user_id": "usr_5b6cca453dc8",
   "display_pseudonym": "Crimson Ridge",
   "personal_route_token": "u_805f545d9995f01bd022f646d24774a2",

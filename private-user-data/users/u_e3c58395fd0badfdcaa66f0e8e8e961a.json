@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-07-01T15:37:39Z",
+  "generated_at": "2026-07-01T16:47:05Z",
   "all_time_summary": {
     "jobs": 13,
     "completed_jobs": 3,
@@ -131,6 +131,46 @@
           "contribution": 0.0054
         }
       ]
+    },
+    "180d": {
+      "jobs": 13,
+      "completed_jobs": 3,
+      "failed_jobs": 10,
+      "cpu_hours_allocated": 2.308333,
+      "measured_cpu_hours": 0.806944,
+      "avg_cpu_efficiency": 0.225035,
+      "jobs_with_measured_cpu": 5,
+      "requested_mem_gb_hours": 16.315,
+      "measured_mem_gb_max_sum": 5.36775,
+      "avg_memory_efficiency": 0.013419,
+      "jobs_with_measured_memory": 7,
+      "estimated_cost_dkk": 0.265119,
+      "underutilized_cost_dkk": 0.258153,
+      "gpu_hours": 0.0,
+      "cpu_cost_dkk": 0.150042,
+      "mem_cost_dkk": 0.265119,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 0.265119,
+      "cost_bearer_efficiency": 0.013419,
+      "cost_bearer_waste_dkk": 0.258153,
+      "leaf_index": 14,
+      "leaf_index_components": [
+        {
+          "id": "cpu",
+          "label": "CPU efficiency",
+          "value": 0.225,
+          "weight": 0.6,
+          "contribution": 0.135
+        },
+        {
+          "id": "memory",
+          "label": "Memory efficiency",
+          "value": 0.0134,
+          "weight": 0.4,
+          "contribution": 0.0054
+        }
+      ]
     }
   },
   "daily_trends": [
@@ -140,7 +180,14 @@
       "avg_memory_efficiency": 0.0067790126800537105,
       "estimated_cost_dkk": 0.11375000000000002,
       "underutilized_cost_dkk": 0.11220876721143724,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 5,
+      "jobs_with_measured_cpu": 1,
+      "jobs_with_measured_memory": 2,
+      "cpu_hours_allocated": 0.7000000000000001,
+      "measured_cpu_hours": 0.34694444444444444,
+      "requested_mem_gb_hours": 7.000000000000001,
+      "measured_mem_gb_max_sum": 1.3558025360107422
     },
     {
       "report_date": "2026-05-01",
@@ -148,7 +195,14 @@
       "avg_memory_efficiency": 0.0002803357442220052,
       "estimated_cost_dkk": 0.011537500000000001,
       "underutilized_cost_dkk": 0.01117638888888889,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 5,
+      "jobs_with_measured_cpu": 2,
+      "jobs_with_measured_memory": 3,
+      "cpu_hours_allocated": 0.17416666666666666,
+      "measured_cpu_hours": 0.0,
+      "requested_mem_gb_hours": 0.7100000000000001,
+      "measured_mem_gb_max_sum": 0.0052280426025390625
     },
     {
       "report_date": "2026-05-05",
@@ -156,7 +210,14 @@
       "avg_memory_efficiency": 0.03976792494455973,
       "estimated_cost_dkk": 0.13983125000000002,
       "underutilized_cost_dkk": 0.13476747386886015,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 3,
+      "jobs_with_measured_cpu": 2,
+      "jobs_with_measured_memory": 2,
+      "cpu_hours_allocated": 1.4341666666666666,
+      "measured_cpu_hours": 0.46,
+      "requested_mem_gb_hours": 8.605,
+      "measured_mem_gb_max_sum": 4.006719589233398
     }
   ],
   "recommendations": [
@@ -261,6 +322,36 @@
       "cost_bearer_waste_dkk": 0.01117638888888889
     }
   ],
+  "leaf": {
+    "version": "2.0",
+    "window_days": 180,
+    "leaf_index": 14,
+    "leaf_index_components": [
+      {
+        "id": "cpu",
+        "label": "CPU efficiency",
+        "value": 0.225,
+        "weight": 0.6,
+        "contribution": 0.135
+      },
+      {
+        "id": "memory",
+        "label": "Memory efficiency",
+        "value": 0.0134,
+        "weight": 0.4,
+        "contribution": 0.0054
+      }
+    ],
+    "confidence": "low",
+    "measurement_coverage": {
+      "jobs_measured": 7,
+      "jobs_excluded": 6,
+      "jobs_measured_pct": 53.85,
+      "cpu_hours_measured_pct": 34.96,
+      "memory_measured_pct": 32.9
+    },
+    "percentile": 40.6
+  },
   "public_user_id": "usr_5c99500e0355",
   "display_pseudonym": "Obsidian Wolf",
   "personal_route_token": "u_e3c58395fd0badfdcaa66f0e8e8e961a",

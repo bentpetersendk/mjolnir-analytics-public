@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-07-01T15:37:46Z",
+  "generated_at": "2026-07-01T16:47:12Z",
   "all_time_summary": {
     "jobs": 19,
     "completed_jobs": 11,
@@ -131,6 +131,46 @@
           "contribution": 0.0309
         }
       ]
+    },
+    "180d": {
+      "jobs": 19,
+      "completed_jobs": 11,
+      "failed_jobs": 8,
+      "cpu_hours_allocated": 89.197778,
+      "measured_cpu_hours": 17.924444,
+      "avg_cpu_efficiency": 0.197563,
+      "jobs_with_measured_cpu": 12,
+      "requested_mem_gb_hours": 533.491111,
+      "measured_mem_gb_max_sum": 157.346981,
+      "avg_memory_efficiency": 0.077342,
+      "jobs_with_measured_memory": 15,
+      "estimated_cost_dkk": 8.685751,
+      "underutilized_cost_dkk": 4.75701,
+      "gpu_hours": 0.0,
+      "cpu_cost_dkk": 5.797856,
+      "mem_cost_dkk": 8.669231,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 8.669231,
+      "cost_bearer_efficiency": 0.077342,
+      "cost_bearer_waste_dkk": 4.75701,
+      "leaf_index": 15,
+      "leaf_index_components": [
+        {
+          "id": "cpu",
+          "label": "CPU efficiency",
+          "value": 0.1976,
+          "weight": 0.6,
+          "contribution": 0.1185
+        },
+        {
+          "id": "memory",
+          "label": "Memory efficiency",
+          "value": 0.0773,
+          "weight": 0.4,
+          "contribution": 0.0309
+        }
+      ]
     }
   },
   "daily_trends": [
@@ -140,7 +180,14 @@
       "avg_memory_efficiency": 0.04684071408377753,
       "estimated_cost_dkk": 0.12043055555555555,
       "underutilized_cost_dkk": 0.10893090824286142,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 7,
+      "jobs_with_measured_cpu": 3,
+      "jobs_with_measured_memory": 4,
+      "cpu_hours_allocated": 1.2352777777777777,
+      "measured_cpu_hours": 0.6216666666666666,
+      "requested_mem_gb_hours": 7.410555555555556,
+      "measured_mem_gb_max_sum": 6.719366073608398
     },
     {
       "report_date": "2026-05-07",
@@ -148,7 +195,14 @@
       "avg_memory_efficiency": 0.14346009338343588,
       "estimated_cost_dkk": 8.540115277777778,
       "underutilized_cost_dkk": 4.623271070975396,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 7,
+      "jobs_with_measured_cpu": 4,
+      "jobs_with_measured_memory": 6,
+      "cpu_hours_allocated": 87.59138888888889,
+      "measured_cpu_hours": 17.296666666666667,
+      "requested_mem_gb_hours": 525.5427777777777,
+      "measured_mem_gb_max_sum": 149.72979736328125
     },
     {
       "report_date": "2026-05-08",
@@ -156,7 +210,14 @@
       "avg_memory_efficiency": 0.022401126225789388,
       "estimated_cost_dkk": 0.025205555555555557,
       "underutilized_cost_dkk": 0.024808298206329345,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 5,
+      "jobs_with_measured_cpu": 5,
+      "jobs_with_measured_memory": 5,
+      "cpu_hours_allocated": 0.37111111111111117,
+      "measured_cpu_hours": 0.006111111111111111,
+      "requested_mem_gb_hours": 0.5377777777777778,
+      "measured_mem_gb_max_sum": 0.8978176116943359
     }
   ],
   "recommendations": [
@@ -375,6 +436,36 @@
       "cost_bearer_waste_dkk": 0.0016249822126494515
     }
   ],
+  "leaf": {
+    "version": "2.0",
+    "window_days": 180,
+    "leaf_index": 15,
+    "leaf_index_components": [
+      {
+        "id": "cpu",
+        "label": "CPU efficiency",
+        "value": 0.1976,
+        "weight": 0.6,
+        "contribution": 0.1185
+      },
+      {
+        "id": "memory",
+        "label": "Memory efficiency",
+        "value": 0.0773,
+        "weight": 0.4,
+        "contribution": 0.0309
+      }
+    ],
+    "confidence": "low",
+    "measurement_coverage": {
+      "jobs_measured": 15,
+      "jobs_excluded": 4,
+      "jobs_measured_pct": 78.95,
+      "cpu_hours_measured_pct": 20.1,
+      "memory_measured_pct": 29.49
+    },
+    "percentile": 44.4
+  },
   "public_user_id": "usr_e1cca29bea66",
   "display_pseudonym": "Blue Heron",
   "personal_route_token": "u_6b86c141aea5bec698f156cf79456cc3",

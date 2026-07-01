@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-07-01T15:37:58Z",
+  "generated_at": "2026-07-01T16:47:25Z",
   "all_time_summary": {
     "jobs": 27,
     "completed_jobs": 10,
@@ -131,6 +131,46 @@
           "contribution": 0.0043
         }
       ]
+    },
+    "180d": {
+      "jobs": 27,
+      "completed_jobs": 10,
+      "failed_jobs": 17,
+      "cpu_hours_allocated": 40.444444,
+      "measured_cpu_hours": 1.898889,
+      "avg_cpu_efficiency": 0.07218,
+      "jobs_with_measured_cpu": 18,
+      "requested_mem_gb_hours": 397.74,
+      "measured_mem_gb_max_sum": 20.954217,
+      "avg_memory_efficiency": 0.010867,
+      "jobs_with_measured_memory": 24,
+      "estimated_cost_dkk": 6.463293,
+      "underutilized_cost_dkk": 6.422709,
+      "gpu_hours": 0.0,
+      "cpu_cost_dkk": 2.628889,
+      "mem_cost_dkk": 6.463275,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 6.463275,
+      "cost_bearer_efficiency": 0.010867,
+      "cost_bearer_waste_dkk": 6.422709,
+      "leaf_index": 5,
+      "leaf_index_components": [
+        {
+          "id": "cpu",
+          "label": "CPU efficiency",
+          "value": 0.0722,
+          "weight": 0.6,
+          "contribution": 0.0433
+        },
+        {
+          "id": "memory",
+          "label": "Memory efficiency",
+          "value": 0.0109,
+          "weight": 0.4,
+          "contribution": 0.0043
+        }
+      ]
     }
   },
   "daily_trends": [
@@ -140,7 +180,14 @@
       "avg_memory_efficiency": 0.000972163200378418,
       "estimated_cost_dkk": 0.07258333333333335,
       "underutilized_cost_dkk": 0.06722083333333334,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 8,
+      "jobs_with_measured_cpu": 3,
+      "jobs_with_measured_memory": 5,
+      "cpu_hours_allocated": 1.1166666666666667,
+      "measured_cpu_hours": 0.0825,
+      "requested_mem_gb_hours": 4.466666666666667,
+      "measured_mem_gb_max_sum": 0.19559478759765625
     },
     {
       "report_date": "2026-04-29",
@@ -148,7 +195,14 @@
       "avg_memory_efficiency": 0.0019527212778727213,
       "estimated_cost_dkk": 6.161006944444445,
       "underutilized_cost_dkk": 6.151862462116282,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 9,
+      "jobs_with_measured_cpu": 9,
+      "jobs_with_measured_memory": 9,
+      "cpu_hours_allocated": 37.91388888888889,
+      "measured_cpu_hours": 0.7127777777777778,
+      "requested_mem_gb_hours": 379.1388888888888,
+      "measured_mem_gb_max_sum": 1.7574491500854492
     },
     {
       "report_date": "2026-05-01",
@@ -156,7 +210,14 @@
       "avg_memory_efficiency": 0.02383772921562195,
       "estimated_cost_dkk": 0.22970277777777778,
       "underutilized_cost_dkk": 0.2036253077275223,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 10,
+      "jobs_with_measured_cpu": 6,
+      "jobs_with_measured_memory": 10,
+      "cpu_hours_allocated": 1.4138888888888888,
+      "measured_cpu_hours": 1.103611111111111,
+      "requested_mem_gb_hours": 14.134444444444442,
+      "measured_mem_gb_max_sum": 19.00117301940918
     }
   ],
   "recommendations": [
@@ -375,6 +436,36 @@
       "cost_bearer_waste_dkk": 0.11887968276341757
     }
   ],
+  "leaf": {
+    "version": "2.0",
+    "window_days": 180,
+    "leaf_index": 5,
+    "leaf_index_components": [
+      {
+        "id": "cpu",
+        "label": "CPU efficiency",
+        "value": 0.0722,
+        "weight": 0.6,
+        "contribution": 0.0433
+      },
+      {
+        "id": "memory",
+        "label": "Memory efficiency",
+        "value": 0.0109,
+        "weight": 0.4,
+        "contribution": 0.0043
+      }
+    ],
+    "confidence": "low",
+    "measurement_coverage": {
+      "jobs_measured": 24,
+      "jobs_excluded": 3,
+      "jobs_measured_pct": 88.89,
+      "cpu_hours_measured_pct": 4.7,
+      "memory_measured_pct": 5.27
+    },
+    "percentile": 21.1
+  },
   "public_user_id": "usr_0430126b4c9c",
   "display_pseudonym": "Scarlet Harbor",
   "personal_route_token": "u_a84b564d4264fea07dbcb8300569f0bc",

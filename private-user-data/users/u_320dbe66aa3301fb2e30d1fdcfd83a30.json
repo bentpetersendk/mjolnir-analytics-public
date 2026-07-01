@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-07-01T15:37:58Z",
+  "generated_at": "2026-07-01T16:47:25Z",
   "all_time_summary": {
     "jobs": 2,
     "completed_jobs": 0,
@@ -131,6 +131,46 @@
           "contribution": 0.0242
         }
       ]
+    },
+    "180d": {
+      "jobs": 2,
+      "completed_jobs": 0,
+      "failed_jobs": 2,
+      "cpu_hours_allocated": 213.391111,
+      "measured_cpu_hours": 0.001944,
+      "avg_cpu_efficiency": 9e-06,
+      "jobs_with_measured_cpu": 2,
+      "requested_mem_gb_hours": 853.564444,
+      "measured_mem_gb_max_sum": 3.865586,
+      "avg_memory_efficiency": 0.0604,
+      "jobs_with_measured_memory": 2,
+      "estimated_cost_dkk": 13.870422,
+      "underutilized_cost_dkk": 13.870296,
+      "gpu_hours": 0.0,
+      "cpu_cost_dkk": 13.870422,
+      "mem_cost_dkk": 13.870422,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "cpu",
+      "cost_bearer_cost_dkk": 13.870422,
+      "cost_bearer_efficiency": 9e-06,
+      "cost_bearer_waste_dkk": 13.870296,
+      "leaf_index": 2,
+      "leaf_index_components": [
+        {
+          "id": "cpu",
+          "label": "CPU efficiency",
+          "value": 0.0,
+          "weight": 0.6,
+          "contribution": 0.0
+        },
+        {
+          "id": "memory",
+          "label": "Memory efficiency",
+          "value": 0.0604,
+          "weight": 0.4,
+          "contribution": 0.0242
+        }
+      ]
     }
   },
   "daily_trends": [
@@ -140,7 +180,14 @@
       "avg_memory_efficiency": 0.06039978563785553,
       "estimated_cost_dkk": 13.870422222222222,
       "underutilized_cost_dkk": 13.870295833333333,
-      "gpu_hours": 0.0
+      "gpu_hours": 0.0,
+      "jobs": 2,
+      "jobs_with_measured_cpu": 2,
+      "jobs_with_measured_memory": 2,
+      "cpu_hours_allocated": 213.39111111111112,
+      "measured_cpu_hours": 0.0019444444444444444,
+      "requested_mem_gb_hours": 853.5644444444445,
+      "measured_mem_gb_max_sum": 3.865586280822754
     }
   ],
   "recommendations": [],
@@ -184,6 +231,36 @@
       "cost_bearer_waste_dkk": 6.9335861111111114
     }
   ],
+  "leaf": {
+    "version": "2.0",
+    "window_days": 180,
+    "leaf_index": 2,
+    "leaf_index_components": [
+      {
+        "id": "cpu",
+        "label": "CPU efficiency",
+        "value": 0.0,
+        "weight": 0.6,
+        "contribution": 0.0
+      },
+      {
+        "id": "memory",
+        "label": "Memory efficiency",
+        "value": 0.0604,
+        "weight": 0.4,
+        "contribution": 0.0242
+      }
+    ],
+    "confidence": "low",
+    "measurement_coverage": {
+      "jobs_measured": 2,
+      "jobs_excluded": 0,
+      "jobs_measured_pct": 100.0,
+      "cpu_hours_measured_pct": 0.0,
+      "memory_measured_pct": 0.45
+    },
+    "percentile": 12.0
+  },
   "public_user_id": "usr_16040c9ea419",
   "display_pseudonym": "Red Crane",
   "personal_route_token": "u_320dbe66aa3301fb2e30d1fdcfd83a30",
