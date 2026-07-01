@@ -453,15 +453,20 @@ function lineChart(title, rows, series, formatter = fmt, options = {}) {
 }
 
 
+// Shared "(i)" tooltip affordance - a native title tooltip, no new
+// dependency. Used anywhere a label needs a short explanatory hint (LEAF
+// Index, Savings Opportunity, warehouse tiles, etc).
+function infoTip(hint) {
+  if (!hint) return '';
+  return `<span class="info-tooltip" tabindex="0" role="img" aria-label="${escapeHtml(hint)}" title="${escapeHtml(hint)}">${icon('info')}</span>`;
+}
+
 // Live "Warehouse Summary" KPI tile - used on both the Overview hero and the
 // dedicated Warehouse page so the two never show different numbers for the
 // same metric. `hint` renders as a native title tooltip (no new dependency).
 function warehouseTile(label, value, sub, hint) {
-  const infoTooltip = hint
-    ? `<span class="info-tooltip" tabindex="0" role="img" aria-label="${escapeHtml(hint)}" title="${escapeHtml(hint)}">${icon('info')}</span>`
-    : '';
   return `<article class="warehouse-tile">
-    <div class="warehouse-tile-label">${escapeHtml(label)}${infoTooltip}</div>
+    <div class="warehouse-tile-label">${escapeHtml(label)}${infoTip(hint)}</div>
     <div class="warehouse-tile-value">${value}</div>
     <div class="warehouse-tile-sub">${sub || ''}</div>
   </article>`;
@@ -3150,6 +3155,79 @@ function efficiencyWithLeaf(eff) {
   return `<span class="leaf-pair">${leafIndicator(eff)}${efficiencyPill(eff)}</span>`;
 }
 
+// ── Phase 7: LEAF Sustainability Index ──────────────────────────────────────
+//
+// The LEAF Index is a composite 0-100 sustainability score. Weights and the
+// set of active components mirror scripts/export_analytics_data.py's
+// LEAF_INDEX_COMPONENTS/compute_leaf_index() exactly, kept in sync by hand
+// since this is a static site with no shared build step. Adding a future
+// dimension (GPU, queue behavior, energy, carbon, ...) means: export the raw
+// metric from the backend, add one entry here with available:true, and
+// nothing else changes - LEAF_INDEX_COMPONENTS below already drives every
+// display (badge, tooltip, LEAF Dashboard sub-scores).
+// `fields` lists every field name this component might be found under,
+// since callers pass either a users_summary row (`cpu_efficiency`) or a raw
+// personal-bundle summary (`avg_cpu_efficiency`).
+const LEAF_INDEX_COMPONENTS = [
+  { id: 'cpu',    label: 'CPU efficiency',    weight: 0.6, available: true,  fields: ['cpu_efficiency', 'avg_cpu_efficiency'] },
+  { id: 'memory', label: 'Memory efficiency', weight: 0.4, available: true,  fields: ['memory_efficiency', 'avg_memory_efficiency'] },
+  { id: 'gpu',    label: 'GPU efficiency',    weight: 0.0, available: false, fields: ['gpu_efficiency'] },
+  { id: 'queue',  label: 'Queue behavior',    weight: 0.0, available: false, fields: ['queue_score'] },
+];
+
+function leafComponentValue(record, component) {
+  for (const field of component.fields) {
+    const v = record?.[field];
+    if (Number.isFinite(Number(v))) return Number(v);
+  }
+  return null;
+}
+
+// Fallback only: used when a record predates the exported `leaf_index`
+// field (e.g. cached/older JSON). Prefer the exported field when present.
+function computeLeafIndex(record) {
+  const active = LEAF_INDEX_COMPONENTS
+    .filter((c) => c.available)
+    .map((c) => ({ c, value: leafComponentValue(record, c) }))
+    .filter(({ value }) => value !== null);
+  const totalWeight = active.reduce((sum, { c }) => sum + c.weight, 0);
+  if (!active.length || totalWeight <= 0) return { score: null, components: [] };
+  let score = 0;
+  const components = active.map(({ c, value }) => {
+    const normWeight = c.weight / totalWeight;
+    const contribution = value * normWeight;
+    score += contribution;
+    return { id: c.id, label: c.label, value, weight: normWeight, contribution };
+  });
+  return { score: Math.round(score * 100), components };
+}
+
+function leafIndexTier(score) {
+  if (score === null || score === undefined || !Number.isFinite(Number(score))) return 'leaf-muted';
+  const v = Number(score);
+  if (v >= 85) return 'leaf-excellent';
+  if (v >= 70) return 'leaf-good';
+  if (v >= 40) return 'leaf-amber';
+  return 'leaf-red';
+}
+
+const LEAF_INDEX_TOOLTIP = 'The LEAF Index reflects overall sustainable use of HPC resources. It currently reflects CPU and memory efficiency, weighted 60/40, and will expand to include additional sustainability dimensions (GPU efficiency, queue behaviour, energy, carbon) as they become available.';
+
+// `record` may be a users_summary row (camelCase, has .leafIndex) or a raw
+// personal-bundle summary (snake_case, has .leaf_index) - support both so
+// callers don't need to normalize first.
+function leafIndexBadge(record, size = 'lg') {
+  const score = record?.leafIndex ?? record?.leaf_index ?? computeLeafIndex(record || {}).score;
+  const cls = leafIndexTier(score);
+  const display = Number.isFinite(Number(score)) ? Math.round(Number(score)) : '—';
+  const tone = LEAF_TONE_LABEL[cls];
+  return `<span class="leaf-index-badge">
+    <span class="leaf ${cls} leaf-${size}" title="${escapeHtml(tone)}" aria-hidden="true">${LEAF_SVG}</span>
+    <span class="leaf-index-value">${display}<span class="leaf-index-scale">/100</span></span>
+    ${infoTip(LEAF_INDEX_TOOLTIP)}
+  </span>`;
+}
+
 // ── Phase 6: Comparison helper functions ────────────────────────────────────
 
 function compareWinnerBadge(values, winnerFn = Math.max) {
@@ -3265,13 +3343,11 @@ function compareKpiDashboard(users) {
       ? `<a href="${href}">${escapeHtml(u.displayPseudonym)}</a>`
       : escapeHtml(u.displayPseudonym);
     const label = isBenchmark ? 'Benchmark' : 'User';
-    const eff = u.overallEfficiency;
     return `<div class="compare-kpi-card${isBenchmark ? ' is-benchmark' : ''}">
       <div class="compare-kpi-user">${label}</div>
       <div class="compare-kpi-name">${nameHtml}</div>
       <div class="compare-kpi-leaf">
-        ${leafIndicator(eff, 'lg')}
-        <span class="compare-kpi-eff-label">${eff !== null && Number.isFinite(eff) ? pct(eff) : '—'}</span>
+        ${leafIndexBadge(u, 'lg')}
       </div>
       <div class="compare-kpi-stats">
         <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">Jobs</span><span class="compare-kpi-stat-value">${fmt(u.totalJobs)}</span></div>
@@ -3464,8 +3540,10 @@ function userProfilePage(publicUserId) {
   const effTone = (v) => (v === null || !Number.isFinite(v)) ? '' : v >= 0.7 ? 'good' : v >= 0.5 ? 'info' : 'warn';
 
   const overallEff = su?.overallEfficiency ?? null;
+  const leafBadgeSource = su?.leafIndex != null ? su : summary;
+  const savingsTooltip = 'Estimated savings if historical jobs had requested closer to the optimal CPU and memory resources while performing the same work. Based on historical allocation behavior, not a billing figure.';
   const kpiCards = `<div class="cards-grid">
-    ${statBlock('LEAF Rating', `<span class="leaf-pair">${leafIndicator(overallEff, 'lg')}<span style="font-size:1.1em;font-weight:700">${overallEff !== null && Number.isFinite(overallEff) ? pct(overallEff) : '—'}</span></span>`, 'Overall resource efficiency', effTone(overallEff))}
+    ${statBlock('LEAF Index', leafIndexBadge(leafBadgeSource, 'lg'), 'Overall sustainability score', effTone(overallEff))}
     ${statBlock('Jobs', fmt(summary.jobs), `${fmt(summary.completed_jobs)} completed · ${fmt(summary.failed_jobs)} failed`)}
     ${statBlock('CPU hours', fmt(summary.cpu_hours_allocated, 1), 'All-time allocated')}
     ${statBlock('GPU hours', fmt(summary.gpu_hours, 1), 'All-time allocated')}
@@ -3473,12 +3551,12 @@ function userProfilePage(publicUserId) {
     ${statBlock('CPU efficiency', `<span class="leaf-pair">${leafIndicator(summary.avg_cpu_efficiency)}${efficiencyPill(summary.avg_cpu_efficiency)}</span>`, 'Measured vs. allocated', effTone(summary.avg_cpu_efficiency))}
     ${statBlock('Memory efficiency', `<span class="leaf-pair">${leafIndicator(summary.avg_memory_efficiency)}${efficiencyPill(summary.avg_memory_efficiency)}</span>`, 'MaxRSS vs. requested', effTone(summary.avg_memory_efficiency))}
     ${statBlock('Estimated cost', money(summary.estimated_cost_dkk), 'Based on allocation')}
-    ${statBlock('Savings opportunity', money(summary.underutilized_cost_dkk), 'Estimated reducible cost', 'warn')}
+    ${statBlock(`Savings opportunity${infoTip(savingsTooltip)}`, money(summary.underutilized_cost_dkk), 'Estimated reducible cost', 'warn')}
   </div>`;
 
   const clusterCtxCards = su ? `<div class="cards-grid">
-    ${statBlock('CPU eff. percentile', su.percentileCpu !== null ? `${Math.round(su.percentileCpu)}th` : '—', 'Among all active users')}
-    ${statBlock('Overall eff. percentile', su.percentileEfficiency !== null ? `${Math.round(su.percentileEfficiency)}th` : '—', 'Among all active users')}
+    ${statBlock('CPU eff. percentile', percentileContext(su.percentileCpu) || '—', 'Among all active users')}
+    ${statBlock('Overall eff. percentile', percentileContext(su.percentileEfficiency) || '—', 'Among all active users')}
     ${statBlock('Active days', fmt(su.activeDays), 'Days with at least one job')}
     ${statBlock('Software modules', su.softwareCount > 0 ? fmt(su.softwareCount) : '—', 'Distinct modules loaded')}
     ${statBlock('Favourite partition', su.favoritePartition ? escapeHtml(su.favoritePartition) : '—', 'Most frequently used')}
@@ -3773,6 +3851,20 @@ function recoveryPage() {
 
 function prototypeBanner() {
   return '<div class="prototype-banner"><strong>Prototype Personal Analytics - Authentication Not Yet Enabled</strong><span>Decision support view. Peer comparisons remain pseudonymous.</span></div>';
+}
+
+// Phase 7: cluster-context phrasing - turns an already-exported percentile
+// rank (0-100, e.g. su.percentileCpu/percentileEfficiency) into a short,
+// human sentence ("Top 10%", "Better than 82% of users"). No new
+// computation: purely a presentation layer over existing percentile fields.
+function percentileContext(percentile0to100) {
+  const n = Number(percentile0to100);
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  if (rounded >= 90) return `Top ${Math.max(1, 100 - rounded)}%`;
+  if (rounded >= 50) return `Better than ${rounded}% of users`;
+  if (rounded > 0) return `Below median (${rounded}th percentile)`;
+  return `${rounded}th percentile`;
 }
 
 function percentileBand(value) {
