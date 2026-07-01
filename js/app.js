@@ -3114,13 +3114,26 @@ function efficiencyPill(eff) {
 
 const LEAF_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>`;
 
+// Phase 7: four glow tiers so glow intensity communicates efficiency, not
+// just hue. `leaf-green`/`leaf-yellow` are kept as CSS aliases of
+// `leaf-good`/`leaf-amber` for backward compatibility with anything still
+// referencing the old class names.
 function leafGlowClass(eff) {
   if (eff === null || eff === undefined || !Number.isFinite(Number(eff))) return 'leaf-muted';
   const v = Number(eff);
-  if (v >= 0.70) return 'leaf-green';
-  if (v >= 0.40) return 'leaf-yellow';
+  if (v >= 0.85) return 'leaf-excellent';
+  if (v >= 0.70) return 'leaf-good';
+  if (v >= 0.40) return 'leaf-amber';
   return 'leaf-red';
 }
+
+const LEAF_TONE_LABEL = {
+  'leaf-excellent': 'Excellent efficiency',
+  'leaf-good': 'Good efficiency',
+  'leaf-amber': 'Medium efficiency',
+  'leaf-red': 'Poor efficiency',
+  'leaf-muted': 'No data',
+};
 
 function leafIndicator(eff, size = '') {
   const cls = leafGlowClass(eff);
@@ -3128,7 +3141,7 @@ function leafIndicator(eff, size = '') {
   const effLabel = (eff !== null && eff !== undefined && Number.isFinite(Number(eff)))
     ? pct(Number(eff))
     : '—';
-  const tone = cls === 'leaf-green' ? 'Excellent efficiency' : cls === 'leaf-yellow' ? 'Acceptable efficiency' : cls === 'leaf-muted' ? 'No data' : 'Low efficiency';
+  const tone = LEAF_TONE_LABEL[cls];
   return `<span class="leaf ${cls}${sizeCls}" title="${tone}: ${effLabel}" aria-label="LEAF sustainability: ${tone} (${effLabel})">${LEAF_SVG}</span>`;
 }
 
