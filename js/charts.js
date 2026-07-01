@@ -387,10 +387,17 @@ export function createLineChart(title, rows, series, formatter = (v) => v, optio
     },
     series: seriesDefs,
   });
-  const latest = allValues[allValues.length - 1];
+  const firstSeriesVals = series[0].values.filter((v) => Number.isFinite(Number(v)));
+  const headlineMode = options.headlineMode || 'last';
+  let headlineValue;
+  if (headlineMode === 'sum') headlineValue = firstSeriesVals.reduce((a, b) => a + b, 0);
+  else if (headlineMode === 'mean') headlineValue = firstSeriesVals.length ? firstSeriesVals.reduce((a, b) => a + b, 0) / firstSeriesVals.length : null;
+  else if (headlineMode === 'max') headlineValue = firstSeriesVals.length ? Math.max(...firstSeriesVals) : null;
+  else headlineValue = allValues[allValues.length - 1];
+  const headlineLabel = options.headlineLabel || `${asArray(rows).length} data points`;
   const { html } = registerChart(option, { label: options.label || title, onClick: options.onClick, csv: options.csv !== false });
   return `<article class="chart-card">
-    <div class="chart-head"><div><h3>${escapeHtml(title)}</h3><span class="subtle">${asArray(rows).length} data points</span></div><strong>${formatter(latest)}</strong></div>
+    <div class="chart-head"><div><h3>${escapeHtml(title)}</h3><span class="subtle">${headlineLabel}</span></div><strong>${headlineValue !== null && headlineValue !== undefined ? formatter(headlineValue) : '—'}</strong></div>
     ${html}
   </article>`;
 }

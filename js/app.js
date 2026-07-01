@@ -138,6 +138,7 @@ const state = {
   menuOpen: false,
   nodeFilters: { class: 'all', partition: 'all', state: 'all', sortKey: 'node', sortDir: 'asc' },
   historyRange: '7d',
+  userProfileRange: '90d',
   // Software Inventory (Software Analytics Milestone 1 frontend, see
   // docs/architecture/SOFTWARE_INVENTORY_FRONTEND.md). All filtering/
   // sorting/pagination happens client-side over the already-loaded
@@ -672,6 +673,27 @@ function filterPointsByRange(points) {
   const range = HISTORY_RANGES.find((r) => r.id === state.historyRange) || HISTORY_RANGES[1];
   const cutoff = Date.now() - range.ms;
   return asArray(points).filter((p) => p && p.timestamp && new Date(p.timestamp).getTime() >= cutoff);
+}
+
+const USER_PROFILE_RANGES = [
+  { id: '30d',  label: '30d',  days: 30 },
+  { id: '90d',  label: '90d',  days: 90 },
+  { id: '180d', label: '180d', days: 180 },
+  { id: '1y',   label: '1y',   days: 365 },
+  { id: 'all',  label: 'All',  days: null },
+];
+
+function profileRangeButtons() {
+  return `<div class="range-toggle">${USER_PROFILE_RANGES.map((r) => `<button type="button" class="range-button${r.id === state.userProfileRange ? ' active' : ''}" data-action="set-profile-range" data-range="${r.id}">${r.label}</button>`).join('')}</div>`;
+}
+
+function filterTrendsByPeriod(trends) {
+  const range = USER_PROFILE_RANGES.find((r) => r.id === state.userProfileRange);
+  if (!range || !range.days) return trends;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - range.days);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  return asArray(trends).filter((r) => r.report_date >= cutoffStr);
 }
 
 function hasCapacityHistory() {
@@ -3090,9 +3112,7 @@ function efficiencyPill(eff) {
 
 // ── Phase 6: LEAF Sustainability Indicator ─────────────────────────────────
 
-const LEAF_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor" stroke="none" aria-hidden="true">
-  <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20C19 20 22 3 22 3c-1 2-8 2-8 2C12 3 9 6 9 9c0 2.2 1 4 3 5C11 12 14 10 17 8Z"/>
-</svg>`;
+const LEAF_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>`;
 
 function leafGlowClass(eff) {
   if (eff === null || eff === undefined || !Number.isFinite(Number(eff))) return 'leaf-muted';
@@ -3471,6 +3491,19 @@ function userProfilePage(publicUserId) {
     ? recs.map((r) => recCard(r.severity || r.priority || 'medium', r.title, r.suggestion || r.detail || '', '')).join('')
     : '<div class="empty-state">No recommendations for this user.</div>';
 
+  const filteredTrends = filterTrendsByPeriod(trends);
+  const rangeLabel = USER_PROFILE_RANGES.find((r) => r.id === state.userProfileRange)?.label || '90d';
+  const trendCharts = filteredTrends.length
+    ? lineChart(`${escapeHtml(pseudonym)} — efficiency`, filteredTrends,
+        [chartSeries(filteredTrends, 'avg_cpu_efficiency', 'CPU', '#3e8cff'),
+         chartSeries(filteredTrends, 'avg_memory_efficiency', 'Memory', '#53d88a')],
+        pct, { zeroBase: true, headlineMode: 'mean', headlineLabel: `Average efficiency (${rangeLabel})` }) +
+      lineChart(`${escapeHtml(pseudonym)} — cost`, filteredTrends,
+        [chartSeries(filteredTrends, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'),
+         chartSeries(filteredTrends, 'underutilized_cost_dkk', 'Savings opp.', '#ff6b7a')],
+        money, { zeroBase: true, headlineMode: 'sum', headlineLabel: `Total cost (${rangeLabel})` })
+    : '<div class="empty-state">No trend data for this period.</div>';
+
   return `<div class="stack">
     <div class="profile-hero">
       <div>
@@ -3483,8 +3516,7 @@ function userProfilePage(publicUserId) {
     <section class="section"><div class="section-head"><h2>Summary</h2><span class="subtle">All-time totals</span></div>${kpiCards}</section>
     ${clusterCtxCards ? `<section class="section"><div class="section-head"><h2>Cluster Context</h2><span class="subtle">Position among all users</span></div>${clusterCtxCards}</section>` : ''}
     <section class="section"><div class="section-head"><h2>Rolling Summaries</h2><span class="subtle">Recent windows</span></div><div class="table-card">${tableFromRows(['Window', 'Jobs', 'CPU eff.', 'Mem eff.', 'Est. cost', 'Savings opp.'], rollingRows)}</div></section>
-    ${lineChart(`${escapeHtml(pseudonym)} — efficiency`, trends, [chartSeries(trends, 'avg_cpu_efficiency', 'CPU', '#3e8cff'), chartSeries(trends, 'avg_memory_efficiency', 'Memory', '#53d88a')], pct, { zeroBase: true })}
-    ${lineChart(`${escapeHtml(pseudonym)} — cost`, trends, [chartSeries(trends, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(trends, 'underutilized_cost_dkk', 'Savings opp.', '#ff6b7a')], money, { zeroBase: true })}
+    <section class="section"><div class="section-head"><h2>Daily Trends</h2>${profileRangeButtons()}</div>${trendCharts}</section>
     <section class="section"><div class="section-head"><h2>Recommendations</h2><span class="subtle">${recs.length} generated</span></div><div class="rec-list">${recCards}</div></section>
     ${topJobs.length ? `<section class="section"><div class="section-head"><h2>Highest-Impact Jobs</h2><span class="subtle">By savings opportunity</span></div><div class="table-card">${tableFromRows(['Partition', 'CPU eff.', 'Mem eff.', 'Savings opp.', 'Est. cost', 'Elapsed h', 'CPUs'], jobsRows)}</div></section>` : ''}
   </div>`;
@@ -4178,6 +4210,12 @@ function wireEvents() {
   document.querySelectorAll('[data-action="set-history-range"]').forEach((el) => {
     el.addEventListener('click', (event) => {
       state.historyRange = event.currentTarget.dataset.range;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="set-profile-range"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      state.userProfileRange = event.currentTarget.dataset.range;
       render();
     });
   });
