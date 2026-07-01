@@ -3256,6 +3256,55 @@ function leafIndexBadge(record, size = 'lg') {
   </span>`;
 }
 
+const LEAF_INDEX_BANDS = [
+  { from: 0, to: 40, color: '#ff6b7a' },
+  { from: 40, to: 70, color: '#e0a94d' },
+  { from: 70, to: 100, color: '#53d88a' },
+];
+
+// Phase 7: the LEAF Dashboard - a "health dashboard" summary of a user's
+// sustainability standing, built entirely from data already computed
+// elsewhere on the profile page (no new backend calls). Sub-scores are
+// looped from LEAF_INDEX_COMPONENTS filtered to `available: true`, so GPU/
+// queue sub-scores appear automatically the day they go live - nothing on
+// this page needs to change when that happens.
+function leafDashboardSection(record, filteredTrends, recs, potentialSavingsDkk) {
+  const subScoreCards = LEAF_INDEX_COMPONENTS
+    .filter((c) => c.available)
+    .map((c) => {
+      const value = leafComponentValue(record, c);
+      return `<article class="stat-card">
+        <div class="label">${escapeHtml(c.label)} LEAF</div>
+        <div class="value"><span class="leaf-pair">${leafIndicator(value)}${efficiencyPill(value)}</span></div>
+        <div class="subtle">${Math.round(c.weight * 100)}% of LEAF Index</div>
+      </article>`;
+    })
+    .join('');
+
+  const leafTrendValues = asArray(filteredTrends).map((row) => computeLeafIndex(row).score);
+  const hasTrend = leafTrendValues.some((v) => Number.isFinite(v));
+  const leafTrendChart = hasTrend
+    ? lineChart('LEAF Index trend', filteredTrends,
+        [{ label: 'LEAF Index', color: '#4CE28F', values: leafTrendValues, dashed: false }],
+        (v) => `${Math.round(v)} / 100`, { zeroBase: true, bands: LEAF_INDEX_BANDS })
+    : '<div class="empty-state">Not enough daily history yet to chart a LEAF Index trend.</div>';
+
+  const improvementsNote = recs.length
+    ? `${recs.length} improvement ${recs.length === 1 ? 'suggestion is' : 'suggestions are'} available below.`
+    : 'No outstanding improvement suggestions - keep it up.';
+
+  return `<section class="section">
+    <div class="section-head"><h2>LEAF Dashboard</h2><span class="subtle">Your sustainability health summary</span></div>
+    <div class="cards-grid">
+      <article class="stat-card"><div class="label">LEAF Index</div><div class="value">${leafIndexBadge(record, 'xl')}</div><div class="subtle">Overall sustainability score</div></article>
+      ${subScoreCards}
+      <article class="stat-card"><div class="label">Potential improvements</div><div class="value" style="font-size:1rem;font-weight:600">${escapeHtml(improvementsNote)}</div></article>
+      <article class="stat-card warn"><div class="label">Estimated savings${infoTip('Estimated savings if historical jobs had requested closer to the optimal CPU and memory resources while performing the same work.')}</div><div class="value">${money(potentialSavingsDkk)}</div><div class="subtle">Estimated reducible cost</div></article>
+    </div>
+    ${leafTrendChart}
+  </section>`;
+}
+
 // ── Phase 6: Comparison helper functions ────────────────────────────────────
 
 function compareWinnerBadge(values, winnerFn = Math.max) {
@@ -3653,6 +3702,7 @@ function userProfilePage(publicUserId) {
       ${backLink}
     </div>
     <section class="section"><div class="section-head"><h2>Summary</h2><span class="subtle">All-time totals</span></div>${kpiCards}</section>
+    ${leafDashboardSection(leafBadgeSource, filteredTrends, recs, summary.underutilized_cost_dkk)}
     ${clusterCtxCards ? `<section class="section"><div class="section-head"><h2>Cluster Context</h2><span class="subtle">Position among all users</span></div>${clusterCtxCards}</section>` : ''}
     <section class="section"><div class="section-head"><h2>Rolling Summaries</h2><span class="subtle">Recent windows</span></div><div class="table-card">${tableFromRows(['Window', 'Jobs', 'CPU eff.', 'Mem eff.', 'Est. cost', 'Savings opp.'], rollingRows)}</div></section>
     <section class="section"><div class="section-head"><h2>Daily Trends</h2>${profileRangeButtons()}</div>${overlayToggles}${trendCharts}${disclaimer('Cost figures are allocation-based estimates, not billing figures.')}</section>
