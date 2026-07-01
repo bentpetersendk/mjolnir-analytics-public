@@ -158,6 +158,51 @@ need a different rendering model (DOM diffing or keeping persistent chart
 instances across renders) - out of scope for this milestone, flagged here
 for whoever picks it up next.
 
+## Trend context: bands, moving averages, reference lines (Phase 7)
+
+Efficiency/sustainability charts should answer "am I improving?" at a
+glance, not just plot isolated daily points. `createLineChart()` supports
+three additions, all optional and off by default where they'd add clutter:
+
+- **Moving averages** are just another series - call `rollingSeries(rows,
+  key, windowSize, label, color)` (in `app.js`) alongside `chartSeries()`
+  and pass both in the `series` array. Rendered dashed, no chart-level
+  option needed. Used on the user profile's efficiency chart (7-day
+  average) and the cluster page's CPU/memory charts (7-day + 30-day).
+- **`options.bands`**: `[{ from, to, color }, ...]`, rendered as a
+  low-opacity (`0.07`) ECharts `markArea` behind the first series -
+  `applyBands()` in `charts.js`. `EFFICIENCY_BANDS`/`LEAF_INDEX_BANDS` in
+  `app.js` define the green/amber/red zones once so every chart agrees with
+  the LEAF glow tiers (`leafGlowClass()`) on what "good" means.
+- **`options.referenceLines`**: `[{ value, label, color }, ...]`, rendered
+  as dashed horizontal `markLine`s - `applyReferenceLines()` in
+  `charts.js`. Used for the user profile's optional "Cluster average" and
+  "Top 10% benchmark" overlays, sourced entirely from already-exported
+  aggregates (`clusterSummary.dailyTrends`, `benchmark_profiles`) - no new
+  data fetched. These overlays are user-toggled (`state.profileChartOverlays`,
+  off by default) via `.chip-toggle` buttons so a first-time viewer sees an
+  uncluttered chart.
+
+## Shared time-range selector (Phase 7)
+
+`js/timeRange.js` replaces what used to be two parallel range/button/filter
+implementations (`HISTORY_RANGES` for Node/Queue/Infrastructure pages,
+`USER_PROFILE_RANGES` for the user profile) with one generic pair:
+
+- `createRangeSelector({ id, ranges, stateKey, action, defaultId })` -
+  `ranges` is `[{ id, label, ms }]` (rolling window) or `[{ id, label, days }]`
+  (calendar days; `days: null` means "no cutoff", e.g. an "All" option).
+- `rangeButtonsHtml(selector, currentId)` - renders the toggle group.
+- `filterByRange(rows, selector, currentId, timestampField)` - filters
+  `rows` by whichever cutoff the selected range implies.
+
+`HISTORY_RANGES`/`USER_PROFILE_RANGES` in `app.js` are now instances of
+`createRangeSelector`; `rangeButtons()`/`filterPointsByRange()` and
+`profileRangeButtons()`/`filterTrendsByPeriod()` are thin wrappers so no
+existing call site changed. **New dashboards should call
+`createRangeSelector()` directly** instead of writing another parallel
+range/button/filter trio.
+
 ## Deferred / future work
 
 Documented here rather than built, per the "no unnecessary visualizations,
