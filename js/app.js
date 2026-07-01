@@ -14,6 +14,7 @@ import {
 } from './charts.js';
 import { OPERATIONAL_EVENTS } from './events.js';
 import { num, fmt, pct, money, escapeHtml, statBlock, tableFromRows } from './ui-helpers.js';
+import { createRangeSelector, rangeButtonsHtml, filterByRange } from './timeRange.js';
 import {
   executiveReportPage, weeklyReportPage, piReportPage as piReportPageImpl,
   userReportPage as userReportPageImpl, queueReportPage, capacityReportPage,
@@ -663,42 +664,53 @@ function sortableTableFromRows(columns, rows, sortKey, sortDir) {
 // see docs/DASHBOARD_DATA_MIGRATION.md). Charts render with Apache ECharts
 // (CDN <script> in index.html) after each render() pass - see
 // mountCharts() near the bottom of this file.
-const HISTORY_RANGES = [
-  { id: '24h', label: '24h', ms: 24 * 60 * 60 * 1000 },
-  { id: '7d', label: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
-  { id: '30d', label: '30d', ms: 30 * 24 * 60 * 60 * 1000 },
-  { id: '90d', label: '90d', ms: 90 * 24 * 60 * 60 * 1000 },
-];
+// Phase 7: both of these are now instances of the shared createRangeSelector
+// (js/timeRange.js) rather than one-off range/button/filter trios. New
+// dashboards should call createRangeSelector() directly instead of adding
+// another parallel implementation.
+const HISTORY_RANGE_SELECTOR = createRangeSelector({
+  id: 'history',
+  stateKey: 'historyRange',
+  action: 'set-history-range',
+  defaultId: '7d',
+  ranges: [
+    { id: '24h', label: '24h', ms: 24 * 60 * 60 * 1000 },
+    { id: '7d', label: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
+    { id: '30d', label: '30d', ms: 30 * 24 * 60 * 60 * 1000 },
+    { id: '90d', label: '90d', ms: 90 * 24 * 60 * 60 * 1000 },
+  ],
+});
+const HISTORY_RANGES = HISTORY_RANGE_SELECTOR.ranges;
 
 function rangeButtons() {
-  return `<div class="range-toggle">${HISTORY_RANGES.map((r) => `<button type="button" class="range-button${r.id === state.historyRange ? ' active' : ''}" data-action="set-history-range" data-range="${r.id}">${r.label}</button>`).join('')}</div>`;
+  return rangeButtonsHtml(HISTORY_RANGE_SELECTOR, state.historyRange);
 }
 
 function filterPointsByRange(points) {
-  const range = HISTORY_RANGES.find((r) => r.id === state.historyRange) || HISTORY_RANGES[1];
-  const cutoff = Date.now() - range.ms;
-  return asArray(points).filter((p) => p && p.timestamp && new Date(p.timestamp).getTime() >= cutoff);
+  return filterByRange(points, HISTORY_RANGE_SELECTOR, state.historyRange, 'timestamp');
 }
 
-const USER_PROFILE_RANGES = [
-  { id: '30d',  label: '30d',  days: 30 },
-  { id: '90d',  label: '90d',  days: 90 },
-  { id: '180d', label: '180d', days: 180 },
-  { id: '1y',   label: '1y',   days: 365 },
-  { id: 'all',  label: 'All',  days: null },
-];
+const USER_PROFILE_RANGE_SELECTOR = createRangeSelector({
+  id: 'userProfile',
+  stateKey: 'userProfileRange',
+  action: 'set-profile-range',
+  defaultId: '90d',
+  ranges: [
+    { id: '30d',  label: '30d',  days: 30 },
+    { id: '90d',  label: '90d',  days: 90 },
+    { id: '180d', label: '180d', days: 180 },
+    { id: '1y',   label: '1y',   days: 365 },
+    { id: 'all',  label: 'All',  days: null },
+  ],
+});
+const USER_PROFILE_RANGES = USER_PROFILE_RANGE_SELECTOR.ranges;
 
 function profileRangeButtons() {
-  return `<div class="range-toggle">${USER_PROFILE_RANGES.map((r) => `<button type="button" class="range-button${r.id === state.userProfileRange ? ' active' : ''}" data-action="set-profile-range" data-range="${r.id}">${r.label}</button>`).join('')}</div>`;
+  return rangeButtonsHtml(USER_PROFILE_RANGE_SELECTOR, state.userProfileRange);
 }
 
 function filterTrendsByPeriod(trends) {
-  const range = USER_PROFILE_RANGES.find((r) => r.id === state.userProfileRange);
-  if (!range || !range.days) return trends;
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - range.days);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
-  return asArray(trends).filter((r) => r.report_date >= cutoffStr);
+  return filterByRange(trends, USER_PROFILE_RANGE_SELECTOR, state.userProfileRange, 'report_date');
 }
 
 function hasCapacityHistory() {
