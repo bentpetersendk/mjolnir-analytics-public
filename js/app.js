@@ -1,4 +1,4 @@
-import { loadMjolnirData, loadPersonalData, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus, loadQueueInsightsData, loadSoftwareInventoryData, loadSoftwareIntelligenceData, loadSoftwareIntelligenceModuleDetail } from './data-loader.js';
+import { loadMjolnirData, loadPersonalData, loadUserBundle, loadNodeInsightsData, loadNodeInsightsHistory, loadSlurmAnalyticsPipelineStatus, loadQueueInsightsData, loadSoftwareInventoryData, loadSoftwareIntelligenceData, loadSoftwareIntelligenceModuleDetail } from './data-loader.js';
 import { requestAnalyticsRecovery } from './recovery-service.js';
 import { startAutoRefresh, setLastUpdatedFromBundle, lastUpdatedLabel, getLastUpdatedAt, isToastVisible } from './refresh-manager.js';
 import {
@@ -86,9 +86,16 @@ const navGroups = [
     ],
   },
   {
+    heading: 'Users',
+    items: [
+      { id: 'users', label: 'All Users', icon: 'users' },
+      { id: 'user-rankings', label: 'Rankings', icon: 'trophy' },
+      { id: 'user-compare', label: 'Compare Users', icon: 'users' },
+    ],
+  },
+  {
     heading: 'Personal',
     items: [
-      { id: 'users', label: 'Community Comparison', icon: 'users' },
       { id: 'recovery', label: 'View My Analytics', icon: 'key' },
     ],
   },
@@ -115,6 +122,8 @@ const hiddenRouteItems = [
   { id: 'groups', label: 'Groups', icon: 'cluster' },
   { id: 'sections', label: 'Sections', icon: 'book' },
   { id: 'si-module', label: 'Module Detail', icon: 'box' },
+  { id: 'user', label: 'User Profile', icon: 'users' },
+  { id: 'compare', label: 'User Comparison', icon: 'users' },
 ];
 const allRouteItems = navItems.concat(hiddenRouteItems);
 
@@ -150,6 +159,13 @@ const state = {
   softwareIntelligenceRelationshipsModule: null,
   softwareIntelligenceTimelineModule: 'all',
   softwareIntelligenceTimelineGranularity: 'daily',
+  usersExplorer: {
+    search: '',
+    sort: { key: 'cpu_hours', dir: 'desc' },
+    page: 1,
+    filters: { activity: 'all', resource: 'all', efficiency: 'all', jobs: 'all' },
+  },
+  comparison: { selected: [] },
 };
 
 let data = null;
@@ -171,6 +187,24 @@ let warehouseSummary = {};
 // flight doesn't trigger a duplicate request.
 const softwareIntelligenceModuleCache = new Map();
 const softwareIntelligenceModuleLoading = new Set();
+
+// User Profile lazy-load cache: Map<public_user_id, bundle|null>.
+// A pending fetch is tracked in the Set so navigating to a profile twice in
+// quick succession never fires two fetches for the same user.
+const userProfileCache = new Map();
+const userProfileLoading = new Set();
+
+function requestUserBundle(publicUserId) {
+  if (!publicUserId || userProfileCache.has(publicUserId) || userProfileLoading.has(publicUserId)) return;
+  const base = data?.sourcePath;
+  if (!base) return;
+  userProfileLoading.add(publicUserId);
+  loadUserBundle(base, publicUserId).then((bundle) => {
+    userProfileLoading.delete(publicUserId);
+    userProfileCache.set(publicUserId, bundle);
+    if (state.route === `user/${encodeURIComponent(publicUserId)}`) render();
+  });
+}
 
 function requestSoftwareIntelligenceModuleDetail(moduleName) {
   if (!moduleName || softwareIntelligenceModuleCache.has(moduleName) || softwareIntelligenceModuleLoading.has(moduleName)) return;
@@ -343,6 +377,11 @@ function softwareIntelligenceModuleDetailKey(route) {
 // after si-relationships follows that same convention rather than
 // introducing ?module= parsing for the first time.
 function isSoftwareIntelligenceRelationshipsRoute(route) { return /^si-relationships(\/.+)?$/.test(route || ''); }
+
+function isUserProfileRoute(route) { return /^user\/.+$/.test(route || ''); }
+function userProfileRouteId(route) { return isUserProfileRoute(route) ? decodeURIComponent(route.slice('user/'.length)) : null; }
+function isUserComparisonRoute(route) { return /^compare\/.+\/.+/.test(route || ''); }
+function userComparisonRouteIds(route) { return isUserComparisonRoute(route) ? route.slice('compare/'.length).split('/').map(decodeURIComponent).filter(Boolean) : []; }
 function softwareIntelligenceRelationshipsModuleKey(route) {
   if (!isSoftwareIntelligenceRelationshipsRoute(route)) return null;
   const rest = route.slice('si-relationships'.length);
@@ -361,6 +400,16 @@ function pageTitle(route) {
   if (isSoftwareModuleDetailRoute(route)) return 'Module Detail';
   if (isSoftwareIntelligenceModuleDetailRoute(route)) return 'Software Intelligence: Module Detail';
   if (isSoftwareIntelligenceRelationshipsRoute(route)) return 'Relationships';
+  if (isUserProfileRoute(route)) {
+    const id = userProfileRouteId(route);
+    const pseudonym = data?.usersSummary?.byId?.[id]?.displayPseudonym;
+    return pseudonym ? pseudonym : 'User Profile';
+  }
+  if (isUserComparisonRoute(route)) {
+    const ids = userComparisonRouteIds(route);
+    const pseudonyms = ids.map((id) => data?.usersSummary?.byId?.[id]?.displayPseudonym).filter(Boolean);
+    return pseudonyms.length >= 2 ? `${pseudonyms[0]} vs ${pseudonyms[1]}` : 'User Comparison';
+  }
   return allRouteItems.find((item) => item.id === route)?.label || 'Overview';
 }
 function trendDirection(current, previous, lowerIsBetter = false) { const delta = num(current) - num(previous); const good = lowerIsBetter ? delta < 0 : delta > 0; if (Math.abs(delta) < 0.0001) return { text: 'Flat', tone: 'info' }; return { text: `${good ? 'Improving' : 'Needs attention'} (${delta > 0 ? '+' : ''}${pct(delta, 1)})`, tone: good ? 'good' : 'warn' }; }
@@ -2965,15 +3014,673 @@ function hierarchyDetailPage(type, id) {
 }
 
 
+const USERS_EXPLORER_PAGE_SIZE = 50;
+
+function dateNDaysAgo(referenceDate, n) {
+  if (!referenceDate) return null;
+  const d = new Date(referenceDate);
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+function usersExplorerFiltered() {
+  const summaryUsers = asArray(data?.usersSummary?.users);
+  const { search, sort, filters } = state.usersExplorer;
+  const dates = summaryUsers.map((u) => u.lastActive).filter(Boolean).sort();
+  const refDate = dates[dates.length - 1] || null;
+  const q = search.trim().toLowerCase();
+
+  let result = summaryUsers.filter((u) => {
+    if (q && !u.displayPseudonym.toLowerCase().includes(q)) return false;
+
+    if (filters.activity === 'today' && u.lastActive !== refDate) return false;
+    if (filters.activity === '7d') { const c = dateNDaysAgo(refDate, 7); if (!u.lastActive || u.lastActive < c) return false; }
+    if (filters.activity === '30d') { const c = dateNDaysAgo(refDate, 30); if (!u.lastActive || u.lastActive < c) return false; }
+    if (filters.activity === '90d') { const c = dateNDaysAgo(refDate, 90); if (!u.lastActive || u.lastActive < c) return false; }
+    if (filters.activity === 'inactive') { const c = dateNDaysAgo(refDate, 90); if (u.lastActive && u.lastActive >= c) return false; }
+
+    if (filters.resource === 'gpu' && !(u.gpuHours > 0)) return false;
+    if (filters.resource === 'cpu' && u.gpuHours > 0) return false;
+
+    const eff = u.overallEfficiency;
+    if (filters.efficiency === 'under50' && (eff === null || eff >= 0.5)) return false;
+    if (filters.efficiency === '50-70' && (eff === null || eff < 0.5 || eff >= 0.7)) return false;
+    if (filters.efficiency === '70-90' && (eff === null || eff < 0.7 || eff >= 0.9)) return false;
+    if (filters.efficiency === 'over90' && (eff === null || eff < 0.9)) return false;
+
+    if (filters.jobs === 'over10' && u.totalJobs <= 10) return false;
+    if (filters.jobs === 'over100' && u.totalJobs <= 100) return false;
+    if (filters.jobs === 'over500' && u.totalJobs <= 500) return false;
+
+    return true;
+  });
+
+  const { key, dir } = sort;
+  const accessor = {
+    pseudonym:       (u) => u.displayPseudonym,
+    total_jobs:      (u) => u.totalJobs,
+    cpu_hours:       (u) => u.cpuHours,
+    gpu_hours:       (u) => u.gpuHours,
+    efficiency:      (u) => u.overallEfficiency ?? -1,
+    last_active:     (u) => u.lastActive ?? '',
+    cost:            (u) => u.estimatedCostDkk,
+    recommendations: (u) => u.recommendationCount,
+  }[key] || ((u) => u.cpuHours);
+
+  return result.slice().sort((a, b) => {
+    const av = accessor(a);
+    const bv = accessor(b);
+    if (typeof av === 'string') return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    return dir === 'asc' ? av - bv : bv - av;
+  });
+}
+
+function usersExplorerSortHeader(label, key) {
+  const { sort } = state.usersExplorer;
+  const active = sort.key === key;
+  const arrow = active ? (sort.dir === 'desc' ? ' ↓' : ' ↑') : '';
+  return `<th><button type="button" class="sort-button" data-action="sort-users-explorer" data-key="${key}">${escapeHtml(label)}${arrow}</button></th>`;
+}
+
+function efficiencyPill(eff) {
+  if (eff === null || eff === undefined || !Number.isFinite(eff)) return '<span class="subtle">—</span>';
+  const tone = eff >= 0.7 ? 'good' : eff >= 0.5 ? 'info' : 'warn';
+  return `<span class="pill ${tone}">${pct(eff)}</span>`;
+}
+
+// ── Phase 6: LEAF Sustainability Indicator ─────────────────────────────────
+
+const LEAF_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor" stroke="none" aria-hidden="true">
+  <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20C19 20 22 3 22 3c-1 2-8 2-8 2C12 3 9 6 9 9c0 2.2 1 4 3 5C11 12 14 10 17 8Z"/>
+</svg>`;
+
+function leafGlowClass(eff) {
+  if (eff === null || eff === undefined || !Number.isFinite(Number(eff))) return 'leaf-muted';
+  const v = Number(eff);
+  if (v >= 0.70) return 'leaf-green';
+  if (v >= 0.40) return 'leaf-yellow';
+  return 'leaf-red';
+}
+
+function leafIndicator(eff, size = '') {
+  const cls = leafGlowClass(eff);
+  const sizeCls = size ? ` leaf-${size}` : '';
+  const effLabel = (eff !== null && eff !== undefined && Number.isFinite(Number(eff)))
+    ? pct(Number(eff))
+    : '—';
+  const tone = cls === 'leaf-green' ? 'Excellent efficiency' : cls === 'leaf-yellow' ? 'Acceptable efficiency' : cls === 'leaf-muted' ? 'No data' : 'Low efficiency';
+  return `<span class="leaf ${cls}${sizeCls}" title="${tone}: ${effLabel}" aria-label="LEAF sustainability: ${tone} (${effLabel})">${LEAF_SVG}</span>`;
+}
+
+function efficiencyWithLeaf(eff) {
+  if (eff === null || eff === undefined || !Number.isFinite(Number(eff))) return '<span class="subtle">—</span>';
+  return `<span class="leaf-pair">${leafIndicator(eff)}${efficiencyPill(eff)}</span>`;
+}
+
+// ── Phase 6: Comparison helper functions ────────────────────────────────────
+
+function compareWinnerBadge(values, winnerFn = Math.max) {
+  const finite = values.map((v) => (Number.isFinite(v) ? v : null));
+  const best = winnerFn(...finite.filter((v) => v !== null));
+  return finite.map((v) => (v !== null && v === best && finite.filter((x) => x === best).length < finite.length)
+    ? `<span class="compare-winner" title="Best value">▲ Best</span>`
+    : '');
+}
+
+function compareWinnerBadgeLow(values) {
+  const finite = values.map((v) => (Number.isFinite(v) ? v : null));
+  const best = Math.min(...finite.filter((v) => v !== null));
+  return finite.map((v) => (v !== null && v === best && finite.filter((x) => x === best).length < finite.length)
+    ? `<span class="compare-winner" title="Best value (lower is better)">▼ Best</span>`
+    : '');
+}
+
+function compareSummary(users) {
+  const bullets = [];
+  const names = users.map((u) => escapeHtml(u.displayPseudonym));
+
+  const finiteEffs = users.map((u) => u.overallEfficiency).filter(Number.isFinite);
+  if (finiteEffs.length >= 2) {
+    const effs = users.map((u) => u.overallEfficiency);
+    const maxEff = Math.max(...effs.filter(Number.isFinite));
+    const minEff = Math.min(...effs.filter(Number.isFinite));
+    if (maxEff - minEff > 0.15) {
+      const best = users.find((u) => u.overallEfficiency === maxEff);
+      const worst = users.find((u) => u.overallEfficiency === minEff);
+      bullets.push(`<strong>${escapeHtml(best.displayPseudonym)}</strong> achieves substantially higher resource efficiency (${pct(maxEff)}) compared to <strong>${escapeHtml(worst.displayPseudonym)}</strong> (${pct(minEff)}).`);
+    } else {
+      bullets.push(`All compared users achieve broadly similar overall efficiency (${pct(minEff)}–${pct(maxEff)}).`);
+    }
+  }
+
+  const cpuEffs = users.map((u) => u.cpuEfficiency).filter(Number.isFinite);
+  if (cpuEffs.length >= 2) {
+    const max = Math.max(...cpuEffs);
+    const min = Math.min(...cpuEffs);
+    if (max - min > 0.15) {
+      const best = users.find((u) => u.cpuEfficiency === max);
+      bullets.push(`<strong>${escapeHtml(best.displayPseudonym)}</strong> has notably higher CPU efficiency (${pct(max)} vs ${pct(min)}).`);
+    }
+  }
+
+  const memEffs = users.map((u) => u.memoryEfficiency).filter(Number.isFinite);
+  if (memEffs.length >= 2) {
+    const max = Math.max(...memEffs);
+    const min = Math.min(...memEffs);
+    if (max - min > 0.15) {
+      const best = users.find((u) => u.memoryEfficiency === max);
+      bullets.push(`<strong>${escapeHtml(best.displayPseudonym)}</strong> uses memory more efficiently (${pct(max)} vs ${pct(min)}).`);
+    }
+  }
+
+  const jobs = users.map((u) => u.totalJobs);
+  if (Math.max(...jobs) / Math.max(1, Math.min(...jobs.filter((j) => j > 0))) > 3) {
+    const hi = users.reduce((a, b) => a.totalJobs > b.totalJobs ? a : b);
+    const lo = users.reduce((a, b) => a.totalJobs < b.totalJobs ? a : b);
+    if (hi !== lo) bullets.push(`<strong>${escapeHtml(hi.displayPseudonym)}</strong> runs significantly more jobs (${fmt(hi.totalJobs)}) than <strong>${escapeHtml(lo.displayPseudonym)}</strong> (${fmt(lo.totalJobs)}).`);
+  }
+
+  const waits = users.map((u) => u.averageQueueWaitSeconds).filter((w) => w !== null && Number.isFinite(w));
+  if (waits.length >= 2) {
+    const max = Math.max(...waits);
+    const min = Math.min(...waits);
+    if (max - min > 300) {
+      const lo = users.find((u) => u.averageQueueWaitSeconds === min);
+      bullets.push(`<strong>${escapeHtml(lo.displayPseudonym)}</strong> experiences shorter average queue wait times (${Math.round(min / 60)} min vs ${Math.round(max / 60)} min).`);
+    }
+  }
+
+  const waste = users.map((u) => u.underutilizedCostDkk);
+  if (Math.max(...waste) > 0 && Math.max(...waste) / Math.max(1, Math.min(...waste.filter((w) => w > 0))) > 3) {
+    const hi = users.reduce((a, b) => a.underutilizedCostDkk > b.underutilizedCostDkk ? a : b);
+    bullets.push(`<strong>${escapeHtml(hi.displayPseudonym)}</strong> has the largest estimated savings opportunity (${money(hi.underutilizedCostDkk)}).`);
+  }
+
+  const swCounts = users.map((u) => u.softwareCount).filter((s) => s > 0);
+  if (swCounts.length >= 2 && Math.max(...swCounts) > Math.min(...swCounts) + 2) {
+    const hi = users.find((u) => u.softwareCount === Math.max(...swCounts));
+    bullets.push(`<strong>${escapeHtml(hi.displayPseudonym)}</strong> uses a broader software portfolio (${fmt(hi.softwareCount)} modules).`);
+  }
+
+  const benchmarks = users.filter((u) => u.isBenchmark);
+  const realUsers = users.filter((u) => !u.isBenchmark);
+  if (benchmarks.length > 0 && realUsers.length > 0) {
+    const ref = benchmarks[0];
+    realUsers.forEach((u) => {
+      const effDiff = (u.overallEfficiency || 0) - (ref.overallEfficiency || 0);
+      if (Math.abs(effDiff) > 0.05) {
+        bullets.push(`<strong>${escapeHtml(u.displayPseudonym)}</strong> is ${effDiff > 0 ? `${pct(effDiff)} above` : `${pct(-effDiff)} below`} the <strong>${escapeHtml(ref.displayPseudonym)}</strong> in overall efficiency.`);
+      }
+    });
+  }
+
+  if (!bullets.length) {
+    bullets.push(`${names.join(' and ')} show comparable resource usage patterns. Review the metrics below for detailed differences.`);
+  }
+
+  return `<div class="compare-summary">
+    <div class="compare-summary-title">Executive Summary</div>
+    <div class="compare-summary-body"><ul>${bullets.map((b) => `<li>${b}</li>`).join('')}</ul></div>
+  </div>`;
+}
+
+function compareKpiDashboard(users) {
+  const cards = users.map((u) => {
+    const isBenchmark = u.isBenchmark;
+    const href = isBenchmark ? null : `#/user/${encodeURIComponent(u.publicUserId)}`;
+    const nameHtml = href
+      ? `<a href="${href}">${escapeHtml(u.displayPseudonym)}</a>`
+      : escapeHtml(u.displayPseudonym);
+    const label = isBenchmark ? 'Benchmark' : 'User';
+    const eff = u.overallEfficiency;
+    return `<div class="compare-kpi-card${isBenchmark ? ' is-benchmark' : ''}">
+      <div class="compare-kpi-user">${label}</div>
+      <div class="compare-kpi-name">${nameHtml}</div>
+      <div class="compare-kpi-leaf">
+        ${leafIndicator(eff, 'lg')}
+        <span class="compare-kpi-eff-label">${eff !== null && Number.isFinite(eff) ? pct(eff) : '—'}</span>
+      </div>
+      <div class="compare-kpi-stats">
+        <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">Jobs</span><span class="compare-kpi-stat-value">${fmt(u.totalJobs)}</span></div>
+        <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">CPU h</span><span class="compare-kpi-stat-value">${fmt(u.cpuHours, 0)}</span></div>
+        <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">CPU eff.</span><span class="compare-kpi-stat-value">${efficiencyPill(u.cpuEfficiency)}</span></div>
+        <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">Mem eff.</span><span class="compare-kpi-stat-value">${efficiencyPill(u.memoryEfficiency)}</span></div>
+        <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">Est. cost</span><span class="compare-kpi-stat-value">${money(u.estimatedCostDkk)}</span></div>
+        <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">Savings opp.</span><span class="compare-kpi-stat-value">${money(u.underutilizedCostDkk)}</span></div>
+      </div>
+    </div>`;
+  });
+  return `<div class="compare-kpi-grid">${cards.join('')}</div>`;
+}
+
+function compareWithGroup(currentUserId) {
+  const summary = data?.usersSummary;
+  const benchmarks = summary?.benchmarkProfiles || [];
+  const btnsByBenchmark = benchmarks.map((b) => {
+    const href = `#/compare/${encodeURIComponent(currentUserId)}/${encodeURIComponent(b.publicUserId)}`;
+    return `<a href="${href}" class="compare-with-btn is-benchmark">${leafIndicator(b.overallEfficiency, 'sm')} ${escapeHtml(b.displayPseudonym)}</a>`;
+  });
+  const randomUsers = (summary?.users || []).filter((u) => u.publicUserId !== currentUserId);
+  const randomUser = randomUsers[Math.floor(Math.random() * randomUsers.length)];
+  const randomBtn = randomUser
+    ? `<button type="button" class="compare-with-btn" data-action="compare-random" data-base-id="${escapeHtml(currentUserId)}" data-users-json='${JSON.stringify(randomUsers.map((u) => u.publicUserId))}'>Random User</button>`
+    : '';
+  return `<div class="compare-with-group">
+    <span class="compare-with-label">Compare with:</span>
+    ${btnsByBenchmark.join('')}
+    ${randomBtn}
+    <a href="#/users" class="compare-with-btn">Select User…</a>
+  </div>`;
+}
+
+function compareTrendCharts(users) {
+  const usersWithTrends = users.filter((u) => u.trends30d && u.trends30d.length > 0);
+  if (!usersWithTrends.length) return '';
+  const colors = ['#3e8cff', '#53d88a', '#ffb84d', '#ff6b7a', '#30d5d0'];
+  const allDates = [...new Set(usersWithTrends.flatMap((u) => u.trends30d.map((t) => t.d)))].sort();
+
+  const cpuSeries = usersWithTrends.map((u, i) => {
+    const byDate = Object.fromEntries((u.trends30d || []).map((t) => [t.d, t.c]));
+    return chartSeries(allDates.map((d) => ({ d, val: byDate[d] ?? null })), 'val', escapeHtml(u.displayPseudonym), colors[i % colors.length]);
+  });
+  const memSeries = usersWithTrends.map((u, i) => {
+    const byDate = Object.fromEntries((u.trends30d || []).map((t) => [t.d, t.m]));
+    return chartSeries(allDates.map((d) => ({ d, val: byDate[d] ?? null })), 'val', escapeHtml(u.displayPseudonym), colors[i % colors.length]);
+  });
+  const rows = allDates.map((d) => ({ report_date: d }));
+
+  return `${lineChart('CPU Efficiency (30-day trend)', rows, cpuSeries, pct, { zeroBase: true })}
+    ${lineChart('Memory Efficiency (30-day trend)', rows, memSeries, pct, { zeroBase: true })}`;
+}
+
+function usersCompareBar() {
+  const sel = state.comparison.selected;
+  if (sel.length < 2) return '';
+  const summary = data?.usersSummary;
+  const labels = sel.map((id) => {
+    const u = summary?.byId?.[id];
+    const pseudonym = u?.displayPseudonym;
+    const isBenchmark = u?.isBenchmark;
+    return `<span class="compare-bar-chip${isBenchmark ? ' is-benchmark' : ''}">${escapeHtml(pseudonym || id)}</span>`;
+  });
+  const href = `#/compare/${sel.map(encodeURIComponent).join('/')}`;
+  return `<div class="compare-bar">
+    <span class="compare-bar-label">Comparing:</span>
+    ${labels.join('')}
+    <a href="${href}" class="btn btn-primary compare-bar-btn">Compare →</a>
+    <button type="button" class="btn btn-secondary" data-action="clear-comparison">Clear</button>
+  </div>`;
+}
+
+function usersExplorerTable(rows) {
+  const selected = new Set(state.comparison.selected);
+  const headers = `<tr>
+    <th class="col-check"><span class="sr-only">Compare</span></th>
+    ${usersExplorerSortHeader('User', 'pseudonym')}
+    ${usersExplorerSortHeader('Jobs', 'total_jobs')}
+    ${usersExplorerSortHeader('CPU hours', 'cpu_hours')}
+    ${usersExplorerSortHeader('GPU hours', 'gpu_hours')}
+    ${usersExplorerSortHeader('Efficiency', 'efficiency')}
+    ${usersExplorerSortHeader('Last active', 'last_active')}
+    ${usersExplorerSortHeader('Est. cost', 'cost')}
+    ${usersExplorerSortHeader('Recs', 'recommendations')}
+  </tr>`;
+  const body = rows.length
+    ? rows.map((u) => `<tr${selected.has(u.publicUserId) ? ' class="compare-selected"' : ''}>
+        <td class="col-check"><input type="checkbox" class="compare-checkbox" data-action="toggle-compare" data-user-id="${escapeHtml(u.publicUserId)}"${selected.has(u.publicUserId) ? ' checked' : ''} aria-label="Select ${escapeHtml(u.displayPseudonym)} for comparison" /></td>
+        <td><a href="#/user/${encodeURIComponent(u.publicUserId)}" class="user-table-link">${escapeHtml(u.displayPseudonym)}</a></td>
+        <td>${fmt(u.totalJobs)}</td>
+        <td>${fmt(u.cpuHours, 1)}</td>
+        <td>${u.gpuHours > 0 ? fmt(u.gpuHours, 1) : '<span class="subtle">—</span>'}</td>
+        <td><div class="leaf-cell">${leafIndicator(u.overallEfficiency)}${efficiencyPill(u.overallEfficiency)}</div></td>
+        <td>${u.lastActive || '<span class="subtle">—</span>'}</td>
+        <td>${money(u.estimatedCostDkk)}</td>
+        <td>${u.recommendationCount > 0 ? `<span class="pill warn">${u.recommendationCount}</span>` : '<span class="subtle">—</span>'}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="9"><div class="empty-state">No users match the current search or filters.</div></td></tr>`;
+  return `<table><thead>${headers}</thead><tbody>${body}</tbody></table>`;
+}
+
+function usersExplorerPagination(page, totalPages, total) {
+  if (totalPages <= 1) return '';
+  return `<div class="pagination">
+    <button type="button" class="btn" data-action="page-users-explorer" data-direction="prev" ${page <= 1 ? 'disabled' : ''}>&larr; Prev</button>
+    <span class="subtle">Page ${page} of ${totalPages} &mdash; ${fmt(total)} users</span>
+    <button type="button" class="btn" data-action="page-users-explorer" data-direction="next" ${page >= totalPages ? 'disabled' : ''}>Next &rarr;</button>
+  </div>`;
+}
+
+function usersExplorerFilterBar() {
+  const { filters } = state.usersExplorer;
+  const sel = (action, opts, current) =>
+    `<select data-action="${action}">${opts.map(([v, l]) => `<option value="${v}"${current === v ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+  return `<div class="filter-bar">
+    <div class="filter-field"><span>Activity</span>${sel('filter-users-activity', [
+      ['all', 'All time'], ['today', 'Active today'], ['7d', 'Last 7 days'],
+      ['30d', 'Last 30 days'], ['90d', 'Last 90 days'], ['inactive', 'Inactive (>90 d)'],
+    ], filters.activity)}</div>
+    <div class="filter-field"><span>Resource</span>${sel('filter-users-resource', [
+      ['all', 'All users'], ['gpu', 'GPU users'], ['cpu', 'CPU-only users'],
+    ], filters.resource)}</div>
+    <div class="filter-field"><span>Efficiency</span>${sel('filter-users-efficiency', [
+      ['all', 'Any'], ['under50', '<50%'], ['50-70', '50–70%'], ['70-90', '70–90%'], ['over90', '>90%'],
+    ], filters.efficiency)}</div>
+    <div class="filter-field"><span>Jobs</span>${sel('filter-users-jobs', [
+      ['all', 'Any count'], ['over10', '>10'], ['over100', '>100'], ['over500', '>500'],
+    ], filters.jobs)}</div>
+  </div>`;
+}
+
 function userPage() {
-  const users = asArray(data?.users).slice(0, 25);
-  const rows = users.map((user) => [escapeHtml(user.label), pct(user.cpu), pct(user.memory), money(user.savings), fmt(user.jobs), fmt(user.recommendations.length)]);
+  const summary = data?.usersSummary;
+  if (!summary?.available) {
+    return `<div class="stack">
+      ${analyticsStatusBar()}
+      <div class="empty-state">User summary data is not yet available in this export. Run the updated export pipeline to generate global/users_summary.json.</div>
+    </div>`;
+  }
+  const filtered = usersExplorerFiltered();
+  const totalPages = Math.max(1, Math.ceil(filtered.length / USERS_EXPLORER_PAGE_SIZE));
+  const page = Math.min(Math.max(1, state.usersExplorer.page), totalPages);
+  const pageRows = filtered.slice((page - 1) * USERS_EXPLORER_PAGE_SIZE, page * USERS_EXPLORER_PAGE_SIZE);
   return `
     <div class="stack">
-      ${infoPanel('What is Community Comparison?', 'Compare your resource usage patterns with similar users. Individual identities remain protected. Comparisons are intended for context and learning, not ranking.')}
-      <section class="section"><div class="section-head"><h2>Community Comparison</h2><span class="subtle">Pseudonymous public users</span></div><p class="subtle">This page shows how public pseudonymous users compare on resource usage and optimization opportunity. Individual Analytics pages will later reveal only the signed-in user's real username.</p></section>
-      <section class="table-card">${tableFromRows(['Pseudonym', 'CPU efficiency', 'Memory efficiency', 'Savings opportunity', 'Jobs', 'Recommendations'], rows)}</section>
-      </div>`;
+      ${analyticsStatusBar()}
+      <section class="section">
+        <div class="section-head"><h2>All Users</h2><span class="subtle">${fmt(summary.users.length)} pseudonymous users · ${fmt(filtered.length)} shown</span></div>
+        <p class="subtle">Every user is identified by a stable pseudonym only. No usernames, emails, or account names are exposed. Click any row to open a full analytics profile.</p>
+        ${usersExplorerFilterBar()}
+        <div class="table-toolbar">
+          <input type="search" class="search" data-action="search-users-explorer" placeholder="Search by pseudonym…" value="${escapeHtml(state.usersExplorer.search)}" />
+        </div>
+        ${usersCompareBar()}
+        <div class="table-card">${usersExplorerTable(pageRows)}</div>
+        ${usersExplorerPagination(page, totalPages, filtered.length)}
+      </section>
+    </div>`;
+}
+
+function userProfilePage(publicUserId) {
+  requestUserBundle(publicUserId);
+  const su = data?.usersSummary?.byId?.[publicUserId];
+  const pseudonym = su?.displayPseudonym || publicUserId;
+  const compareIds = state.comparison.selected.filter((id) => id !== publicUserId);
+  const compareHref = compareIds.length >= 1
+    ? `#/compare/${[publicUserId, ...compareIds].map(encodeURIComponent).join('/')}`
+    : null;
+  const compareButton = compareHref
+    ? `<a href="${compareHref}" class="btn btn-secondary">Compare ↔</a>`
+    : `<button type="button" class="btn btn-secondary" data-action="add-to-compare" data-user-id="${escapeHtml(publicUserId)}" title="Select this user for comparison">+ Add to Compare</button>`;
+  const backLink = `<div class="profile-actions">${compareButton}<a href="#/users" class="btn btn-secondary">&larr; All Users</a></div>
+    ${compareWithGroup(publicUserId)}`;
+
+  if (userProfileLoading.has(publicUserId)) {
+    return `<div class="stack"><div class="profile-hero"><div><div class="context-label">User Profile</div><h1>${escapeHtml(pseudonym)}</h1></div>${backLink}</div><div class="empty-state">Loading…</div></div>`;
+  }
+  const bundle = userProfileCache.get(publicUserId);
+  if (!bundle) {
+    return `<div class="stack"><div class="profile-hero"><div><div class="context-label">User Profile</div><h1>${escapeHtml(pseudonym)}</h1></div>${backLink}</div><div class="empty-state">Profile unavailable for this user.</div></div>`;
+  }
+
+  const summary = asObject(bundle.all_time_summary);
+  const trends = asArray(bundle.daily_trends);
+  const recs = asArray(bundle.recommendations);
+  const topJobs = asArray(bundle.top_inefficient_jobs);
+  const rolling = asObject(bundle.rolling_summaries);
+
+  const effTone = (v) => (v === null || !Number.isFinite(v)) ? '' : v >= 0.7 ? 'good' : v >= 0.5 ? 'info' : 'warn';
+
+  const overallEff = su?.overallEfficiency ?? null;
+  const kpiCards = `<div class="cards-grid">
+    ${statBlock('LEAF Rating', `<span class="leaf-pair">${leafIndicator(overallEff, 'lg')}<span style="font-size:1.1em;font-weight:700">${overallEff !== null && Number.isFinite(overallEff) ? pct(overallEff) : '—'}</span></span>`, 'Overall resource efficiency', effTone(overallEff))}
+    ${statBlock('Jobs', fmt(summary.jobs), `${fmt(summary.completed_jobs)} completed · ${fmt(summary.failed_jobs)} failed`)}
+    ${statBlock('CPU hours', fmt(summary.cpu_hours_allocated, 1), 'All-time allocated')}
+    ${statBlock('GPU hours', fmt(summary.gpu_hours, 1), 'All-time allocated')}
+    ${statBlock('Memory GB·h', fmt(summary.requested_mem_gb_hours, 0), 'All-time requested')}
+    ${statBlock('CPU efficiency', `<span class="leaf-pair">${leafIndicator(summary.avg_cpu_efficiency)}${efficiencyPill(summary.avg_cpu_efficiency)}</span>`, 'Measured vs. allocated', effTone(summary.avg_cpu_efficiency))}
+    ${statBlock('Memory efficiency', `<span class="leaf-pair">${leafIndicator(summary.avg_memory_efficiency)}${efficiencyPill(summary.avg_memory_efficiency)}</span>`, 'MaxRSS vs. requested', effTone(summary.avg_memory_efficiency))}
+    ${statBlock('Estimated cost', money(summary.estimated_cost_dkk), 'Based on allocation')}
+    ${statBlock('Savings opportunity', money(summary.underutilized_cost_dkk), 'Estimated reducible cost', 'warn')}
+  </div>`;
+
+  const clusterCtxCards = su ? `<div class="cards-grid">
+    ${statBlock('CPU eff. percentile', su.percentileCpu !== null ? `${Math.round(su.percentileCpu)}th` : '—', 'Among all active users')}
+    ${statBlock('Overall eff. percentile', su.percentileEfficiency !== null ? `${Math.round(su.percentileEfficiency)}th` : '—', 'Among all active users')}
+    ${statBlock('Active days', fmt(su.activeDays), 'Days with at least one job')}
+    ${statBlock('Software modules', su.softwareCount > 0 ? fmt(su.softwareCount) : '—', 'Distinct modules loaded')}
+    ${statBlock('Favourite partition', su.favoritePartition ? escapeHtml(su.favoritePartition) : '—', 'Most frequently used')}
+    ${statBlock('Favourite software', su.favoriteSoftware ? escapeHtml(su.favoriteSoftware) : '—', 'Most-used module')}
+  </div>` : '';
+
+  const rollingRows = ['7d', '30d', '90d'].map((k) => {
+    const w = asObject(rolling[k]);
+    return [k, fmt(w.jobs), pct(w.avg_cpu_efficiency), pct(w.avg_memory_efficiency), money(w.estimated_cost_dkk), money(w.underutilized_cost_dkk)];
+  });
+
+  const jobsRows = topJobs.map((j) => [
+    escapeHtml(j.partition_name || '—'),
+    pct(j.measured_cpu_efficiency),
+    pct(j.memory_efficiency),
+    money(j.underutilized_cost_dkk),
+    money(j.estimated_cost_dkk),
+    fmt(j.elapsed_hours, 1),
+    fmt(j.alloc_cpus),
+  ]);
+
+  const recCards = recs.length
+    ? recs.map((r) => recCard(r.severity || r.priority || 'medium', r.title, r.suggestion || r.detail || '', '')).join('')
+    : '<div class="empty-state">No recommendations for this user.</div>';
+
+  return `<div class="stack">
+    <div class="profile-hero">
+      <div>
+        <div class="context-label">User Profile</div>
+        <h1>${escapeHtml(pseudonym)}</h1>
+        <p class="subtle">Last active: ${su?.lastActive || '—'} · Stable pseudonymous identifier</p>
+      </div>
+      ${backLink}
+    </div>
+    <section class="section"><div class="section-head"><h2>Summary</h2><span class="subtle">All-time totals</span></div>${kpiCards}</section>
+    ${clusterCtxCards ? `<section class="section"><div class="section-head"><h2>Cluster Context</h2><span class="subtle">Position among all users</span></div>${clusterCtxCards}</section>` : ''}
+    <section class="section"><div class="section-head"><h2>Rolling Summaries</h2><span class="subtle">Recent windows</span></div><div class="table-card">${tableFromRows(['Window', 'Jobs', 'CPU eff.', 'Mem eff.', 'Est. cost', 'Savings opp.'], rollingRows)}</div></section>
+    ${lineChart(`${escapeHtml(pseudonym)} — efficiency`, trends, [chartSeries(trends, 'avg_cpu_efficiency', 'CPU', '#3e8cff'), chartSeries(trends, 'avg_memory_efficiency', 'Memory', '#53d88a')], pct, { zeroBase: true })}
+    ${lineChart(`${escapeHtml(pseudonym)} — cost`, trends, [chartSeries(trends, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(trends, 'underutilized_cost_dkk', 'Savings opp.', '#ff6b7a')], money, { zeroBase: true })}
+    <section class="section"><div class="section-head"><h2>Recommendations</h2><span class="subtle">${recs.length} generated</span></div><div class="rec-list">${recCards}</div></section>
+    ${topJobs.length ? `<section class="section"><div class="section-head"><h2>Highest-Impact Jobs</h2><span class="subtle">By savings opportunity</span></div><div class="table-card">${tableFromRows(['Partition', 'CPU eff.', 'Mem eff.', 'Savings opp.', 'Est. cost', 'Elapsed h', 'CPUs'], jobsRows)}</div></section>` : ''}
+  </div>`;
+}
+
+function userLeaderboard(title, users, valueKey, formatter, limit = 10, showLeaf = false) {
+  const sorted = asArray(users)
+    .filter((u) => {
+      const v = u[valueKey];
+      return v !== null && v !== undefined && Number.isFinite(Number(v)) && Number(v) > 0;
+    })
+    .slice()
+    .sort((a, b) => Number(b[valueKey]) - Number(a[valueKey]))
+    .slice(0, limit);
+  if (!sorted.length) return '';
+  const rows = sorted.map((u, i) => {
+    const eff = showLeaf ? (u.overallEfficiency ?? null) : null;
+    const leafHtml = showLeaf ? `${leafIndicator(eff)} ` : '';
+    return `<tr>
+      <td><span class="rank-badge">${i + 1}</span></td>
+      <td><a href="#/user/${encodeURIComponent(u.publicUserId)}" class="user-table-link">${escapeHtml(u.displayPseudonym)}</a></td>
+      <td><div class="leaf-cell">${leafHtml}${formatter(u[valueKey])}</div></td>
+    </tr>`;
+  }).join('');
+  return `<section class="section">
+    <div class="section-head"><h2>${escapeHtml(title)}</h2><span class="subtle">Top ${sorted.length}</span></div>
+    <div class="table-card"><table><thead><tr><th>#</th><th>User</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table></div>
+  </section>`;
+}
+
+function userRankingsPage() {
+  const summary = data?.usersSummary;
+  if (!summary?.available) {
+    return `<div class="stack">
+      ${analyticsStatusBar()}
+      <div class="empty-state">User summary data is not yet available. Run the updated export pipeline to generate global/users_summary.json.</div>
+    </div>`;
+  }
+  const users = summary.users;
+  const measuredUsers = users.filter((u) => u.overallEfficiency !== null && u.totalJobs >= 5);
+  const measuredCpuUsers = users.filter((u) => u.cpuEfficiency !== null && u.totalJobs >= 5);
+  const measuredMemUsers = users.filter((u) => u.memoryEfficiency !== null && u.totalJobs >= 5);
+  const swUsers = users.filter((u) => u.softwareCount > 0);
+  const leafNote = `<section class="section">
+    <div class="section-head"><h2>${leafIndicator(0.85, 'lg')} LEAF Sustainability Indicators</h2></div>
+    <p class="subtle">The ${leafIndicator(0.85)} green leaf indicates excellent resource efficiency — sustainable, environmentally responsible HPC computing. The ${leafIndicator(0.55)} yellow leaf indicates room for optimisation. The ${leafIndicator(0.15)} red leaf indicates significant waste and optimisation potential. LEAF indicators are shown throughout the platform wherever efficiency is displayed.</p>
+  </section>`;
+  return `<div class="stack">
+    ${analyticsStatusBar()}
+    ${infoPanel('About these rankings', 'All users are identified by stable pseudonyms only. Rankings highlight resource usage patterns — not individual performance judgements.')}
+    ${leafNote}
+    <div class="trend-grid">
+      ${userLeaderboard('Most Sustainable Users', measuredUsers, 'overallEfficiency', (v) => `<span class="leaf-pair">${leafIndicator(v)}${pct(v)}</span>`, 10, false)}
+      ${userLeaderboard('Highest CPU Efficiency', measuredCpuUsers, 'cpuEfficiency', (v) => `<span class="leaf-pair">${leafIndicator(v)}${pct(v)}</span>`, 10, false)}
+      ${userLeaderboard('Highest Memory Efficiency', measuredMemUsers, 'memoryEfficiency', (v) => `<span class="leaf-pair">${leafIndicator(v)}${pct(v)}</span>`, 10, false)}
+      ${userLeaderboard('Highest Savings Opportunity', users, 'underutilizedCostDkk', money)}
+      ${userLeaderboard('Highest CPU Consumption', users, 'cpuHours', (v) => `${fmt(v, 0)} h`)}
+      ${userLeaderboard('Highest GPU Consumption', users, 'gpuHours', (v) => `${fmt(v, 1)} h`)}
+      ${userLeaderboard('Most Active Users', users, 'totalJobs', (v) => `${fmt(v)} jobs`)}
+      ${userLeaderboard('Largest Memory Consumers', users, 'memoryGbHours', (v) => `${fmt(v, 0)} GB·h`)}
+      ${userLeaderboard('Most Software Diversity', swUsers, 'softwareCount', (v) => `${fmt(v)} modules`)}
+      ${userLeaderboard('Most Active Days', users, 'activeDays', (v) => `${fmt(v)} days`)}
+    </div>
+  </div>`;
+}
+
+function userCompareSelectorPage() {
+  const summary = data?.usersSummary;
+  if (!summary?.available) {
+    return `<div class="stack">${analyticsStatusBar()}<div class="empty-state">User summary data is not yet available.</div></div>`;
+  }
+  const sel = state.comparison.selected;
+  return `<div class="stack">
+    ${analyticsStatusBar()}
+    <section class="section">
+      <div class="section-head"><h2>Compare Users</h2><span class="subtle">Side-by-side analysis of pseudonymous users</span></div>
+      <p class="subtle">Select two or more users from the <a href="#/users">All Users explorer</a> using the checkboxes in the table, then click <strong>Compare →</strong>. All identifiers remain pseudonymous.</p>
+      ${sel.length >= 2
+        ? `${usersCompareBar()}<p class="subtle" style="margin-top:8px">Or go back to <a href="#/users">All Users</a> to change your selection.</p>`
+        : `<div class="empty-state">No users selected yet. <a href="#/users">Go to All Users →</a> and use the checkboxes to pick two users.</div>`}
+    </section>
+  </div>`;
+}
+
+function userComparisonPage(ids) {
+  const summary = data?.usersSummary;
+  if (!summary?.available) {
+    return `<div class="stack">${analyticsStatusBar()}<div class="empty-state">User summary data is not yet available.</div></div>`;
+  }
+  const users = ids.map((id) => summary.byId[id]).filter(Boolean);
+  if (users.length < 2) {
+    return `<div class="stack">${analyticsStatusBar()}<div class="empty-state">At least two valid user IDs are required for comparison. <a href="#/users">&larr; Back to All Users</a></div></div>`;
+  }
+
+  const dash = '<span class="subtle">—</span>';
+
+  // ── Winner badge helpers: find best value in each row ───────────────────
+  const winHigh = (vals) => compareWinnerBadge(vals, Math.max);
+  const winLow  = (vals) => compareWinnerBadgeLow(vals);
+
+  const row = (label, rawVals, winBadges) => {
+    const cells = rawVals.map((v, i) => {
+      const badge = winBadges ? winBadges[i] : '';
+      return `<td class="compare-value">${v}${badge}</td>`;
+    });
+    return `<tr><th class="compare-label">${escapeHtml(label)}</th>${cells.join('')}</tr>`;
+  };
+
+  const effRow = (label, key) => {
+    const vals = users.map((u) => u[key]);
+    const display = vals.map((v) => efficiencyWithLeaf(v));
+    return row(label, display, winHigh(vals.map((v) => Number(v))));
+  };
+
+  const numRow = (label, displayFn, numFn, preferHigh = true) => {
+    const nums = users.map(numFn);
+    const display = users.map((u, i) => displayFn(u, i));
+    return row(label, display, preferHigh ? winHigh(nums) : winLow(nums));
+  };
+
+  const tableRows = [
+    effRow('Overall efficiency',  'overallEfficiency'),
+    effRow('CPU efficiency',      'cpuEfficiency'),
+    effRow('Memory efficiency',   'memoryEfficiency'),
+    numRow('Total jobs',          (u) => fmt(u.totalJobs), (u) => u.totalJobs),
+    numRow('Completed',           (u) => fmt(u.completedJobs), (u) => u.completedJobs),
+    numRow('Failed',              (u) => u.failedJobs > 0 ? `<span class="pill warn">${fmt(u.failedJobs)}</span>` : '<span class="subtle">0</span>', (u) => -u.failedJobs),
+    numRow('CPU hours',           (u) => fmt(u.cpuHours, 1), (u) => u.cpuHours),
+    numRow('GPU hours',           (u) => u.gpuHours > 0 ? fmt(u.gpuHours, 1) : dash, (u) => u.gpuHours),
+    numRow('Memory GB·h',         (u) => fmt(u.memoryGbHours, 0), (u) => u.memoryGbHours),
+    numRow('Walltime hours',      (u) => fmt(u.walltimeHours, 1), (u) => u.walltimeHours),
+    numRow('Estimated cost',      (u) => money(u.estimatedCostDkk), (u) => u.estimatedCostDkk),
+    numRow('Savings opportunity', (u) => money(u.underutilizedCostDkk), (u) => -u.underutilizedCostDkk, false),
+    numRow('Avg queue wait',      (u) => u.averageQueueWaitSeconds != null ? `${Math.round(u.averageQueueWaitSeconds / 60)} min` : dash, (u) => -(u.averageQueueWaitSeconds ?? Infinity), false),
+    numRow('Active days',         (u) => fmt(u.activeDays), (u) => u.activeDays),
+    row('Last active',            users.map((u) => u.lastActive || dash)),
+    numRow('Software modules',    (u) => u.softwareCount > 0 ? fmt(u.softwareCount) : dash, (u) => u.softwareCount),
+    row('Recommendations',        users.map((u) => {
+      if (u.isBenchmark) return dash;
+      return u.recommendationCount > 0 ? `<span class="pill warn">${u.recommendationCount}</span>` : dash;
+    })),
+    row('Favourite partition',    users.map((u) => u.favoritePartition ? escapeHtml(u.favoritePartition) : dash)),
+    row('Favourite software',     users.map((u) => u.favoriteSoftware ? escapeHtml(u.favoriteSoftware) : dash)),
+    numRow('CPU eff. percentile', (u) => u.percentileCpu !== null ? `${Math.round(u.percentileCpu)}th` : dash, (u) => u.percentileCpu ?? -1),
+    numRow('Eff. percentile',     (u) => u.percentileEfficiency !== null ? `${Math.round(u.percentileEfficiency)}th` : dash, (u) => u.percentileEfficiency ?? -1),
+  ];
+
+  const userHeaders = users.map((u) => {
+    const isBenchmark = u.isBenchmark;
+    const inner = isBenchmark
+      ? `<span title="${escapeHtml(u.displayPseudonym)}">${escapeHtml(u.displayPseudonym)}</span>`
+      : `<a href="#/user/${encodeURIComponent(u.publicUserId)}" class="user-table-link">${escapeHtml(u.displayPseudonym)}</a>`;
+    return `<th class="compare-user-head${isBenchmark ? ' is-benchmark' : ''}">${inner}</th>`;
+  }).join('');
+
+  // ── Copy URL and CSV export ──────────────────────────────────────────────
+  const currentUrl = window.location.href;
+  const csvData = [
+    ['Metric', ...users.map((u) => u.displayPseudonym)].join(','),
+    ['Overall efficiency', ...users.map((u) => u.overallEfficiency ?? '')].join(','),
+    ['CPU efficiency', ...users.map((u) => u.cpuEfficiency ?? '')].join(','),
+    ['Memory efficiency', ...users.map((u) => u.memoryEfficiency ?? '')].join(','),
+    ['Total jobs', ...users.map((u) => u.totalJobs)].join(','),
+    ['CPU hours', ...users.map((u) => u.cpuHours)].join(','),
+    ['GPU hours', ...users.map((u) => u.gpuHours)].join(','),
+    ['Estimated cost (DKK)', ...users.map((u) => u.estimatedCostDkk)].join(','),
+    ['Savings opportunity (DKK)', ...users.map((u) => u.underutilizedCostDkk)].join(','),
+  ].join('\n');
+  const csvBlob = `data:text/csv;charset=utf-8,${encodeURIComponent(csvData)}`;
+
+  const actionsBar = `<div class="compare-actions-bar">
+    <button type="button" class="btn btn-secondary" data-action="copy-compare-url" data-url="${escapeHtml(currentUrl)}">Copy URL</button>
+    <a href="${csvBlob}" download="comparison-${Date.now()}.csv" class="btn btn-secondary">Export CSV</a>
+    <a href="#/users" class="btn btn-secondary">&larr; All Users</a>
+  </div>`;
+
+  return `<div class="stack">
+    ${analyticsStatusBar()}
+    <section class="section">
+      <div class="section-head">
+        <h2>User Comparison</h2>
+        <span class="subtle">${users.length} compared &mdash; all-time aggregates</span>
+      </div>
+      <p class="subtle">All real users are identified by stable pseudonyms only. Benchmark profiles are synthetic aggregates computed from the full user population.</p>
+      ${actionsBar}
+      ${compareKpiDashboard(users)}
+      ${compareSummary(users)}
+      <div class="table-card compare-table-wrapper">
+        <table class="compare-table">
+          <thead><tr><th class="compare-label">Metric</th>${userHeaders}</tr></thead>
+          <tbody>${tableRows.join('')}</tbody>
+        </table>
+      </div>
+    </section>
+    ${compareTrendCharts(users)}
+  </div>`;
 }
 
 function costPage() {
@@ -3286,6 +3993,8 @@ function render() {
     groups: groupsPage,
     sections: sectionsPage,
     users: userPage,
+    'user-rankings': userRankingsPage,
+    'user-compare': userCompareSelectorPage,
     cost: costPage,
     recovery: recoveryPage,
     methodology: methodologyPage,
@@ -3317,7 +4026,11 @@ function render() {
                 ? softwareIntelligenceRelationshipsPage(softwareIntelligenceRelationshipsModuleKey(state.route))
                 : isHierarchyDetailRoute(state.route)
                   ? hierarchyDetailPage(detailRouteParts(state.route).type, detailRouteParts(state.route).id)
-                  : (renderers[state.route] || renderers.landing)();
+                  : isUserProfileRoute(state.route)
+                    ? userProfilePage(userProfileRouteId(state.route))
+                    : isUserComparisonRoute(state.route)
+                      ? userComparisonPage(userComparisonRouteIds(state.route))
+                      : (renderers[state.route] || renderers.landing)();
   app.innerHTML = renderShell(content);
   wireEvents();
   mountCharts();
@@ -3585,6 +4298,95 @@ function wireEvents() {
       render();
     });
   });
+  // Users Explorer: search, sort, filter, pagination — same data-action/
+  // rerenderPreservingViewState() pattern as Software Inventory above.
+  document.querySelector('[data-action="search-users-explorer"]')?.addEventListener('input', (event) => {
+    const cursor = event.currentTarget.selectionStart;
+    state.usersExplorer.search = event.currentTarget.value;
+    state.usersExplorer.page = 1;
+    render();
+    const refocused = document.querySelector('[data-action="search-users-explorer"]');
+    if (refocused) { refocused.focus(); refocused.setSelectionRange(cursor, cursor); }
+  });
+  document.querySelectorAll('[data-action="sort-users-explorer"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      const key = event.currentTarget.dataset.key;
+      if (state.usersExplorer.sort.key === key) {
+        state.usersExplorer.sort.dir = state.usersExplorer.sort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.usersExplorer.sort = { key, dir: key === 'pseudonym' ? 'asc' : 'desc' };
+      }
+      state.usersExplorer.page = 1;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="page-users-explorer"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      state.usersExplorer.page += event.currentTarget.dataset.direction === 'prev' ? -1 : 1;
+      render();
+    });
+  });
+  document.querySelector('[data-action="filter-users-activity"]')?.addEventListener('change', (event) => {
+    state.usersExplorer.filters.activity = event.currentTarget.value;
+    state.usersExplorer.page = 1;
+    render();
+  });
+  document.querySelector('[data-action="filter-users-resource"]')?.addEventListener('change', (event) => {
+    state.usersExplorer.filters.resource = event.currentTarget.value;
+    state.usersExplorer.page = 1;
+    render();
+  });
+  document.querySelector('[data-action="filter-users-efficiency"]')?.addEventListener('change', (event) => {
+    state.usersExplorer.filters.efficiency = event.currentTarget.value;
+    state.usersExplorer.page = 1;
+    render();
+  });
+  document.querySelector('[data-action="filter-users-jobs"]')?.addEventListener('change', (event) => {
+    state.usersExplorer.filters.jobs = event.currentTarget.value;
+    state.usersExplorer.page = 1;
+    render();
+  });
+  // User Comparison: toggle individual checkbox, clear all, add from profile page.
+  document.querySelectorAll('[data-action="toggle-compare"]').forEach((el) => {
+    el.addEventListener('change', (event) => {
+      const id = event.currentTarget.dataset.userId;
+      if (!id) return;
+      const idx = state.comparison.selected.indexOf(id);
+      if (event.currentTarget.checked && idx === -1) state.comparison.selected.push(id);
+      else if (!event.currentTarget.checked && idx !== -1) state.comparison.selected.splice(idx, 1);
+      render();
+    });
+  });
+  document.querySelector('[data-action="clear-comparison"]')?.addEventListener('click', () => {
+    state.comparison.selected = [];
+    render();
+  });
+  document.querySelector('[data-action="add-to-compare"]')?.addEventListener('click', (event) => {
+    const id = event.currentTarget.dataset.userId;
+    if (id && !state.comparison.selected.includes(id)) state.comparison.selected.push(id);
+    render();
+  });
+  document.querySelectorAll('[data-action="copy-compare-url"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      const url = event.currentTarget.dataset.url;
+      if (url) navigator.clipboard?.writeText(url).catch(() => {});
+      const btn = event.currentTarget;
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    });
+  });
+  document.querySelectorAll('[data-action="compare-random"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      const baseId = event.currentTarget.dataset.baseId;
+      let userIds = [];
+      try { userIds = JSON.parse(event.currentTarget.dataset.usersJson || '[]'); } catch (_) { return; }
+      if (!baseId || !userIds.length) return;
+      const randomId = userIds[Math.floor(Math.random() * userIds.length)];
+      window.location.hash = `/compare/${encodeURIComponent(baseId)}/${encodeURIComponent(randomId)}`;
+    });
+  });
+
   document.querySelector('[data-recovery-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;

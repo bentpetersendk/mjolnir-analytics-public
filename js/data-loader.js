@@ -116,6 +116,7 @@ function normalizeGlobal(index) {
   return {
     cluster_summary: global.cluster_summary || 'global/cluster_summary.json',
     percentiles: global.percentiles || 'global/percentiles.json',
+    users_summary: global.users_summary || null,
     account_summary: global.account_summary || global.accounts || null,
     projects: global.projects || null,
     pi_summaries: global.pi_summaries || null,
@@ -137,9 +138,10 @@ async function tryLoadTree(base) {
   const globalIndex = normalizeGlobal(index);
   const usersIndex = asArray(index.users);
 
-  const [clusterSummary, percentiles, accountSummary, projectHierarchy, piHierarchy, groupHierarchy, sectionHierarchy] = await Promise.all([
+  const [clusterSummary, percentiles, usersSummaryDoc, accountSummary, projectHierarchy, piHierarchy, groupHierarchy, sectionHierarchy] = await Promise.all([
     loadJson(`${base}${globalIndex.cluster_summary}`),
     loadJson(`${base}${globalIndex.percentiles}`),
+    globalIndex.users_summary ? tryOptionalJson(`${base}${globalIndex.users_summary}`) : null,
     globalIndex.account_summary ? tryOptionalJson(`${base}${globalIndex.account_summary}`) : null,
     globalIndex.projects ? tryOptionalJson(`${base}${globalIndex.projects}`) : null,
     globalIndex.pi_summaries ? tryOptionalJson(`${base}${globalIndex.pi_summaries}`) : null,
@@ -162,6 +164,7 @@ async function tryLoadTree(base) {
     index,
     clusterSummary,
     percentiles,
+    usersSummaryDoc,
     accountSummary,
     projectHierarchy,
     piHierarchy,
@@ -347,6 +350,55 @@ function normalizePersonalUserViewModel(bundle, routeToken) {
   };
 }
 
+function normalizeUserRow(r) {
+  const eff = (v) => (v !== null && v !== undefined) ? Number(v) : null;
+  return {
+    publicUserId:              r.public_user_id || '',
+    displayPseudonym:         r.display_pseudonym || '',
+    isBenchmark:              r.is_benchmark === true,
+    benchmarkSize:            r.benchmark_size != null ? Number(r.benchmark_size) : null,
+    totalJobs:                numberOrZero(r.total_jobs),
+    completedJobs:            numberOrZero(r.completed_jobs),
+    failedJobs:               numberOrZero(r.failed_jobs),
+    cpuHours:                 numberOrZero(r.cpu_hours),
+    memoryGbHours:            numberOrZero(r.memory_gb_hours),
+    gpuHours:                 numberOrZero(r.gpu_hours),
+    walltimeHours:            numberOrZero(r.walltime_hours),
+    estimatedCostDkk:         numberOrZero(r.estimated_cost_dkk),
+    underutilizedCostDkk:     numberOrZero(r.underutilized_cost_dkk),
+    cpuEfficiency:            eff(r.cpu_efficiency),
+    memoryEfficiency:         eff(r.memory_efficiency),
+    overallEfficiency:        eff(r.overall_efficiency),
+    averageQueueWaitSeconds:  r.average_queue_wait_seconds !== null ? numberOrZero(r.average_queue_wait_seconds) : null,
+    medianQueueWaitSeconds:   r.median_queue_wait_seconds !== null ? numberOrZero(r.median_queue_wait_seconds) : null,
+    lastActive:               r.last_active || null,
+    activeDays:               numberOrZero(r.active_days),
+    softwareCount:            numberOrZero(r.software_count),
+    recommendationCount:      r.recommendation_count != null ? numberOrZero(r.recommendation_count) : null,
+    favoritePartition:        r.favorite_partition || null,
+    favoriteSoftware:         r.favorite_software || null,
+    percentileCpu:            eff(r.percentile_cpu),
+    percentileEfficiency:     eff(r.percentile_efficiency),
+    trends30d:                Array.isArray(r.trends_30d) ? r.trends_30d : [],
+  };
+}
+
+function normalizeUsersSummary(doc) {
+  if (!doc) return { available: false, generatedAt: null, users: [], benchmarkProfiles: [], byId: {} };
+  const users = asArray(doc.users).map((row) => normalizeUserRow(asObject(row)));
+  const benchmarkProfiles = asArray(doc.benchmark_profiles).map((row) => normalizeUserRow(asObject(row)));
+  const byId = {};
+  users.forEach((u) => { byId[u.publicUserId] = u; });
+  benchmarkProfiles.forEach((b) => { byId[b.publicUserId] = b; });
+  return {
+    available: true,
+    generatedAt: doc.generated_at || null,
+    users,
+    benchmarkProfiles,
+    byId,
+  };
+}
+
 function topBy(users, key, direction = 'desc', limit = 25) {
   return users
     .filter((user) => Number.isFinite(Number(user[key])))
@@ -457,6 +509,7 @@ function normalizeProjects(accountSummary) {
 }
 
 function buildDerivedData(tree) {
+  const usersSummary = normalizeUsersSummary(tree.usersSummaryDoc);
   const cluster = asObject(tree.clusterSummary);
   const percentilesRoot = asObject(tree.percentiles);
   const p = asObject(percentilesRoot.percentiles);
@@ -476,6 +529,7 @@ function buildDerivedData(tree) {
     sourcePath: tree.sourcePath,
     generatedAt: tree.index && tree.index.generated_at,
     schemaVersion: tree.index && tree.index.schema_version,
+    usersSummary,
     clusterSummary: {
       allTime,
       rolling30d: asObject(cluster.cluster_rolling_summaries && cluster.cluster_rolling_summaries['30d']),
@@ -532,6 +586,12 @@ function buildDerivedData(tree) {
       dataWindowDays: cluster.data_window_days ?? tree.index.data_window_days ?? null,
     },
   };
+}
+
+export async function loadUserBundle(base, publicUserId) {
+  if (!base || !publicUserId) return null;
+  const b = base.endsWith('/') ? base : `${base}/`;
+  return tryOptionalJson(`${b}users/${encodeURIComponent(publicUserId)}.json`);
 }
 
 export async function loadPersonalData(routeToken) {
