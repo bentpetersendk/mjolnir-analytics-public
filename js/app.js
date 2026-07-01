@@ -3305,6 +3305,38 @@ function leafDashboardSection(record, filteredTrends, recs, potentialSavingsDkk)
   </section>`;
 }
 
+// Phase 7: positive reinforcement - celebrate improvements instead of only
+// surfacing what's wrong. Compares the 7-day rolling window against the
+// 30-day rolling window (both already exported, same pair trendDirection()
+// uses elsewhere) as a practical proxy for "recent vs. a month ago." Only
+// improvements are called out; flat or negative movement stays silent here
+// (the Recommendations section already covers what needs attention).
+function positiveReinforcementBanner(rolling) {
+  const recent = asObject(rolling['7d']);
+  const baseline = asObject(rolling['30d']);
+  const delta = (a, b) => {
+    const an = Number(a), bn = Number(b);
+    return (Number.isFinite(an) && Number.isFinite(bn)) ? an - bn : null;
+  };
+
+  const leafDelta = delta(recent.leaf_index, baseline.leaf_index);
+  const cpuDelta = delta(recent.avg_cpu_efficiency, baseline.avg_cpu_efficiency);
+  const memDelta = delta(recent.avg_memory_efficiency, baseline.avg_memory_efficiency);
+  const savingsDelta = delta(baseline.underutilized_cost_dkk, recent.underutilized_cost_dkk); // positive = savings opportunity shrank
+
+  const messages = [];
+  if (leafDelta !== null && Math.round(leafDelta) >= 1) {
+    const points = Math.round(leafDelta);
+    messages.push(`LEAF Index improved by ${points} point${points === 1 ? '' : 's'} recently.`);
+  }
+  if (cpuDelta !== null && cpuDelta >= 0.02) messages.push(`CPU efficiency improved by ${Math.round(cpuDelta * 100)}%.`);
+  if (memDelta !== null && memDelta >= 0.02) messages.push(`Memory requests are now better matched to actual usage.`);
+  if (savingsDelta !== null && savingsDelta >= 1) messages.push(`Estimated savings opportunity reduced by ${money(savingsDelta)}.`);
+
+  if (!messages.length) return '';
+  return `<div class="leaf-celebration">${messages.map((m) => `<span class="leaf-celebration-item">${escapeHtml(m)}</span>`).join('')}</div>`;
+}
+
 // ── Phase 6: Comparison helper functions ────────────────────────────────────
 
 function compareWinnerBadge(values, winnerFn = Math.max) {
@@ -3701,6 +3733,7 @@ function userProfilePage(publicUserId) {
       </div>
       ${backLink}
     </div>
+    ${positiveReinforcementBanner(rolling)}
     <section class="section"><div class="section-head"><h2>Summary</h2><span class="subtle">All-time totals</span></div>${kpiCards}</section>
     ${leafDashboardSection(leafBadgeSource, filteredTrends, recs, summary.underutilized_cost_dkk)}
     ${clusterCtxCards ? `<section class="section"><div class="section-head"><h2>Cluster Context</h2><span class="subtle">Position among all users</span></div>${clusterCtxCards}</section>` : ''}
