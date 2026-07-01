@@ -344,9 +344,35 @@ function normalizePersonalUserViewModel(bundle, routeToken) {
       savings: percentile.savings ?? percentile.underutilized_cost_dkk,
     },
     trends,
+    leaf: normalizeLeafBlock(root.leaf),
     topInefficientJobs: asArray(root.top_inefficient_jobs).map(normalizePersonalJob),
     recommendations: asArray(root.recommendations).map(normalizeRecommendation),
     peerComparisons: asArray(root.peer_comparisons).map(normalizePeer),
+  };
+}
+
+// Phase 8: the "leaf" methodology block (version/window_days/leaf_index/
+// leaf_index_components/confidence/measurement_coverage/percentile) is the
+// only LEAF Index meant for display - see js/app.js's LEAF_INDEX_TOOLTIP.
+// Legacy leaf_index/leaf_index_components fields are left un-normalized
+// here on purpose: nothing should read them for display after Phase 8.
+function normalizeLeafBlock(leaf) {
+  const l = asObject(leaf);
+  const coverage = asObject(l.measurement_coverage);
+  return {
+    version: l.version || null,
+    windowDays: l.window_days != null ? Number(l.window_days) : null,
+    leafIndex: l.leaf_index != null ? Number(l.leaf_index) : null,
+    leafIndexComponents: Array.isArray(l.leaf_index_components) ? l.leaf_index_components : [],
+    confidence: l.confidence || null,
+    percentile: l.percentile != null ? Number(l.percentile) : null,
+    measurementCoverage: {
+      jobsMeasured: coverage.jobs_measured != null ? Number(coverage.jobs_measured) : null,
+      jobsExcluded: coverage.jobs_excluded != null ? Number(coverage.jobs_excluded) : null,
+      jobsMeasuredPct: coverage.jobs_measured_pct != null ? Number(coverage.jobs_measured_pct) : null,
+      cpuHoursMeasuredPct: coverage.cpu_hours_measured_pct != null ? Number(coverage.cpu_hours_measured_pct) : null,
+      memoryMeasuredPct: coverage.memory_measured_pct != null ? Number(coverage.memory_measured_pct) : null,
+    },
   };
 }
 
@@ -381,6 +407,7 @@ function normalizeUserRow(r) {
     percentileEfficiency:     eff(r.percentile_efficiency),
     leafIndex:                r.leaf_index != null ? Number(r.leaf_index) : null,
     leafIndexComponents:      Array.isArray(r.leaf_index_components) ? r.leaf_index_components : [],
+    leaf:                     normalizeLeafBlock(r.leaf),
     trends30d:                Array.isArray(r.trends_30d) ? r.trends_30d : [],
   };
 }

@@ -3097,7 +3097,10 @@ function usersExplorerFiltered() {
     if (filters.resource === 'gpu' && !(u.gpuHours > 0)) return false;
     if (filters.resource === 'cpu' && u.gpuHours > 0) return false;
 
-    const eff = u.overallEfficiency;
+    // Phase 8: filter/sort/display by the 180d rolling efficiency, not
+    // lifetime overallEfficiency, so Explorer/Rankings reflect current
+    // behaviour like everything else in this phase.
+    const eff = windowOverallEfficiency(u);
     if (filters.efficiency === 'under50' && (eff === null || eff >= 0.5)) return false;
     if (filters.efficiency === '50-70' && (eff === null || eff < 0.5 || eff >= 0.7)) return false;
     if (filters.efficiency === '70-90' && (eff === null || eff < 0.7 || eff >= 0.9)) return false;
@@ -3116,7 +3119,7 @@ function usersExplorerFiltered() {
     total_jobs:      (u) => u.totalJobs,
     cpu_hours:       (u) => u.cpuHours,
     gpu_hours:       (u) => u.gpuHours,
-    efficiency:      (u) => u.overallEfficiency ?? -1,
+    efficiency:      (u) => windowOverallEfficiency(u) ?? -1,
     last_active:     (u) => u.lastActive ?? '',
     cost:            (u) => u.estimatedCostDkk,
     recommendations: (u) => u.recommendationCount,
@@ -3211,6 +3214,66 @@ function leafComponentValue(record, component) {
   return null;
 }
 
+// Phase 8: LEAF 2.0 - the only LEAF Index meant for display, ranking, or
+// sorting is the rolling-window one exported as bundle/record.leaf (a
+// users_summary row, personal bundle, or user/hierarchy bundle all carry the
+// same "leaf" shape - see data-loader.js normalizeLeafBlock and
+// scripts/export_analytics_data.py build_leaf_block()). The legacy
+// leafIndex/leaf_index fields are lifetime-scoped and kept only for
+// external backward compatibility - nothing in this file reads them for
+// display after this point.
+const LEAF_ROLLING_LABEL = 'LEAF (180d rolling)';
+
+// `record.leaf` may be pre-normalized (camelCase, from data-loader.js
+// normalizeLeafBlock - users_summary rows, personal bundles) or raw JSON
+// (snake_case - a user/hierarchy bundle fetched straight off the wire, see
+// requestUserBundle/loadUserBundle) - support both so callers never need to
+// care which shape they were handed.
+function leafBlockOf(record) {
+  const leaf = record?.leaf;
+  if (!leaf) return null;
+  return {
+    leafIndex: leaf.leafIndex ?? leaf.leaf_index ?? null,
+    leafIndexComponents: leaf.leafIndexComponents ?? leaf.leaf_index_components ?? [],
+    confidence: leaf.confidence ?? null,
+    percentile: leaf.percentile ?? null,
+    windowDays: leaf.windowDays ?? leaf.window_days ?? null,
+    measurementCoverage: leaf.measurementCoverage ?? {
+      jobsMeasured: leaf.measurement_coverage?.jobs_measured ?? null,
+      jobsExcluded: leaf.measurement_coverage?.jobs_excluded ?? null,
+      jobsMeasuredPct: leaf.measurement_coverage?.jobs_measured_pct ?? null,
+      cpuHoursMeasuredPct: leaf.measurement_coverage?.cpu_hours_measured_pct ?? null,
+      memoryMeasuredPct: leaf.measurement_coverage?.memory_measured_pct ?? null,
+    },
+  };
+}
+
+function leafComponentFromBlock(leaf, componentId) {
+  const c = (leaf?.leafIndexComponents || []).find((x) => x.id === componentId);
+  return c ? c.value : null;
+}
+
+// Rolling-window analogue of a record's (lifetime) overallEfficiency, used
+// wherever Users Explorer/Rankings ranks or filters by "efficiency" so that
+// ranking reflects recent behaviour, not lifetime history.
+function windowOverallEfficiency(record) {
+  const leaf = leafBlockOf(record);
+  const present = ['cpu', 'memory']
+    .map((id) => leafComponentFromBlock(leaf, id))
+    .filter((v) => v !== null && v !== undefined && Number.isFinite(v));
+  return present.length ? present.reduce((a, b) => a + b, 0) / present.length : null;
+}
+
+const LEAF_CONFIDENCE_LABEL = { high: 'High', medium: 'Medium', low: 'Low', very_low: 'Very low' };
+const LEAF_CONFIDENCE_TOOLTIP = 'Confidence reflects how much of your recent activity actually has measured CPU/memory utilization data - low confidence means most jobs in this window lack the accounting data needed to compute efficiency, not that your efficiency is poor.';
+
+function leafConfidenceChip(leaf) {
+  const key = leaf?.confidence;
+  const label = LEAF_CONFIDENCE_LABEL[key] || '—';
+  const cls = key === 'high' ? 'good' : key === 'medium' ? 'info' : key === 'low' ? 'warn' : 'bad';
+  return `<span class="pill ${cls}" title="${escapeHtml(LEAF_CONFIDENCE_TOOLTIP)}">${escapeHtml(label)} confidence${infoTip(LEAF_CONFIDENCE_TOOLTIP)}</span>`;
+}
+
 // Fallback only: used when a record predates the exported `leaf_index`
 // field (e.g. cached/older JSON). Prefer the exported field when present.
 function computeLeafIndex(record) {
@@ -3239,19 +3302,30 @@ function leafIndexTier(score) {
   return 'leaf-red';
 }
 
-const LEAF_INDEX_TOOLTIP = 'The LEAF Index reflects overall sustainable use of HPC resources. It currently reflects CPU and memory efficiency, weighted 60/40, and will expand to include additional sustainability dimensions (GPU efficiency, queue behaviour, energy, carbon) as they become available.';
+// Phase 8: LEAF measures resource efficiency/environmental sustainability
+// and is independent of price; Savings Opportunity measures realistic
+// near-term cost reduction from measurable jobs. They can move independently
+// (e.g. low LEAF from years of history but small realistic savings today) -
+// this tooltip is the one place that distinction is explained, reused on
+// every "Savings opportunity" stat card.
+const LEAF_VS_SAVINGS_TOOLTIP = 'LEAF measures resource efficiency (environmental sustainability), independent of cost. Savings Opportunity measures realistic near-term cost reduction, estimated only from jobs with measured utilization, over the same 180-day window as LEAF. A user can have a low LEAF but a small Savings Opportunity if most of their recent jobs lack measurement data - see the Measurement Coverage note above.';
 
-// `record` may be a users_summary row (camelCase, has .leafIndex) or a raw
-// personal-bundle summary (snake_case, has .leaf_index) - support both so
-// callers don't need to normalize first.
+const LEAF_INDEX_TOOLTIP = 'The LEAF Index reflects sustainable use of HPC resources over the last 180 days (not your all-time history), so it can actually improve as your usage improves. It currently reflects CPU and memory efficiency, weighted 60/40, and will expand to include additional sustainability dimensions (GPU efficiency, queue behaviour, energy, carbon) as they become available. Version 2.0.';
+
+// `record` may be a users_summary row, personal bundle, or user/hierarchy
+// bundle - all carry a `leaf` block (see data-loader.js normalizeLeafBlock /
+// export_analytics_data.py build_leaf_block). Falls back to computeLeafIndex
+// only for JSON that predates the `leaf` block entirely (very old cache).
 function leafIndexBadge(record, size = 'lg') {
-  const score = record?.leafIndex ?? record?.leaf_index ?? computeLeafIndex(record || {}).score;
+  const leaf = leafBlockOf(record);
+  const score = leaf?.leafIndex ?? computeLeafIndex(record || {}).score;
   const cls = leafIndexTier(score);
   const display = Number.isFinite(Number(score)) ? Math.round(Number(score)) : '—';
   const tone = LEAF_TONE_LABEL[cls];
   return `<span class="leaf-index-badge">
     <span class="leaf ${cls} leaf-${size}" title="${escapeHtml(tone)}" aria-hidden="true">${LEAF_SVG}</span>
     <span class="leaf-index-value">${display}<span class="leaf-index-scale">/100</span></span>
+    <span class="leaf-index-window subtle">${escapeHtml(LEAF_ROLLING_LABEL)}</span>
     ${infoTip(LEAF_INDEX_TOOLTIP)}
   </span>`;
 }
@@ -3269,14 +3343,20 @@ const LEAF_INDEX_BANDS = [
 // queue sub-scores appear automatically the day they go live - nothing on
 // this page needs to change when that happens.
 function leafDashboardSection(record, filteredTrends, recs, potentialSavingsDkk) {
+  const leaf = leafBlockOf(record);
+  // Phase 8: sub-scores read the same rolling-window components as the
+  // headline badge (leaf.leafIndexComponents), not the lifetime
+  // cpu_efficiency/memory_efficiency fields leafComponentValue() reads -
+  // otherwise the sub-scores and the badge above them would silently
+  // describe two different time windows.
   const subScoreCards = LEAF_INDEX_COMPONENTS
     .filter((c) => c.available)
     .map((c) => {
-      const value = leafComponentValue(record, c);
+      const value = leafComponentFromBlock(leaf, c.id);
       return `<article class="stat-card">
         <div class="label">${escapeHtml(c.label)} LEAF</div>
         <div class="value"><span class="leaf-pair">${leafIndicator(value)}${efficiencyPill(value)}</span></div>
-        <div class="subtle">${Math.round(c.weight * 100)}% of LEAF Index</div>
+        <div class="subtle">${Math.round(c.weight * 100)}% of LEAF Index · ${escapeHtml(LEAF_ROLLING_LABEL)}</div>
       </article>`;
     })
     .join('');
@@ -3293,13 +3373,20 @@ function leafDashboardSection(record, filteredTrends, recs, potentialSavingsDkk)
     ? `${recs.length} improvement ${recs.length === 1 ? 'suggestion is' : 'suggestions are'} available below.`
     : 'No outstanding improvement suggestions - keep it up.';
 
+  const coverage = leaf?.measurementCoverage || {};
+  const coverageNote = Number.isFinite(coverage.jobsMeasured) && Number.isFinite(coverage.jobsExcluded)
+    ? `LEAF calculated from ${fmt(coverage.jobsMeasured)} measured jobs${coverage.jobsExcluded > 0 ? ` · ${fmt(coverage.jobsExcluded)} jobs excluded (utilization data unavailable)` : ''}.`
+    : 'Not enough measured jobs in this window to compute measurement coverage.';
+  const coverageTooltip = 'Jobs without measured CPU/memory utilization are excluded from LEAF entirely - they are never treated as 0% efficient, since that would be unrepresentative of unknown data.';
+
   return `<section class="section">
-    <div class="section-head"><h2>LEAF Dashboard</h2><span class="subtle">Your sustainability health summary</span></div>
+    <div class="section-head"><h2>LEAF Dashboard</h2><span class="subtle">Your sustainability health summary · ${escapeHtml(LEAF_ROLLING_LABEL)}</span></div>
     <div class="cards-grid">
-      <article class="stat-card"><div class="label">LEAF Index</div><div class="value">${leafIndexBadge(record, 'xl')}</div><div class="subtle">Overall sustainability score</div></article>
+      <article class="stat-card"><div class="label">LEAF Index</div><div class="value">${leafIndexBadge(record, 'xl')}</div><div class="subtle">${leafConfidenceChip(leaf)}</div></article>
       ${subScoreCards}
+      <article class="stat-card"><div class="label">Measurement coverage${infoTip(coverageTooltip)}</div><div class="value" style="font-size:1rem;font-weight:600">${escapeHtml(coverageNote)}</div></article>
       <article class="stat-card"><div class="label">Potential improvements</div><div class="value" style="font-size:1rem;font-weight:600">${escapeHtml(improvementsNote)}</div></article>
-      <article class="stat-card warn"><div class="label">Estimated savings${infoTip('Estimated savings if historical jobs had requested closer to the optimal CPU and memory resources while performing the same work.')}</div><div class="value">${money(potentialSavingsDkk)}</div><div class="subtle">Estimated reducible cost</div></article>
+      <article class="stat-card warn"><div class="label">Savings opportunity${infoTip(LEAF_VS_SAVINGS_TOOLTIP)}</div><div class="value">${money(potentialSavingsDkk)}</div><div class="subtle">Estimated reducible cost · ${escapeHtml(LEAF_ROLLING_LABEL)}</div></article>
     </div>
     ${leafTrendChart}
   </section>`;
@@ -3335,6 +3422,112 @@ function positiveReinforcementBanner(rolling) {
 
   if (!messages.length) return '';
   return `<div class="leaf-celebration">${messages.map((m) => `<span class="leaf-celebration-item">${escapeHtml(m)}</span>`).join('')}</div>`;
+}
+
+// ── Phase 8: LEAF Journey ────────────────────────────────────────────────────
+//
+// Turns the LEAF Dashboard from a report card into a coaching view: is this
+// user improving, and if so at what, and if not what's the single biggest
+// remaining lever. Built entirely from bundle.daily_trends (already
+// unbounded full history) and bundle.leaf - no new backend data.
+
+function nearestTrendPoint(trends, daysAgo) {
+  const rows = asArray(trends).filter((r) => r && r.report_date);
+  if (!rows.length) return null;
+  const target = new Date();
+  target.setDate(target.getDate() - daysAgo);
+  let best = null;
+  let bestDiff = Infinity;
+  for (const row of rows) {
+    const diff = Math.abs(new Date(row.report_date).getTime() - target.getTime());
+    if (diff < bestDiff) { bestDiff = diff; best = row; }
+  }
+  return best;
+}
+
+function leafJourneyDeltaLabel(delta) {
+  if (delta === null || !Number.isFinite(delta)) return '—';
+  if (delta > 0) return `▲ +${delta}`;
+  if (delta < 0) return `▼ ${delta}`;
+  return 'No change';
+}
+
+function leafJourneySection(bundle, su) {
+  const leaf = leafBlockOf(bundle);
+  const trends = asArray(bundle.daily_trends);
+  if (leaf?.leafIndex == null || !trends.length) return '';
+
+  const current = leaf.leafIndex;
+  const point30 = nearestTrendPoint(trends, 30);
+  const point180 = nearestTrendPoint(trends, 180);
+  const leaf30 = point30 ? computeLeafIndex(point30).score : null;
+  const leaf180 = point180 ? computeLeafIndex(point180).score : null;
+  const delta30 = Number.isFinite(leaf30) ? Math.round(current - leaf30) : null;
+  const delta180 = Number.isFinite(leaf180) ? Math.round(current - leaf180) : null;
+
+  const cpuNow = leafComponentFromBlock(leaf, 'cpu');
+  const memNow = leafComponentFromBlock(leaf, 'memory');
+  const cpu30 = point30 ? point30.avg_cpu_efficiency : null;
+  const mem30 = point30 ? point30.avg_memory_efficiency : null;
+
+  const improvements = [];
+  const opportunities = [];
+  if (Number.isFinite(cpuNow) && Number.isFinite(cpu30) && cpuNow - cpu30 >= 0.03) improvements.push('Improved CPU utilization');
+  else if (Number.isFinite(cpuNow) && cpuNow < 0.4) opportunities.push('CPU requests remain higher than measured usage');
+  if (Number.isFinite(memNow) && Number.isFinite(mem30) && memNow - mem30 >= 0.03) improvements.push('Reduced memory over-allocation');
+  else if (Number.isFinite(memNow) && memNow < 0.4) opportunities.push('Memory requests remain higher than measured usage');
+
+  const improvementsHtml = improvements.length
+    ? improvements.map((m) => `<div>✓ ${escapeHtml(m)}</div>`).join('')
+    : '<div class="subtle">No clear improvements yet - keep going.</div>';
+  const opportunitiesHtml = opportunities.length
+    ? opportunities.map((m) => `<div>• ${escapeHtml(m)}</div>`).join('')
+    : '<div class="subtle">No major remaining opportunities identified.</div>';
+
+  return `<section class="section">
+    <div class="section-head"><h2>Your LEAF Journey</h2><span class="subtle">Tracking progress, not judging history</span></div>
+    <div class="cards-grid">
+      <article class="stat-card"><div class="label">Current LEAF</div><div class="value">${Math.round(current)}<span class="leaf-index-scale">/100</span></div><div class="subtle">${leafJourneyDeltaLabel(delta30)} vs ~30 days ago</div></article>
+      <article class="stat-card"><div class="label">6-month change</div><div class="value">${leafJourneyDeltaLabel(delta180)}</div><div class="subtle">vs ~180 days ago</div></article>
+      <article class="stat-card"><div class="label">Cluster percentile</div><div class="value">${Number.isFinite(leaf.percentile) ? Math.round(leaf.percentile) + 'th' : '—'}</div><div class="subtle">${percentileContext(leaf.percentile) || `Among users with measured activity in the last ${leaf.windowDays || 180} days`}</div></article>
+      <article class="stat-card"><div class="label">Biggest improvements</div><div class="value" style="font-size:0.95rem;font-weight:600">${improvementsHtml}</div></article>
+      <article class="stat-card"><div class="label">Remaining opportunity</div><div class="value" style="font-size:0.95rem;font-weight:600">${opportunitiesHtml}</div></article>
+    </div>
+  </section>`;
+}
+
+// ── Phase 8: Sustainability Achievements ─────────────────────────────────────
+//
+// Informational only - purely derived from already-exported data, never fed
+// back into LEAF, confidence, coverage, or any ranking.
+
+function sustainabilityAchievements(bundle, su) {
+  const leaf = leafBlockOf(bundle);
+  if (leaf?.leafIndex == null) return '';
+  const trends = asArray(bundle.daily_trends);
+  const point180 = nearestTrendPoint(trends, 180);
+  const latestPoint = trends.length ? trends[trends.length - 1] : null;
+  const leaf180 = point180 ? computeLeafIndex(point180).score : null;
+  const improvedPct = Number.isFinite(leaf180) && leaf180 > 0 ? ((leaf.leafIndex - leaf180) / leaf180) * 100 : null;
+  const wasteNow = latestPoint ? Number(latestPoint.underutilized_cost_dkk) : null;
+  const wasteThen = point180 ? Number(point180.underutilized_cost_dkk) : null;
+  const wasteReducedPct = Number.isFinite(wasteNow) && Number.isFinite(wasteThen) && wasteThen > 0
+    ? ((wasteThen - wasteNow) / wasteThen) * 100
+    : null;
+
+  const badges = [];
+  if (leaf.leafIndex > 50) badges.push({ icon: '🌱', label: 'LEAF > 50%' });
+  if (leaf.leafIndex > 70) badges.push({ icon: '🌿', label: 'LEAF > 70%' });
+  if (leaf.leafIndex > 85) badges.push({ icon: '🌳', label: 'LEAF > 85%' });
+  if (Number.isFinite(leaf.percentile) && leaf.percentile >= 90) badges.push({ icon: '🏆', label: 'Top 10%' });
+  if (Number.isFinite(improvedPct) && improvedPct >= 15) badges.push({ icon: '⚡', label: `Improved ${Math.round(improvedPct)}% over 6 months` });
+  if (Number.isFinite(wasteReducedPct) && wasteReducedPct >= 50) badges.push({ icon: '💚', label: `Reduced estimated waste by ${Math.round(wasteReducedPct)}%` });
+
+  if (!badges.length) return '';
+  return `<section class="section">
+    <div class="section-head"><h2>Sustainability Achievements</h2><span class="subtle">Informational only - never affects your score</span></div>
+    <div class="chip-toggle-row">${badges.map((b) => `<span class="pill info" title="${escapeHtml(b.label)}">${b.icon} ${escapeHtml(b.label)}</span>`).join('')}</div>
+  </section>`;
 }
 
 // ── Phase 6: Comparison helper functions ────────────────────────────────────
@@ -3538,7 +3731,7 @@ function usersExplorerTable(rows) {
     ${usersExplorerSortHeader('Jobs', 'total_jobs')}
     ${usersExplorerSortHeader('CPU hours', 'cpu_hours')}
     ${usersExplorerSortHeader('GPU hours', 'gpu_hours')}
-    ${usersExplorerSortHeader('Efficiency', 'efficiency')}
+    ${usersExplorerSortHeader('Efficiency (180d)', 'efficiency')}
     ${usersExplorerSortHeader('Last active', 'last_active')}
     ${usersExplorerSortHeader('Est. cost', 'cost')}
     ${usersExplorerSortHeader('Recs', 'recommendations')}
@@ -3550,7 +3743,7 @@ function usersExplorerTable(rows) {
         <td>${fmt(u.totalJobs)}</td>
         <td>${fmt(u.cpuHours, 1)}</td>
         <td>${u.gpuHours > 0 ? fmt(u.gpuHours, 1) : '<span class="subtle">—</span>'}</td>
-        <td><div class="leaf-cell">${leafIndicator(u.overallEfficiency)}${efficiencyPill(u.overallEfficiency)}</div></td>
+        <td><div class="leaf-cell">${leafIndicator(windowOverallEfficiency(u))}${efficiencyPill(windowOverallEfficiency(u))}</div></td>
         <td>${u.lastActive || '<span class="subtle">—</span>'}</td>
         <td>${money(u.estimatedCostDkk)}</td>
         <td>${u.recommendationCount > 0 ? `<span class="pill warn">${u.recommendationCount}</span>` : '<span class="subtle">—</span>'}</td>
@@ -3645,22 +3838,27 @@ function userProfilePage(publicUserId) {
   const recs = asArray(bundle.recommendations);
   const topJobs = asArray(bundle.top_inefficient_jobs);
   const rolling = asObject(bundle.rolling_summaries);
+  const rolling180 = asObject(rolling['180d']);
 
   const effTone = (v) => (v === null || !Number.isFinite(v)) ? '' : v >= 0.7 ? 'good' : v >= 0.5 ? 'info' : 'warn';
 
-  const overallEff = su?.overallEfficiency ?? null;
-  const leafBadgeSource = su?.leafIndex != null ? su : summary;
-  const savingsTooltip = 'Estimated savings if historical jobs had requested closer to the optimal CPU and memory resources while performing the same work. Based on historical allocation behavior, not a billing figure.';
+  // Phase 8: leafBadgeSource is the raw bundle (bundle.leaf, 180d rolling) -
+  // no longer a mix of the normalized users_summary row and the lifetime
+  // all_time_summary. su is still used for percentile context/pseudonym.
+  const leafBadgeSource = bundle;
+  const leaf = leafBlockOf(bundle);
+  const windowCpuEff = leafComponentFromBlock(leaf, 'cpu');
+  const windowMemEff = leafComponentFromBlock(leaf, 'memory');
   const kpiCards = `<div class="cards-grid">
-    ${statBlock('LEAF Index', leafIndexBadge(leafBadgeSource, 'lg'), 'Overall sustainability score', effTone(overallEff))}
+    ${statBlock('LEAF Index', leafIndexBadge(leafBadgeSource, 'lg'), leafConfidenceChip(leaf), effTone(windowOverallEfficiency(su || {})))}
     ${statBlock('Jobs', fmt(summary.jobs), `${fmt(summary.completed_jobs)} completed · ${fmt(summary.failed_jobs)} failed`)}
     ${statBlock('CPU hours', fmt(summary.cpu_hours_allocated, 1), 'All-time allocated')}
     ${statBlock('GPU hours', fmt(summary.gpu_hours, 1), 'All-time allocated')}
     ${statBlock('Memory GB·h', fmt(summary.requested_mem_gb_hours, 0), 'All-time requested')}
-    ${statBlock('CPU efficiency', `<span class="leaf-pair">${leafIndicator(summary.avg_cpu_efficiency)}${efficiencyPill(summary.avg_cpu_efficiency)}</span>`, 'Measured vs. allocated', effTone(summary.avg_cpu_efficiency))}
-    ${statBlock('Memory efficiency', `<span class="leaf-pair">${leafIndicator(summary.avg_memory_efficiency)}${efficiencyPill(summary.avg_memory_efficiency)}</span>`, 'MaxRSS vs. requested', effTone(summary.avg_memory_efficiency))}
-    ${statBlock('Estimated cost', money(summary.estimated_cost_dkk), 'Based on allocation')}
-    ${statBlock(`Savings opportunity${infoTip(savingsTooltip)}`, money(summary.underutilized_cost_dkk), 'Estimated reducible cost', 'warn')}
+    ${statBlock('CPU efficiency', `<span class="leaf-pair">${leafIndicator(windowCpuEff)}${efficiencyPill(windowCpuEff)}</span>`, `Measured vs. allocated · ${LEAF_ROLLING_LABEL}`, effTone(windowCpuEff))}
+    ${statBlock('Memory efficiency', `<span class="leaf-pair">${leafIndicator(windowMemEff)}${efficiencyPill(windowMemEff)}</span>`, `MaxRSS vs. requested · ${LEAF_ROLLING_LABEL}`, effTone(windowMemEff))}
+    ${statBlock('Estimated cost', money(summary.estimated_cost_dkk), 'All-time, based on allocation')}
+    ${statBlock(`Savings opportunity${infoTip(LEAF_VS_SAVINGS_TOOLTIP)}`, money(rolling180.underutilized_cost_dkk), `Estimated reducible cost · ${LEAF_ROLLING_LABEL}`, 'warn')}
   </div>`;
 
   const clusterCtxCards = su ? `<div class="cards-grid">
@@ -3672,7 +3870,7 @@ function userProfilePage(publicUserId) {
     ${statBlock('Favourite software', su.favoriteSoftware ? escapeHtml(su.favoriteSoftware) : '—', 'Most-used module')}
   </div>` : '';
 
-  const rollingRows = ['7d', '30d', '90d'].map((k) => {
+  const rollingRows = ['7d', '30d', '90d', '180d'].map((k) => {
     const w = asObject(rolling[k]);
     return [k, fmt(w.jobs), pct(w.avg_cpu_efficiency), pct(w.avg_memory_efficiency), money(w.estimated_cost_dkk), money(w.underutilized_cost_dkk)];
   });
@@ -3734,8 +3932,10 @@ function userProfilePage(publicUserId) {
       ${backLink}
     </div>
     ${positiveReinforcementBanner(rolling)}
-    <section class="section"><div class="section-head"><h2>Summary</h2><span class="subtle">All-time totals</span></div>${kpiCards}</section>
-    ${leafDashboardSection(leafBadgeSource, filteredTrends, recs, summary.underutilized_cost_dkk)}
+    <section class="section"><div class="section-head"><h2>Summary</h2><span class="subtle">LEAF, efficiency & savings: ${LEAF_ROLLING_LABEL} · volume metrics: all-time totals</span></div>${kpiCards}</section>
+    ${leafDashboardSection(leafBadgeSource, filteredTrends, recs, rolling180.underutilized_cost_dkk)}
+    ${leafJourneySection(bundle, su)}
+    ${sustainabilityAchievements(bundle, su)}
     ${clusterCtxCards ? `<section class="section"><div class="section-head"><h2>Cluster Context</h2><span class="subtle">Position among all users</span></div>${clusterCtxCards}</section>` : ''}
     <section class="section"><div class="section-head"><h2>Rolling Summaries</h2><span class="subtle">Recent windows</span></div><div class="table-card">${tableFromRows(['Window', 'Jobs', 'CPU eff.', 'Mem eff.', 'Est. cost', 'Savings opp.'], rollingRows)}</div></section>
     <section class="section"><div class="section-head"><h2>Daily Trends</h2>${profileRangeButtons()}</div>${overlayToggles}${trendCharts}${disclaimer('Cost figures are allocation-based estimates, not billing figures.')}</section>
@@ -3778,7 +3978,13 @@ function userRankingsPage() {
     </div>`;
   }
   const users = summary.users;
-  const measuredUsers = users.filter((u) => u.overallEfficiency !== null && u.totalJobs >= 5);
+  // Phase 8: "Most Sustainable Users" ranks by rolling-window LEAF
+  // (leaf.leafIndex, 180d), not lifetime overallEfficiency - each user
+  // record gets a flat leafIndex180 so userLeaderboard() (which reads
+  // u[valueKey] directly) can rank/format it like any other numeric field.
+  const measuredUsers = users
+    .filter((u) => u.leaf?.leafIndex != null && u.totalJobs >= 5)
+    .map((u) => ({ ...u, leafIndex180: u.leaf.leafIndex }));
   const measuredCpuUsers = users.filter((u) => u.cpuEfficiency !== null && u.totalJobs >= 5);
   const measuredMemUsers = users.filter((u) => u.memoryEfficiency !== null && u.totalJobs >= 5);
   const swUsers = users.filter((u) => u.softwareCount > 0);
@@ -3791,7 +3997,7 @@ function userRankingsPage() {
     ${infoPanel('About these rankings', 'All users are identified by stable pseudonyms only. Rankings highlight resource usage patterns — not individual performance judgements.')}
     ${leafNote}
     <div class="trend-grid">
-      ${userLeaderboard('Most Sustainable Users', measuredUsers, 'overallEfficiency', (v) => `<span class="leaf-pair">${leafIndicator(v)}${pct(v)}</span>`, 10, false)}
+      ${userLeaderboard(`Most Sustainable Users (${LEAF_ROLLING_LABEL})`, measuredUsers, 'leafIndex180', (v) => `<span class="leaf-pair">${leafIndicator(v / 100)}${Math.round(v)} / 100</span>`, 10, false)}
       ${userLeaderboard('Highest CPU Efficiency', measuredCpuUsers, 'cpuEfficiency', (v) => `<span class="leaf-pair">${leafIndicator(v)}${pct(v)}</span>`, 10, false)}
       ${userLeaderboard('Highest Memory Efficiency', measuredMemUsers, 'memoryEfficiency', (v) => `<span class="leaf-pair">${leafIndicator(v)}${pct(v)}</span>`, 10, false)}
       ${userLeaderboard('Highest Savings Opportunity', users, 'underutilizedCostDkk', money)}
