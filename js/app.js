@@ -140,6 +140,9 @@ const state = {
   nodeFilters: { class: 'all', partition: 'all', state: 'all', sortKey: 'node', sortDir: 'asc' },
   historyRange: '7d',
   userProfileRange: '90d',
+  // Phase 7: off by default so charts stay subtle/uncluttered until a user
+  // opts in.
+  profileChartOverlays: { clusterAvg: false, benchmark: false },
   // Software Inventory (Software Analytics Milestone 1 frontend, see
   // docs/architecture/SOFTWARE_INVENTORY_FRONTEND.md). All filtering/
   // sorting/pagination happens client-side over the already-loaded
@@ -428,6 +431,19 @@ function rollingAverage(rows, key, windowSize) {
     return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
   });
 }
+
+function meanOf(rows, key) {
+  const values = asArray(rows).map((row) => Number(row && row[key])).filter(Number.isFinite);
+  return values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : null;
+}
+
+// Efficiency bands - kept in one place so the chart legend and the LEAF
+// glow tiers (leafGlowClass) always agree on what "good" means.
+const EFFICIENCY_BANDS = [
+  { from: 0, to: 0.40, color: '#ff6b7a' },
+  { from: 0.40, to: 0.70, color: '#e0a94d' },
+  { from: 0.70, to: 1, color: '#53d88a' },
+];
 
 function chartSeries(rows, key, label, color, options = {}) {
   return {
@@ -3596,15 +3612,35 @@ function userProfilePage(publicUserId) {
 
   const filteredTrends = filterTrendsByPeriod(trends);
   const rangeLabel = USER_PROFILE_RANGES.find((r) => r.id === state.userProfileRange)?.label || '90d';
+  const overlays = state.profileChartOverlays;
+  const overlayToggles = `<div class="chip-toggle-row">
+    <button type="button" class="chip-toggle${overlays.clusterAvg ? ' active' : ''}" data-action="toggle-chart-overlay" data-overlay="clusterAvg">Cluster average</button>
+    <button type="button" class="chip-toggle${overlays.benchmark ? ' active' : ''}" data-action="toggle-chart-overlay" data-overlay="benchmark">Top 10% benchmark</button>
+  </div>`;
+  const clusterTrendRows = filterByRange(data?.clusterSummary?.dailyTrends, USER_PROFILE_RANGE_SELECTOR, state.userProfileRange, 'report_date');
+  const top10Benchmark = data?.usersSummary?.benchmarkProfiles?.find((b) => b.publicUserId === 'benchmark_top_10pct');
+  const effReferenceLines = [
+    ...(overlays.clusterAvg ? [
+      { value: meanOf(clusterTrendRows, 'avg_cpu_efficiency'), label: 'Cluster avg CPU', color: '#3e8cff' },
+      { value: meanOf(clusterTrendRows, 'avg_memory_efficiency'), label: 'Cluster avg memory', color: '#53d88a' },
+    ] : []),
+    ...(overlays.benchmark && top10Benchmark ? [
+      { value: top10Benchmark.cpuEfficiency, label: 'Top 10% CPU', color: '#ffd166' },
+      { value: top10Benchmark.memoryEfficiency, label: 'Top 10% memory', color: '#c084fc' },
+    ] : []),
+  ].filter((r) => Number.isFinite(r.value));
   const trendCharts = filteredTrends.length
     ? lineChart(`${escapeHtml(pseudonym)} — efficiency`, filteredTrends,
         [chartSeries(filteredTrends, 'avg_cpu_efficiency', 'CPU', '#3e8cff'),
-         chartSeries(filteredTrends, 'avg_memory_efficiency', 'Memory', '#53d88a')],
-        pct, { zeroBase: true, headlineMode: 'mean', headlineLabel: `Average efficiency (${rangeLabel})` }) +
-      lineChart(`${escapeHtml(pseudonym)} — cost`, filteredTrends,
-        [chartSeries(filteredTrends, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'),
-         chartSeries(filteredTrends, 'underutilized_cost_dkk', 'Savings opp.', '#ff6b7a')],
-        money, { zeroBase: true, headlineMode: 'sum', headlineLabel: `Total cost (${rangeLabel})` })
+         chartSeries(filteredTrends, 'avg_memory_efficiency', 'Memory', '#53d88a'),
+         rollingSeries(filteredTrends, 'avg_cpu_efficiency', 7, 'CPU (7d avg)', '#30d5d0'),
+         rollingSeries(filteredTrends, 'avg_memory_efficiency', 7, 'Memory (7d avg)', '#9dd8ff')],
+        pct, { zeroBase: true, headlineMode: 'mean', headlineLabel: `Average efficiency (${rangeLabel})`,
+               bands: EFFICIENCY_BANDS, referenceLines: effReferenceLines }) +
+      lineChart(`${escapeHtml(pseudonym)} — estimated compute cost`, filteredTrends,
+        [chartSeries(filteredTrends, 'estimated_cost_dkk', 'Estimated allocation cost', '#3e8cff'),
+         chartSeries(filteredTrends, 'underutilized_cost_dkk', 'Potential savings', '#ff6b7a')],
+        money, { zeroBase: true, headlineMode: 'sum', headlineLabel: `Total estimated cost (${rangeLabel})` })
     : '<div class="empty-state">No trend data for this period.</div>';
 
   return `<div class="stack">
@@ -3619,7 +3655,7 @@ function userProfilePage(publicUserId) {
     <section class="section"><div class="section-head"><h2>Summary</h2><span class="subtle">All-time totals</span></div>${kpiCards}</section>
     ${clusterCtxCards ? `<section class="section"><div class="section-head"><h2>Cluster Context</h2><span class="subtle">Position among all users</span></div>${clusterCtxCards}</section>` : ''}
     <section class="section"><div class="section-head"><h2>Rolling Summaries</h2><span class="subtle">Recent windows</span></div><div class="table-card">${tableFromRows(['Window', 'Jobs', 'CPU eff.', 'Mem eff.', 'Est. cost', 'Savings opp.'], rollingRows)}</div></section>
-    <section class="section"><div class="section-head"><h2>Daily Trends</h2>${profileRangeButtons()}</div>${trendCharts}</section>
+    <section class="section"><div class="section-head"><h2>Daily Trends</h2>${profileRangeButtons()}</div>${overlayToggles}${trendCharts}${disclaimer('Cost figures are allocation-based estimates, not billing figures.')}</section>
     <section class="section"><div class="section-head"><h2>Recommendations</h2><span class="subtle">${recs.length} generated</span></div><div class="rec-list">${recCards}</div></section>
     ${topJobs.length ? `<section class="section"><div class="section-head"><h2>Highest-Impact Jobs</h2><span class="subtle">By savings opportunity</span></div><div class="table-card">${tableFromRows(['Partition', 'CPU eff.', 'Mem eff.', 'Savings opp.', 'Est. cost', 'Elapsed h', 'CPUs'], jobsRows)}</div></section>` : ''}
   </div>`;
@@ -3839,7 +3875,7 @@ function costPage() {
         statBlock('Driver-resource potential savings', money(allTime.cost_bearer_waste_dkk ?? allTime.underutilized_cost_dkk), 'Estimated potential savings from the main cost driver (Cost-Bearer model)'),
       ].join('')}</div>${disclaimer(LOWER_BOUND_NOTE)}${disclaimer(GPU_WASTE_NOTE)}${disclaimer(AGGREGATE_NOTE)}</section>
       <section class="section"><div class="section-head"><h2>Measurement coverage</h2><span class="subtle">Measured vs unmeasured jobs by main cost driver</span></div>${coverageCards(data?.clusterSummary?.measurementCoverage)}</section>
-      ${lineChart('Daily cost opportunity', rows, [chartSeries(rows, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(rows, 'underutilized_cost_dkk', 'Savings opportunity', '#ff6b7a')], money, { zeroBase: true })}
+      ${lineChart('Estimated Compute Cost vs. Potential Savings', rows, [chartSeries(rows, 'estimated_cost_dkk', 'Estimated allocation cost', '#3e8cff'), chartSeries(rows, 'underutilized_cost_dkk', 'Potential savings', '#ff6b7a')], money, { zeroBase: true })}
       <section class="section"><div class="section-head"><h2>Cost actions</h2><span class="subtle">Impact-ranked</span></div><div class="rec-list">${recommendationCards(5).join('')}</div></section>
       </div>`;
 }
@@ -4002,11 +4038,11 @@ function personalAnalyticsPage() {
     </section>
     <div class="stack">
       <section class="section"><div class="section-head"><h2>Priority Actions</h2><span class="subtle">What should I do?</span></div>${priorityActions(vm.recommendations)}</section>
-      <section class="section"><div class="section-head"><h2>Savings Opportunity Breakdown</h2><span class="subtle">How much can I save?</span></div>${savingsBreakdown(vm.recommendations, metrics)}</section>
+      <section class="section"><div class="section-head"><h2>Potential Savings Breakdown${infoTip('Estimated savings if historical jobs had requested closer to the optimal CPU and memory resources while performing the same work. Based on historical allocation behavior, not a billing figure.')}</h2><span class="subtle">How much can I save?</span></div>${savingsBreakdown(vm.recommendations, metrics)}</section>
       <section class="section"><div class="section-head"><h2>How do I compare?</h2><span class="subtle">Percentile bands, not rank numbers</span></div>${personalContextCards(metrics, percentile)}<div class="metric-explain wide"><strong>How to read these bands</strong><span>Percentile bands summarize position among exported users without exposing exact ranks. Higher savings opportunity means more room to improve, not a badge of failure.</span></div></section>
       <section class="section"><div class="section-head"><h2>Trend evidence</h2><span class="subtle">Why these actions are being recommended</span></div><div class="trend-grid">
-        ${lineChart('Efficiency trend evidence', trends, [chartSeries(trends, 'avg_cpu_efficiency', 'CPU efficiency', '#3e8cff'), chartSeries(trends, 'avg_memory_efficiency', 'Memory efficiency', '#53d88a')], pct, { zeroBase: true })}
-        ${lineChart('Cost opportunity trend', trends, [chartSeries(trends, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(trends, 'underutilized_cost_dkk', 'Savings opportunity', '#ff6b7a')], money, { zeroBase: true })}
+        ${lineChart('Efficiency trend evidence', trends, [chartSeries(trends, 'avg_cpu_efficiency', 'CPU efficiency', '#3e8cff'), chartSeries(trends, 'avg_memory_efficiency', 'Memory efficiency', '#53d88a')], pct, { zeroBase: true, bands: EFFICIENCY_BANDS })}
+        ${lineChart('Estimated Compute Cost Trend', trends, [chartSeries(trends, 'estimated_cost_dkk', 'Estimated allocation cost', '#3e8cff'), chartSeries(trends, 'underutilized_cost_dkk', 'Potential savings', '#ff6b7a')], money, { zeroBase: true })}
       </div></section>
       <section class="section"><div class="section-head"><h2>Keep perspective: anonymous peers</h2><span class="subtle">Peer comparison stays pseudonymous</span></div>${peerComparisonTable(vm.peerComparisons)}</section>
       <section class="section"><div class="section-head"><h2>Highest-Impact Jobs to Review</h2><span class="subtle">Which jobs offer the most room to improve?</span></div><p class="subtle" style="line-height:1.7">These jobs are shown because they combine cost with low CPU or memory use. Reviewing them can help you adjust similar submissions in the future.</p>${personalJobsTable(vm.topInefficientJobs)}</section>
@@ -4333,6 +4369,13 @@ function wireEvents() {
   document.querySelectorAll('[data-action="set-profile-range"]').forEach((el) => {
     el.addEventListener('click', (event) => {
       state.userProfileRange = event.currentTarget.dataset.range;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="toggle-chart-overlay"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      const key = event.currentTarget.dataset.overlay;
+      state.profileChartOverlays[key] = !state.profileChartOverlays[key];
       render();
     });
   });
