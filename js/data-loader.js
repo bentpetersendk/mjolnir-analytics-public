@@ -379,6 +379,8 @@ function normalizeUserRow(r) {
     favoriteSoftware:         r.favorite_software || null,
     percentileCpu:            eff(r.percentile_cpu),
     percentileEfficiency:     eff(r.percentile_efficiency),
+    leafIndex:                r.leaf_index != null ? Number(r.leaf_index) : null,
+    leafIndexComponents:      Array.isArray(r.leaf_index_components) ? r.leaf_index_components : [],
     trends30d:                Array.isArray(r.trends_30d) ? r.trends_30d : [],
   };
 }

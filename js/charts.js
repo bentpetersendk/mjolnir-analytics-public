@@ -372,12 +372,20 @@ export function setupChartResize() {
 //                rendered as dashed vertical markLines when their date
 //                falls within the plotted range
 //   emptyMessage - overrides the default "No data available for <title>."
+//   bands      - Phase 7: array of { from, to, color, opacity? } low-opacity
+//                background markArea bands (e.g. green/amber/red efficiency
+//                bands), drawn behind the first series
+//   referenceLines - Phase 7: array of { value, label, color } horizontal
+//                markLines (e.g. cluster average or benchmark overlays),
+//                drawn on the first series
 export function createLineChart(title, rows, series, formatter = (v) => v, options = {}) {
   const allValues = series.flatMap((s) => s.values).filter((v) => Number.isFinite(Number(v)));
   if (!allValues.length) return emptyState(options.emptyMessage || `No data available for ${escapeHtml(title)} yet.`);
   const categories = asArray(rows).map((r) => r.report_date ?? r.timestamp);
   const seriesDefs = series.map((s) => lineSeries({ name: s.label, color: s.color, dashed: s.dashed, area: options.area }, s.values));
   if (options.events?.length) annotateTimeline(seriesDefs[0], categories, options.events);
+  if (options.bands?.length) applyBands(seriesDefs[0], options.bands);
+  if (options.referenceLines?.length) applyReferenceLines(seriesDefs[0], options.referenceLines);
   const option = Object.assign(baseChartOption(categories, {}, { unitLabel: options.unitLabel }), {
     yAxis: {
       type: 'value',
@@ -400,6 +408,45 @@ export function createLineChart(title, rows, series, formatter = (v) => v, optio
     <div class="chart-head"><div><h3>${escapeHtml(title)}</h3><span class="subtle">${headlineLabel}</span></div><strong>${headlineValue !== null && headlineValue !== undefined ? formatter(headlineValue) : '—'}</strong></div>
     ${html}
   </article>`;
+}
+
+// Phase 7: subtle background bands (e.g. green ≥0.70 / amber 0.40-0.70 /
+// red <0.40 efficiency zones) so a chart communicates "am I improving?" at
+// a glance instead of requiring the reader to compare against a remembered
+// threshold. Deliberately low-opacity and unlabeled by default so a chart
+// with bands off still reads exactly like one without this option.
+export function applyBands(series, bands) {
+  if (!series || !bands?.length) return;
+  series.markArea = {
+    silent: true,
+    itemStyle: { opacity: 0.07 },
+    data: bands.map((b) => [
+      { yAxis: b.from, itemStyle: { color: b.color } },
+      { yAxis: b.to },
+    ]),
+  };
+}
+
+// Phase 7: horizontal reference lines (cluster average, benchmark profiles)
+// drawn on top of a chart's own series - purely visual comparison, no new
+// data fetched (values come from already-exported aggregates/benchmarks).
+export function applyReferenceLines(series, referenceLines) {
+  if (!series || !referenceLines?.length) return;
+  const existing = series.markLine;
+  const data = referenceLines
+    .filter((r) => Number.isFinite(Number(r.value)))
+    .map((r) => ({
+      name: r.label || '',
+      yAxis: Number(r.value),
+      lineStyle: { color: r.color || cssVar('--muted', '#90a2bc'), type: 'dashed', width: 1 },
+      label: { color: chartTextColor(), fontSize: 11, formatter: (p) => p.name },
+    }));
+  if (!data.length) return;
+  series.markLine = {
+    silent: true,
+    symbol: 'none',
+    data: [...(existing?.data || []), ...data],
+  };
 }
 
 // Adds dashed vertical markLines for operational events (js/events.js) that

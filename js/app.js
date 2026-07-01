@@ -14,6 +14,7 @@ import {
 } from './charts.js';
 import { OPERATIONAL_EVENTS } from './events.js';
 import { num, fmt, pct, money, escapeHtml, statBlock, tableFromRows } from './ui-helpers.js';
+import { createRangeSelector, rangeButtonsHtml, filterByRange } from './timeRange.js';
 import {
   executiveReportPage, weeklyReportPage, piReportPage as piReportPageImpl,
   userReportPage as userReportPageImpl, queueReportPage, capacityReportPage,
@@ -139,6 +140,9 @@ const state = {
   nodeFilters: { class: 'all', partition: 'all', state: 'all', sortKey: 'node', sortDir: 'asc' },
   historyRange: '7d',
   userProfileRange: '90d',
+  // Phase 7: off by default so charts stay subtle/uncluttered until a user
+  // opts in.
+  profileChartOverlays: { clusterAvg: false, benchmark: false },
   // Software Inventory (Software Analytics Milestone 1 frontend, see
   // docs/architecture/SOFTWARE_INVENTORY_FRONTEND.md). All filtering/
   // sorting/pagination happens client-side over the already-loaded
@@ -428,6 +432,19 @@ function rollingAverage(rows, key, windowSize) {
   });
 }
 
+function meanOf(rows, key) {
+  const values = asArray(rows).map((row) => Number(row && row[key])).filter(Number.isFinite);
+  return values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : null;
+}
+
+// Efficiency bands - kept in one place so the chart legend and the LEAF
+// glow tiers (leafGlowClass) always agree on what "good" means.
+const EFFICIENCY_BANDS = [
+  { from: 0, to: 0.40, color: '#ff6b7a' },
+  { from: 0.40, to: 0.70, color: '#e0a94d' },
+  { from: 0.70, to: 1, color: '#53d88a' },
+];
+
 function chartSeries(rows, key, label, color, options = {}) {
   return {
     label,
@@ -453,15 +470,20 @@ function lineChart(title, rows, series, formatter = fmt, options = {}) {
 }
 
 
+// Shared "(i)" tooltip affordance - a native title tooltip, no new
+// dependency. Used anywhere a label needs a short explanatory hint (LEAF
+// Index, Savings Opportunity, warehouse tiles, etc).
+function infoTip(hint) {
+  if (!hint) return '';
+  return `<span class="info-tooltip" tabindex="0" role="img" aria-label="${escapeHtml(hint)}" title="${escapeHtml(hint)}">${icon('info')}</span>`;
+}
+
 // Live "Warehouse Summary" KPI tile - used on both the Overview hero and the
 // dedicated Warehouse page so the two never show different numbers for the
 // same metric. `hint` renders as a native title tooltip (no new dependency).
 function warehouseTile(label, value, sub, hint) {
-  const infoTooltip = hint
-    ? `<span class="info-tooltip" tabindex="0" role="img" aria-label="${escapeHtml(hint)}" title="${escapeHtml(hint)}">${icon('info')}</span>`
-    : '';
   return `<article class="warehouse-tile">
-    <div class="warehouse-tile-label">${escapeHtml(label)}${infoTooltip}</div>
+    <div class="warehouse-tile-label">${escapeHtml(label)}${infoTip(hint)}</div>
     <div class="warehouse-tile-value">${value}</div>
     <div class="warehouse-tile-sub">${sub || ''}</div>
   </article>`;
@@ -658,42 +680,53 @@ function sortableTableFromRows(columns, rows, sortKey, sortDir) {
 // see docs/DASHBOARD_DATA_MIGRATION.md). Charts render with Apache ECharts
 // (CDN <script> in index.html) after each render() pass - see
 // mountCharts() near the bottom of this file.
-const HISTORY_RANGES = [
-  { id: '24h', label: '24h', ms: 24 * 60 * 60 * 1000 },
-  { id: '7d', label: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
-  { id: '30d', label: '30d', ms: 30 * 24 * 60 * 60 * 1000 },
-  { id: '90d', label: '90d', ms: 90 * 24 * 60 * 60 * 1000 },
-];
+// Phase 7: both of these are now instances of the shared createRangeSelector
+// (js/timeRange.js) rather than one-off range/button/filter trios. New
+// dashboards should call createRangeSelector() directly instead of adding
+// another parallel implementation.
+const HISTORY_RANGE_SELECTOR = createRangeSelector({
+  id: 'history',
+  stateKey: 'historyRange',
+  action: 'set-history-range',
+  defaultId: '7d',
+  ranges: [
+    { id: '24h', label: '24h', ms: 24 * 60 * 60 * 1000 },
+    { id: '7d', label: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
+    { id: '30d', label: '30d', ms: 30 * 24 * 60 * 60 * 1000 },
+    { id: '90d', label: '90d', ms: 90 * 24 * 60 * 60 * 1000 },
+  ],
+});
+const HISTORY_RANGES = HISTORY_RANGE_SELECTOR.ranges;
 
 function rangeButtons() {
-  return `<div class="range-toggle">${HISTORY_RANGES.map((r) => `<button type="button" class="range-button${r.id === state.historyRange ? ' active' : ''}" data-action="set-history-range" data-range="${r.id}">${r.label}</button>`).join('')}</div>`;
+  return rangeButtonsHtml(HISTORY_RANGE_SELECTOR, state.historyRange);
 }
 
 function filterPointsByRange(points) {
-  const range = HISTORY_RANGES.find((r) => r.id === state.historyRange) || HISTORY_RANGES[1];
-  const cutoff = Date.now() - range.ms;
-  return asArray(points).filter((p) => p && p.timestamp && new Date(p.timestamp).getTime() >= cutoff);
+  return filterByRange(points, HISTORY_RANGE_SELECTOR, state.historyRange, 'timestamp');
 }
 
-const USER_PROFILE_RANGES = [
-  { id: '30d',  label: '30d',  days: 30 },
-  { id: '90d',  label: '90d',  days: 90 },
-  { id: '180d', label: '180d', days: 180 },
-  { id: '1y',   label: '1y',   days: 365 },
-  { id: 'all',  label: 'All',  days: null },
-];
+const USER_PROFILE_RANGE_SELECTOR = createRangeSelector({
+  id: 'userProfile',
+  stateKey: 'userProfileRange',
+  action: 'set-profile-range',
+  defaultId: '90d',
+  ranges: [
+    { id: '30d',  label: '30d',  days: 30 },
+    { id: '90d',  label: '90d',  days: 90 },
+    { id: '180d', label: '180d', days: 180 },
+    { id: '1y',   label: '1y',   days: 365 },
+    { id: 'all',  label: 'All',  days: null },
+  ],
+});
+const USER_PROFILE_RANGES = USER_PROFILE_RANGE_SELECTOR.ranges;
 
 function profileRangeButtons() {
-  return `<div class="range-toggle">${USER_PROFILE_RANGES.map((r) => `<button type="button" class="range-button${r.id === state.userProfileRange ? ' active' : ''}" data-action="set-profile-range" data-range="${r.id}">${r.label}</button>`).join('')}</div>`;
+  return rangeButtonsHtml(USER_PROFILE_RANGE_SELECTOR, state.userProfileRange);
 }
 
 function filterTrendsByPeriod(trends) {
-  const range = USER_PROFILE_RANGES.find((r) => r.id === state.userProfileRange);
-  if (!range || !range.days) return trends;
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - range.days);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
-  return asArray(trends).filter((r) => r.report_date >= cutoffStr);
+  return filterByRange(trends, USER_PROFILE_RANGE_SELECTOR, state.userProfileRange, 'report_date');
 }
 
 function hasCapacityHistory() {
@@ -3114,13 +3147,26 @@ function efficiencyPill(eff) {
 
 const LEAF_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>`;
 
+// Phase 7: four glow tiers so glow intensity communicates efficiency, not
+// just hue. `leaf-green`/`leaf-yellow` are kept as CSS aliases of
+// `leaf-good`/`leaf-amber` for backward compatibility with anything still
+// referencing the old class names.
 function leafGlowClass(eff) {
   if (eff === null || eff === undefined || !Number.isFinite(Number(eff))) return 'leaf-muted';
   const v = Number(eff);
-  if (v >= 0.70) return 'leaf-green';
-  if (v >= 0.40) return 'leaf-yellow';
+  if (v >= 0.85) return 'leaf-excellent';
+  if (v >= 0.70) return 'leaf-good';
+  if (v >= 0.40) return 'leaf-amber';
   return 'leaf-red';
 }
+
+const LEAF_TONE_LABEL = {
+  'leaf-excellent': 'Excellent efficiency',
+  'leaf-good': 'Good efficiency',
+  'leaf-amber': 'Medium efficiency',
+  'leaf-red': 'Poor efficiency',
+  'leaf-muted': 'No data',
+};
 
 function leafIndicator(eff, size = '') {
   const cls = leafGlowClass(eff);
@@ -3128,13 +3174,167 @@ function leafIndicator(eff, size = '') {
   const effLabel = (eff !== null && eff !== undefined && Number.isFinite(Number(eff)))
     ? pct(Number(eff))
     : '—';
-  const tone = cls === 'leaf-green' ? 'Excellent efficiency' : cls === 'leaf-yellow' ? 'Acceptable efficiency' : cls === 'leaf-muted' ? 'No data' : 'Low efficiency';
+  const tone = LEAF_TONE_LABEL[cls];
   return `<span class="leaf ${cls}${sizeCls}" title="${tone}: ${effLabel}" aria-label="LEAF sustainability: ${tone} (${effLabel})">${LEAF_SVG}</span>`;
 }
 
 function efficiencyWithLeaf(eff) {
   if (eff === null || eff === undefined || !Number.isFinite(Number(eff))) return '<span class="subtle">—</span>';
   return `<span class="leaf-pair">${leafIndicator(eff)}${efficiencyPill(eff)}</span>`;
+}
+
+// ── Phase 7: LEAF Sustainability Index ──────────────────────────────────────
+//
+// The LEAF Index is a composite 0-100 sustainability score. Weights and the
+// set of active components mirror scripts/export_analytics_data.py's
+// LEAF_INDEX_COMPONENTS/compute_leaf_index() exactly, kept in sync by hand
+// since this is a static site with no shared build step. Adding a future
+// dimension (GPU, queue behavior, energy, carbon, ...) means: export the raw
+// metric from the backend, add one entry here with available:true, and
+// nothing else changes - LEAF_INDEX_COMPONENTS below already drives every
+// display (badge, tooltip, LEAF Dashboard sub-scores).
+// `fields` lists every field name this component might be found under,
+// since callers pass either a users_summary row (`cpu_efficiency`) or a raw
+// personal-bundle summary (`avg_cpu_efficiency`).
+const LEAF_INDEX_COMPONENTS = [
+  { id: 'cpu',    label: 'CPU efficiency',    weight: 0.6, available: true,  fields: ['cpu_efficiency', 'avg_cpu_efficiency'] },
+  { id: 'memory', label: 'Memory efficiency', weight: 0.4, available: true,  fields: ['memory_efficiency', 'avg_memory_efficiency'] },
+  { id: 'gpu',    label: 'GPU efficiency',    weight: 0.0, available: false, fields: ['gpu_efficiency'] },
+  { id: 'queue',  label: 'Queue behavior',    weight: 0.0, available: false, fields: ['queue_score'] },
+];
+
+function leafComponentValue(record, component) {
+  for (const field of component.fields) {
+    const v = record?.[field];
+    if (Number.isFinite(Number(v))) return Number(v);
+  }
+  return null;
+}
+
+// Fallback only: used when a record predates the exported `leaf_index`
+// field (e.g. cached/older JSON). Prefer the exported field when present.
+function computeLeafIndex(record) {
+  const active = LEAF_INDEX_COMPONENTS
+    .filter((c) => c.available)
+    .map((c) => ({ c, value: leafComponentValue(record, c) }))
+    .filter(({ value }) => value !== null);
+  const totalWeight = active.reduce((sum, { c }) => sum + c.weight, 0);
+  if (!active.length || totalWeight <= 0) return { score: null, components: [] };
+  let score = 0;
+  const components = active.map(({ c, value }) => {
+    const normWeight = c.weight / totalWeight;
+    const contribution = value * normWeight;
+    score += contribution;
+    return { id: c.id, label: c.label, value, weight: normWeight, contribution };
+  });
+  return { score: Math.round(score * 100), components };
+}
+
+function leafIndexTier(score) {
+  if (score === null || score === undefined || !Number.isFinite(Number(score))) return 'leaf-muted';
+  const v = Number(score);
+  if (v >= 85) return 'leaf-excellent';
+  if (v >= 70) return 'leaf-good';
+  if (v >= 40) return 'leaf-amber';
+  return 'leaf-red';
+}
+
+const LEAF_INDEX_TOOLTIP = 'The LEAF Index reflects overall sustainable use of HPC resources. It currently reflects CPU and memory efficiency, weighted 60/40, and will expand to include additional sustainability dimensions (GPU efficiency, queue behaviour, energy, carbon) as they become available.';
+
+// `record` may be a users_summary row (camelCase, has .leafIndex) or a raw
+// personal-bundle summary (snake_case, has .leaf_index) - support both so
+// callers don't need to normalize first.
+function leafIndexBadge(record, size = 'lg') {
+  const score = record?.leafIndex ?? record?.leaf_index ?? computeLeafIndex(record || {}).score;
+  const cls = leafIndexTier(score);
+  const display = Number.isFinite(Number(score)) ? Math.round(Number(score)) : '—';
+  const tone = LEAF_TONE_LABEL[cls];
+  return `<span class="leaf-index-badge">
+    <span class="leaf ${cls} leaf-${size}" title="${escapeHtml(tone)}" aria-hidden="true">${LEAF_SVG}</span>
+    <span class="leaf-index-value">${display}<span class="leaf-index-scale">/100</span></span>
+    ${infoTip(LEAF_INDEX_TOOLTIP)}
+  </span>`;
+}
+
+const LEAF_INDEX_BANDS = [
+  { from: 0, to: 40, color: '#ff6b7a' },
+  { from: 40, to: 70, color: '#e0a94d' },
+  { from: 70, to: 100, color: '#53d88a' },
+];
+
+// Phase 7: the LEAF Dashboard - a "health dashboard" summary of a user's
+// sustainability standing, built entirely from data already computed
+// elsewhere on the profile page (no new backend calls). Sub-scores are
+// looped from LEAF_INDEX_COMPONENTS filtered to `available: true`, so GPU/
+// queue sub-scores appear automatically the day they go live - nothing on
+// this page needs to change when that happens.
+function leafDashboardSection(record, filteredTrends, recs, potentialSavingsDkk) {
+  const subScoreCards = LEAF_INDEX_COMPONENTS
+    .filter((c) => c.available)
+    .map((c) => {
+      const value = leafComponentValue(record, c);
+      return `<article class="stat-card">
+        <div class="label">${escapeHtml(c.label)} LEAF</div>
+        <div class="value"><span class="leaf-pair">${leafIndicator(value)}${efficiencyPill(value)}</span></div>
+        <div class="subtle">${Math.round(c.weight * 100)}% of LEAF Index</div>
+      </article>`;
+    })
+    .join('');
+
+  const leafTrendValues = asArray(filteredTrends).map((row) => computeLeafIndex(row).score);
+  const hasTrend = leafTrendValues.some((v) => Number.isFinite(v));
+  const leafTrendChart = hasTrend
+    ? lineChart('LEAF Index trend', filteredTrends,
+        [{ label: 'LEAF Index', color: '#4CE28F', values: leafTrendValues, dashed: false }],
+        (v) => `${Math.round(v)} / 100`, { zeroBase: true, bands: LEAF_INDEX_BANDS })
+    : '<div class="empty-state">Not enough daily history yet to chart a LEAF Index trend.</div>';
+
+  const improvementsNote = recs.length
+    ? `${recs.length} improvement ${recs.length === 1 ? 'suggestion is' : 'suggestions are'} available below.`
+    : 'No outstanding improvement suggestions - keep it up.';
+
+  return `<section class="section">
+    <div class="section-head"><h2>LEAF Dashboard</h2><span class="subtle">Your sustainability health summary</span></div>
+    <div class="cards-grid">
+      <article class="stat-card"><div class="label">LEAF Index</div><div class="value">${leafIndexBadge(record, 'xl')}</div><div class="subtle">Overall sustainability score</div></article>
+      ${subScoreCards}
+      <article class="stat-card"><div class="label">Potential improvements</div><div class="value" style="font-size:1rem;font-weight:600">${escapeHtml(improvementsNote)}</div></article>
+      <article class="stat-card warn"><div class="label">Estimated savings${infoTip('Estimated savings if historical jobs had requested closer to the optimal CPU and memory resources while performing the same work.')}</div><div class="value">${money(potentialSavingsDkk)}</div><div class="subtle">Estimated reducible cost</div></article>
+    </div>
+    ${leafTrendChart}
+  </section>`;
+}
+
+// Phase 7: positive reinforcement - celebrate improvements instead of only
+// surfacing what's wrong. Compares the 7-day rolling window against the
+// 30-day rolling window (both already exported, same pair trendDirection()
+// uses elsewhere) as a practical proxy for "recent vs. a month ago." Only
+// improvements are called out; flat or negative movement stays silent here
+// (the Recommendations section already covers what needs attention).
+function positiveReinforcementBanner(rolling) {
+  const recent = asObject(rolling['7d']);
+  const baseline = asObject(rolling['30d']);
+  const delta = (a, b) => {
+    const an = Number(a), bn = Number(b);
+    return (Number.isFinite(an) && Number.isFinite(bn)) ? an - bn : null;
+  };
+
+  const leafDelta = delta(recent.leaf_index, baseline.leaf_index);
+  const cpuDelta = delta(recent.avg_cpu_efficiency, baseline.avg_cpu_efficiency);
+  const memDelta = delta(recent.avg_memory_efficiency, baseline.avg_memory_efficiency);
+  const savingsDelta = delta(baseline.underutilized_cost_dkk, recent.underutilized_cost_dkk); // positive = savings opportunity shrank
+
+  const messages = [];
+  if (leafDelta !== null && Math.round(leafDelta) >= 1) {
+    const points = Math.round(leafDelta);
+    messages.push(`LEAF Index improved by ${points} point${points === 1 ? '' : 's'} recently.`);
+  }
+  if (cpuDelta !== null && cpuDelta >= 0.02) messages.push(`CPU efficiency improved by ${Math.round(cpuDelta * 100)}%.`);
+  if (memDelta !== null && memDelta >= 0.02) messages.push(`Memory requests are now better matched to actual usage.`);
+  if (savingsDelta !== null && savingsDelta >= 1) messages.push(`Estimated savings opportunity reduced by ${money(savingsDelta)}.`);
+
+  if (!messages.length) return '';
+  return `<div class="leaf-celebration">${messages.map((m) => `<span class="leaf-celebration-item">${escapeHtml(m)}</span>`).join('')}</div>`;
 }
 
 // ── Phase 6: Comparison helper functions ────────────────────────────────────
@@ -3252,13 +3452,11 @@ function compareKpiDashboard(users) {
       ? `<a href="${href}">${escapeHtml(u.displayPseudonym)}</a>`
       : escapeHtml(u.displayPseudonym);
     const label = isBenchmark ? 'Benchmark' : 'User';
-    const eff = u.overallEfficiency;
     return `<div class="compare-kpi-card${isBenchmark ? ' is-benchmark' : ''}">
       <div class="compare-kpi-user">${label}</div>
       <div class="compare-kpi-name">${nameHtml}</div>
       <div class="compare-kpi-leaf">
-        ${leafIndicator(eff, 'lg')}
-        <span class="compare-kpi-eff-label">${eff !== null && Number.isFinite(eff) ? pct(eff) : '—'}</span>
+        ${leafIndexBadge(u, 'lg')}
       </div>
       <div class="compare-kpi-stats">
         <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">Jobs</span><span class="compare-kpi-stat-value">${fmt(u.totalJobs)}</span></div>
@@ -3451,8 +3649,10 @@ function userProfilePage(publicUserId) {
   const effTone = (v) => (v === null || !Number.isFinite(v)) ? '' : v >= 0.7 ? 'good' : v >= 0.5 ? 'info' : 'warn';
 
   const overallEff = su?.overallEfficiency ?? null;
+  const leafBadgeSource = su?.leafIndex != null ? su : summary;
+  const savingsTooltip = 'Estimated savings if historical jobs had requested closer to the optimal CPU and memory resources while performing the same work. Based on historical allocation behavior, not a billing figure.';
   const kpiCards = `<div class="cards-grid">
-    ${statBlock('LEAF Rating', `<span class="leaf-pair">${leafIndicator(overallEff, 'lg')}<span style="font-size:1.1em;font-weight:700">${overallEff !== null && Number.isFinite(overallEff) ? pct(overallEff) : '—'}</span></span>`, 'Overall resource efficiency', effTone(overallEff))}
+    ${statBlock('LEAF Index', leafIndexBadge(leafBadgeSource, 'lg'), 'Overall sustainability score', effTone(overallEff))}
     ${statBlock('Jobs', fmt(summary.jobs), `${fmt(summary.completed_jobs)} completed · ${fmt(summary.failed_jobs)} failed`)}
     ${statBlock('CPU hours', fmt(summary.cpu_hours_allocated, 1), 'All-time allocated')}
     ${statBlock('GPU hours', fmt(summary.gpu_hours, 1), 'All-time allocated')}
@@ -3460,12 +3660,12 @@ function userProfilePage(publicUserId) {
     ${statBlock('CPU efficiency', `<span class="leaf-pair">${leafIndicator(summary.avg_cpu_efficiency)}${efficiencyPill(summary.avg_cpu_efficiency)}</span>`, 'Measured vs. allocated', effTone(summary.avg_cpu_efficiency))}
     ${statBlock('Memory efficiency', `<span class="leaf-pair">${leafIndicator(summary.avg_memory_efficiency)}${efficiencyPill(summary.avg_memory_efficiency)}</span>`, 'MaxRSS vs. requested', effTone(summary.avg_memory_efficiency))}
     ${statBlock('Estimated cost', money(summary.estimated_cost_dkk), 'Based on allocation')}
-    ${statBlock('Savings opportunity', money(summary.underutilized_cost_dkk), 'Estimated reducible cost', 'warn')}
+    ${statBlock(`Savings opportunity${infoTip(savingsTooltip)}`, money(summary.underutilized_cost_dkk), 'Estimated reducible cost', 'warn')}
   </div>`;
 
   const clusterCtxCards = su ? `<div class="cards-grid">
-    ${statBlock('CPU eff. percentile', su.percentileCpu !== null ? `${Math.round(su.percentileCpu)}th` : '—', 'Among all active users')}
-    ${statBlock('Overall eff. percentile', su.percentileEfficiency !== null ? `${Math.round(su.percentileEfficiency)}th` : '—', 'Among all active users')}
+    ${statBlock('CPU eff. percentile', percentileContext(su.percentileCpu) || '—', 'Among all active users')}
+    ${statBlock('Overall eff. percentile', percentileContext(su.percentileEfficiency) || '—', 'Among all active users')}
     ${statBlock('Active days', fmt(su.activeDays), 'Days with at least one job')}
     ${statBlock('Software modules', su.softwareCount > 0 ? fmt(su.softwareCount) : '—', 'Distinct modules loaded')}
     ${statBlock('Favourite partition', su.favoritePartition ? escapeHtml(su.favoritePartition) : '—', 'Most frequently used')}
@@ -3493,15 +3693,35 @@ function userProfilePage(publicUserId) {
 
   const filteredTrends = filterTrendsByPeriod(trends);
   const rangeLabel = USER_PROFILE_RANGES.find((r) => r.id === state.userProfileRange)?.label || '90d';
+  const overlays = state.profileChartOverlays;
+  const overlayToggles = `<div class="chip-toggle-row">
+    <button type="button" class="chip-toggle${overlays.clusterAvg ? ' active' : ''}" data-action="toggle-chart-overlay" data-overlay="clusterAvg">Cluster average</button>
+    <button type="button" class="chip-toggle${overlays.benchmark ? ' active' : ''}" data-action="toggle-chart-overlay" data-overlay="benchmark">Top 10% benchmark</button>
+  </div>`;
+  const clusterTrendRows = filterByRange(data?.clusterSummary?.dailyTrends, USER_PROFILE_RANGE_SELECTOR, state.userProfileRange, 'report_date');
+  const top10Benchmark = data?.usersSummary?.benchmarkProfiles?.find((b) => b.publicUserId === 'benchmark_top_10pct');
+  const effReferenceLines = [
+    ...(overlays.clusterAvg ? [
+      { value: meanOf(clusterTrendRows, 'avg_cpu_efficiency'), label: 'Cluster avg CPU', color: '#3e8cff' },
+      { value: meanOf(clusterTrendRows, 'avg_memory_efficiency'), label: 'Cluster avg memory', color: '#53d88a' },
+    ] : []),
+    ...(overlays.benchmark && top10Benchmark ? [
+      { value: top10Benchmark.cpuEfficiency, label: 'Top 10% CPU', color: '#ffd166' },
+      { value: top10Benchmark.memoryEfficiency, label: 'Top 10% memory', color: '#c084fc' },
+    ] : []),
+  ].filter((r) => Number.isFinite(r.value));
   const trendCharts = filteredTrends.length
     ? lineChart(`${escapeHtml(pseudonym)} — efficiency`, filteredTrends,
         [chartSeries(filteredTrends, 'avg_cpu_efficiency', 'CPU', '#3e8cff'),
-         chartSeries(filteredTrends, 'avg_memory_efficiency', 'Memory', '#53d88a')],
-        pct, { zeroBase: true, headlineMode: 'mean', headlineLabel: `Average efficiency (${rangeLabel})` }) +
-      lineChart(`${escapeHtml(pseudonym)} — cost`, filteredTrends,
-        [chartSeries(filteredTrends, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'),
-         chartSeries(filteredTrends, 'underutilized_cost_dkk', 'Savings opp.', '#ff6b7a')],
-        money, { zeroBase: true, headlineMode: 'sum', headlineLabel: `Total cost (${rangeLabel})` })
+         chartSeries(filteredTrends, 'avg_memory_efficiency', 'Memory', '#53d88a'),
+         rollingSeries(filteredTrends, 'avg_cpu_efficiency', 7, 'CPU (7d avg)', '#30d5d0'),
+         rollingSeries(filteredTrends, 'avg_memory_efficiency', 7, 'Memory (7d avg)', '#9dd8ff')],
+        pct, { zeroBase: true, headlineMode: 'mean', headlineLabel: `Average efficiency (${rangeLabel})`,
+               bands: EFFICIENCY_BANDS, referenceLines: effReferenceLines }) +
+      lineChart(`${escapeHtml(pseudonym)} — estimated compute cost`, filteredTrends,
+        [chartSeries(filteredTrends, 'estimated_cost_dkk', 'Estimated allocation cost', '#3e8cff'),
+         chartSeries(filteredTrends, 'underutilized_cost_dkk', 'Potential savings', '#ff6b7a')],
+        money, { zeroBase: true, headlineMode: 'sum', headlineLabel: `Total estimated cost (${rangeLabel})` })
     : '<div class="empty-state">No trend data for this period.</div>';
 
   return `<div class="stack">
@@ -3513,10 +3733,12 @@ function userProfilePage(publicUserId) {
       </div>
       ${backLink}
     </div>
+    ${positiveReinforcementBanner(rolling)}
     <section class="section"><div class="section-head"><h2>Summary</h2><span class="subtle">All-time totals</span></div>${kpiCards}</section>
+    ${leafDashboardSection(leafBadgeSource, filteredTrends, recs, summary.underutilized_cost_dkk)}
     ${clusterCtxCards ? `<section class="section"><div class="section-head"><h2>Cluster Context</h2><span class="subtle">Position among all users</span></div>${clusterCtxCards}</section>` : ''}
     <section class="section"><div class="section-head"><h2>Rolling Summaries</h2><span class="subtle">Recent windows</span></div><div class="table-card">${tableFromRows(['Window', 'Jobs', 'CPU eff.', 'Mem eff.', 'Est. cost', 'Savings opp.'], rollingRows)}</div></section>
-    <section class="section"><div class="section-head"><h2>Daily Trends</h2>${profileRangeButtons()}</div>${trendCharts}</section>
+    <section class="section"><div class="section-head"><h2>Daily Trends</h2>${profileRangeButtons()}</div>${overlayToggles}${trendCharts}${disclaimer('Cost figures are allocation-based estimates, not billing figures.')}</section>
     <section class="section"><div class="section-head"><h2>Recommendations</h2><span class="subtle">${recs.length} generated</span></div><div class="rec-list">${recCards}</div></section>
     ${topJobs.length ? `<section class="section"><div class="section-head"><h2>Highest-Impact Jobs</h2><span class="subtle">By savings opportunity</span></div><div class="table-card">${tableFromRows(['Partition', 'CPU eff.', 'Mem eff.', 'Savings opp.', 'Est. cost', 'Elapsed h', 'CPUs'], jobsRows)}</div></section>` : ''}
   </div>`;
@@ -3736,7 +3958,7 @@ function costPage() {
         statBlock('Driver-resource potential savings', money(allTime.cost_bearer_waste_dkk ?? allTime.underutilized_cost_dkk), 'Estimated potential savings from the main cost driver (Cost-Bearer model)'),
       ].join('')}</div>${disclaimer(LOWER_BOUND_NOTE)}${disclaimer(GPU_WASTE_NOTE)}${disclaimer(AGGREGATE_NOTE)}</section>
       <section class="section"><div class="section-head"><h2>Measurement coverage</h2><span class="subtle">Measured vs unmeasured jobs by main cost driver</span></div>${coverageCards(data?.clusterSummary?.measurementCoverage)}</section>
-      ${lineChart('Daily cost opportunity', rows, [chartSeries(rows, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(rows, 'underutilized_cost_dkk', 'Savings opportunity', '#ff6b7a')], money, { zeroBase: true })}
+      ${lineChart('Estimated Compute Cost vs. Potential Savings', rows, [chartSeries(rows, 'estimated_cost_dkk', 'Estimated allocation cost', '#3e8cff'), chartSeries(rows, 'underutilized_cost_dkk', 'Potential savings', '#ff6b7a')], money, { zeroBase: true })}
       <section class="section"><div class="section-head"><h2>Cost actions</h2><span class="subtle">Impact-ranked</span></div><div class="rec-list">${recommendationCards(5).join('')}</div></section>
       </div>`;
 }
@@ -3760,6 +3982,20 @@ function recoveryPage() {
 
 function prototypeBanner() {
   return '<div class="prototype-banner"><strong>Prototype Personal Analytics - Authentication Not Yet Enabled</strong><span>Decision support view. Peer comparisons remain pseudonymous.</span></div>';
+}
+
+// Phase 7: cluster-context phrasing - turns an already-exported percentile
+// rank (0-100, e.g. su.percentileCpu/percentileEfficiency) into a short,
+// human sentence ("Top 10%", "Better than 82% of users"). No new
+// computation: purely a presentation layer over existing percentile fields.
+function percentileContext(percentile0to100) {
+  const n = Number(percentile0to100);
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  if (rounded >= 90) return `Top ${Math.max(1, 100 - rounded)}%`;
+  if (rounded >= 50) return `Better than ${rounded}% of users`;
+  if (rounded > 0) return `Below median (${rounded}th percentile)`;
+  return `${rounded}th percentile`;
 }
 
 function percentileBand(value) {
@@ -3885,11 +4121,11 @@ function personalAnalyticsPage() {
     </section>
     <div class="stack">
       <section class="section"><div class="section-head"><h2>Priority Actions</h2><span class="subtle">What should I do?</span></div>${priorityActions(vm.recommendations)}</section>
-      <section class="section"><div class="section-head"><h2>Savings Opportunity Breakdown</h2><span class="subtle">How much can I save?</span></div>${savingsBreakdown(vm.recommendations, metrics)}</section>
+      <section class="section"><div class="section-head"><h2>Potential Savings Breakdown${infoTip('Estimated savings if historical jobs had requested closer to the optimal CPU and memory resources while performing the same work. Based on historical allocation behavior, not a billing figure.')}</h2><span class="subtle">How much can I save?</span></div>${savingsBreakdown(vm.recommendations, metrics)}</section>
       <section class="section"><div class="section-head"><h2>How do I compare?</h2><span class="subtle">Percentile bands, not rank numbers</span></div>${personalContextCards(metrics, percentile)}<div class="metric-explain wide"><strong>How to read these bands</strong><span>Percentile bands summarize position among exported users without exposing exact ranks. Higher savings opportunity means more room to improve, not a badge of failure.</span></div></section>
       <section class="section"><div class="section-head"><h2>Trend evidence</h2><span class="subtle">Why these actions are being recommended</span></div><div class="trend-grid">
-        ${lineChart('Efficiency trend evidence', trends, [chartSeries(trends, 'avg_cpu_efficiency', 'CPU efficiency', '#3e8cff'), chartSeries(trends, 'avg_memory_efficiency', 'Memory efficiency', '#53d88a')], pct, { zeroBase: true })}
-        ${lineChart('Cost opportunity trend', trends, [chartSeries(trends, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(trends, 'underutilized_cost_dkk', 'Savings opportunity', '#ff6b7a')], money, { zeroBase: true })}
+        ${lineChart('Efficiency trend evidence', trends, [chartSeries(trends, 'avg_cpu_efficiency', 'CPU efficiency', '#3e8cff'), chartSeries(trends, 'avg_memory_efficiency', 'Memory efficiency', '#53d88a')], pct, { zeroBase: true, bands: EFFICIENCY_BANDS })}
+        ${lineChart('Estimated Compute Cost Trend', trends, [chartSeries(trends, 'estimated_cost_dkk', 'Estimated allocation cost', '#3e8cff'), chartSeries(trends, 'underutilized_cost_dkk', 'Potential savings', '#ff6b7a')], money, { zeroBase: true })}
       </div></section>
       <section class="section"><div class="section-head"><h2>Keep perspective: anonymous peers</h2><span class="subtle">Peer comparison stays pseudonymous</span></div>${peerComparisonTable(vm.peerComparisons)}</section>
       <section class="section"><div class="section-head"><h2>Highest-Impact Jobs to Review</h2><span class="subtle">Which jobs offer the most room to improve?</span></div><p class="subtle" style="line-height:1.7">These jobs are shown because they combine cost with low CPU or memory use. Reviewing them can help you adjust similar submissions in the future.</p>${personalJobsTable(vm.topInefficientJobs)}</section>
@@ -4216,6 +4452,13 @@ function wireEvents() {
   document.querySelectorAll('[data-action="set-profile-range"]').forEach((el) => {
     el.addEventListener('click', (event) => {
       state.userProfileRange = event.currentTarget.dataset.range;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="toggle-chart-overlay"]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      const key = event.currentTarget.dataset.overlay;
+      state.profileChartOverlays[key] = !state.profileChartOverlays[key];
       render();
     });
   });
