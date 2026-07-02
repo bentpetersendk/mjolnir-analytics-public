@@ -3312,6 +3312,12 @@ const LEAF_VS_SAVINGS_TOOLTIP = 'LEAF measures resource efficiency (environmenta
 
 const LEAF_INDEX_TOOLTIP = 'The LEAF Index reflects sustainable use of HPC resources over the last 180 days (not your all-time history), so it can actually improve as your usage improves. It currently reflects CPU and memory efficiency, weighted 60/40, and will expand to include additional sustainability dimensions (GPU efficiency, queue behaviour, energy, carbon) as they become available. Version 2.0.';
 
+// Phase 8.1: every "current performance" surface (LEAF, Savings Opportunity,
+// Recommendations, the CPU/Memory Efficiency rankings, and the Users
+// Explorer efficiency column/filter) now shares this one window - this
+// tooltip is the single place that scope is spelled out for the reader.
+const EFFICIENCY_WINDOW_TOOLTIP = 'Efficiency values reflect the previous 180 days unless explicitly marked as lifetime/all-time.';
+
 // `record` may be a users_summary row, personal bundle, or user/hierarchy
 // bundle - all carry a `leaf` block (see data-loader.js normalizeLeafBlock /
 // export_analytics_data.py build_leaf_block). Falls back to computeLeafIndex
@@ -3552,36 +3558,40 @@ function compareSummary(users) {
   const bullets = [];
   const names = users.map((u) => escapeHtml(u.displayPseudonym));
 
-  const finiteEffs = users.map((u) => u.overallEfficiency).filter(Number.isFinite);
+  // Phase 8.1: compare bullets describe the same rolling 180d window as
+  // LEAF/Savings Opportunity/Recommendations elsewhere, not lifetime
+  // overallEfficiency/cpuEfficiency/memoryEfficiency.
+  const effs180 = users.map((u) => windowOverallEfficiency(u));
+  const finiteEffs = effs180.filter(Number.isFinite);
   if (finiteEffs.length >= 2) {
-    const effs = users.map((u) => u.overallEfficiency);
+    const effs = effs180;
     const maxEff = Math.max(...effs.filter(Number.isFinite));
     const minEff = Math.min(...effs.filter(Number.isFinite));
     if (maxEff - minEff > 0.15) {
-      const best = users.find((u) => u.overallEfficiency === maxEff);
-      const worst = users.find((u) => u.overallEfficiency === minEff);
+      const best = users.find((u, i) => effs[i] === maxEff);
+      const worst = users.find((u, i) => effs[i] === minEff);
       bullets.push(`<strong>${escapeHtml(best.displayPseudonym)}</strong> achieves substantially higher resource efficiency (${pct(maxEff)}) compared to <strong>${escapeHtml(worst.displayPseudonym)}</strong> (${pct(minEff)}).`);
     } else {
       bullets.push(`All compared users achieve broadly similar overall efficiency (${pct(minEff)}–${pct(maxEff)}).`);
     }
   }
 
-  const cpuEffs = users.map((u) => u.cpuEfficiency).filter(Number.isFinite);
+  const cpuEffs = users.map((u) => u.cpuEfficiency180d).filter(Number.isFinite);
   if (cpuEffs.length >= 2) {
     const max = Math.max(...cpuEffs);
     const min = Math.min(...cpuEffs);
     if (max - min > 0.15) {
-      const best = users.find((u) => u.cpuEfficiency === max);
+      const best = users.find((u) => u.cpuEfficiency180d === max);
       bullets.push(`<strong>${escapeHtml(best.displayPseudonym)}</strong> has notably higher CPU efficiency (${pct(max)} vs ${pct(min)}).`);
     }
   }
 
-  const memEffs = users.map((u) => u.memoryEfficiency).filter(Number.isFinite);
+  const memEffs = users.map((u) => u.memoryEfficiency180d).filter(Number.isFinite);
   if (memEffs.length >= 2) {
     const max = Math.max(...memEffs);
     const min = Math.min(...memEffs);
     if (max - min > 0.15) {
-      const best = users.find((u) => u.memoryEfficiency === max);
+      const best = users.find((u) => u.memoryEfficiency180d === max);
       bullets.push(`<strong>${escapeHtml(best.displayPseudonym)}</strong> uses memory more efficiently (${pct(max)} vs ${pct(min)}).`);
     }
   }
@@ -3620,7 +3630,7 @@ function compareSummary(users) {
   if (benchmarks.length > 0 && realUsers.length > 0) {
     const ref = benchmarks[0];
     realUsers.forEach((u) => {
-      const effDiff = (u.overallEfficiency || 0) - (ref.overallEfficiency || 0);
+      const effDiff = (windowOverallEfficiency(u) || 0) - (windowOverallEfficiency(ref) || 0);
       if (Math.abs(effDiff) > 0.05) {
         bullets.push(`<strong>${escapeHtml(u.displayPseudonym)}</strong> is ${effDiff > 0 ? `${pct(effDiff)} above` : `${pct(-effDiff)} below`} the <strong>${escapeHtml(ref.displayPseudonym)}</strong> in overall efficiency.`);
       }
@@ -3654,8 +3664,8 @@ function compareKpiDashboard(users) {
       <div class="compare-kpi-stats">
         <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">Jobs</span><span class="compare-kpi-stat-value">${fmt(u.totalJobs)}</span></div>
         <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">CPU h</span><span class="compare-kpi-stat-value">${fmt(u.cpuHours, 0)}</span></div>
-        <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">CPU eff.</span><span class="compare-kpi-stat-value">${efficiencyPill(u.cpuEfficiency)}</span></div>
-        <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">Mem eff.</span><span class="compare-kpi-stat-value">${efficiencyPill(u.memoryEfficiency)}</span></div>
+        <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">CPU eff. (180d)</span><span class="compare-kpi-stat-value">${efficiencyPill(u.cpuEfficiency180d)}</span></div>
+        <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">Mem eff. (180d)</span><span class="compare-kpi-stat-value">${efficiencyPill(u.memoryEfficiency180d)}</span></div>
         <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">Est. cost</span><span class="compare-kpi-stat-value">${money(u.estimatedCostDkk)}</span></div>
         <div class="compare-kpi-stat"><span class="compare-kpi-stat-label">Savings opp.</span><span class="compare-kpi-stat-value">${money(u.underutilizedCostDkk)}</span></div>
       </div>
@@ -3669,7 +3679,7 @@ function compareWithGroup(currentUserId) {
   const benchmarks = summary?.benchmarkProfiles || [];
   const btnsByBenchmark = benchmarks.map((b) => {
     const href = `#/compare/${encodeURIComponent(currentUserId)}/${encodeURIComponent(b.publicUserId)}`;
-    return `<a href="${href}" class="compare-with-btn is-benchmark">${leafIndicator(b.overallEfficiency, 'sm')} ${escapeHtml(b.displayPseudonym)}</a>`;
+    return `<a href="${href}" class="compare-with-btn is-benchmark">${leafIndicator(windowOverallEfficiency(b), 'sm')} ${escapeHtml(b.displayPseudonym)}</a>`;
   });
   const randomUsers = (summary?.users || []).filter((u) => u.publicUserId !== currentUserId);
   const randomUser = randomUsers[Math.floor(Math.random() * randomUsers.length)];
@@ -3861,9 +3871,14 @@ function userProfilePage(publicUserId) {
     ${statBlock(`Savings opportunity${infoTip(LEAF_VS_SAVINGS_TOOLTIP)}`, money(rolling180.underutilized_cost_dkk), `Estimated reducible cost · ${LEAF_ROLLING_LABEL}`, 'warn')}
   </div>`;
 
+  // Phase 8.1: these percentile cards now describe the same 180d window as
+  // the KPI cards above (CPU/Memory efficiency, LEAF) instead of lifetime
+  // percentile_cpu/percentile_efficiency - a lifetime percentile shown right
+  // next to rolling-window efficiency numbers was exactly the "#2 in CPU
+  // Efficiency, #18 in LEAF" inconsistency this phase fixes.
   const clusterCtxCards = su ? `<div class="cards-grid">
-    ${statBlock('CPU eff. percentile', percentileContext(su.percentileCpu) || '—', 'Among all active users')}
-    ${statBlock('Overall eff. percentile', percentileContext(su.percentileEfficiency) || '—', 'Among all active users')}
+    ${statBlock('CPU eff. percentile', percentileContext(su.percentileCpu180d) || '—', `Among all active users · ${LEAF_ROLLING_LABEL}`)}
+    ${statBlock('LEAF percentile', percentileContext(su.leaf?.percentile) || '—', `Among all active users · ${LEAF_ROLLING_LABEL}`)}
     ${statBlock('Active days', fmt(su.activeDays), 'Days with at least one job')}
     ${statBlock('Software modules', su.softwareCount > 0 ? fmt(su.softwareCount) : '—', 'Distinct modules loaded')}
     ${statBlock('Favourite partition', su.favoritePartition ? escapeHtml(su.favoritePartition) : '—', 'Most frequently used')}
@@ -3903,9 +3918,13 @@ function userProfilePage(publicUserId) {
       { value: meanOf(clusterTrendRows, 'avg_cpu_efficiency'), label: 'Cluster avg CPU', color: '#3e8cff' },
       { value: meanOf(clusterTrendRows, 'avg_memory_efficiency'), label: 'Cluster avg memory', color: '#53d88a' },
     ] : []),
+    // Phase 8.1: the Top 10% reference line uses the benchmark's rolling
+    // 180d fields, matching this same chart's KPI cards above (windowCpuEff/
+    // windowMemEff), not the benchmark's lifetime cpuEfficiency/
+    // memoryEfficiency.
     ...(overlays.benchmark && top10Benchmark ? [
-      { value: top10Benchmark.cpuEfficiency, label: 'Top 10% CPU', color: '#ffd166' },
-      { value: top10Benchmark.memoryEfficiency, label: 'Top 10% memory', color: '#c084fc' },
+      { value: top10Benchmark.cpuEfficiency180d, label: 'Top 10% CPU (180d)', color: '#ffd166' },
+      { value: top10Benchmark.memoryEfficiency180d, label: 'Top 10% memory (180d)', color: '#c084fc' },
     ] : []),
   ].filter((r) => Number.isFinite(r.value));
   const trendCharts = filteredTrends.length
@@ -3955,7 +3974,7 @@ function userLeaderboard(title, users, valueKey, formatter, limit = 10, showLeaf
     .slice(0, limit);
   if (!sorted.length) return '';
   const rows = sorted.map((u, i) => {
-    const eff = showLeaf ? (u.overallEfficiency ?? null) : null;
+    const eff = showLeaf ? windowOverallEfficiency(u) : null;
     const leafHtml = showLeaf ? `${leafIndicator(eff)} ` : '';
     return `<tr>
       <td><span class="rank-badge">${i + 1}</span></td>
@@ -3985,8 +4004,12 @@ function userRankingsPage() {
   const measuredUsers = users
     .filter((u) => u.leaf?.leafIndex != null && u.totalJobs >= 5)
     .map((u) => ({ ...u, leafIndex180: u.leaf.leafIndex }));
-  const measuredCpuUsers = users.filter((u) => u.cpuEfficiency !== null && u.totalJobs >= 5);
-  const measuredMemUsers = users.filter((u) => u.memoryEfficiency !== null && u.totalJobs >= 5);
+  // Phase 8.1: "Highest CPU/Memory Efficiency" rank by the rolling 180d
+  // fields (same window as LEAF/Savings Opportunity/Recommendations above),
+  // not the lifetime cpuEfficiency/memoryEfficiency - see data-loader.js
+  // normalizeUserRow.
+  const measuredCpuUsers = users.filter((u) => u.cpuEfficiency180d !== null && u.totalJobs >= 5);
+  const measuredMemUsers = users.filter((u) => u.memoryEfficiency180d !== null && u.totalJobs >= 5);
   const swUsers = users.filter((u) => u.softwareCount > 0);
   const leafNote = `<section class="section">
     <div class="section-head"><h2>${leafIndicator(0.85, 'lg')} LEAF Sustainability Indicators</h2></div>
@@ -3994,12 +4017,12 @@ function userRankingsPage() {
   </section>`;
   return `<div class="stack">
     ${analyticsStatusBar()}
-    ${infoPanel('About these rankings', 'All users are identified by stable pseudonyms only. Rankings highlight resource usage patterns — not individual performance judgements.')}
+    ${infoPanel('About these rankings', `All users are identified by stable pseudonyms only. Rankings highlight resource usage patterns — not individual performance judgements. ${EFFICIENCY_WINDOW_TOOLTIP}`)}
     ${leafNote}
     <div class="trend-grid">
       ${userLeaderboard(`Most Sustainable Users (${LEAF_ROLLING_LABEL})`, measuredUsers, 'leafIndex180', (v) => `<span class="leaf-pair">${leafIndicator(v / 100)}${Math.round(v)} / 100</span>`, 10, false)}
-      ${userLeaderboard('Highest CPU Efficiency', measuredCpuUsers, 'cpuEfficiency', (v) => `<span class="leaf-pair">${leafIndicator(v)}${pct(v)}</span>`, 10, false)}
-      ${userLeaderboard('Highest Memory Efficiency', measuredMemUsers, 'memoryEfficiency', (v) => `<span class="leaf-pair">${leafIndicator(v)}${pct(v)}</span>`, 10, false)}
+      ${userLeaderboard('Highest CPU Efficiency (180d)', measuredCpuUsers, 'cpuEfficiency180d', (v) => `<span class="leaf-pair">${leafIndicator(v)}${pct(v)}</span>`, 10, false)}
+      ${userLeaderboard('Highest Memory Efficiency (180d)', measuredMemUsers, 'memoryEfficiency180d', (v) => `<span class="leaf-pair">${leafIndicator(v)}${pct(v)}</span>`, 10, false)}
       ${userLeaderboard('Highest Savings Opportunity', users, 'underutilizedCostDkk', money)}
       ${userLeaderboard('Highest CPU Consumption', users, 'cpuHours', (v) => `${fmt(v, 0)} h`)}
       ${userLeaderboard('Highest GPU Consumption', users, 'gpuHours', (v) => `${fmt(v, 1)} h`)}
@@ -4053,8 +4076,12 @@ function userComparisonPage(ids) {
     return `<tr><th class="compare-label">${escapeHtml(label)}</th>${cells.join('')}</tr>`;
   };
 
-  const effRow = (label, key) => {
-    const vals = users.map((u) => u[key]);
+  // `keyOrFn` may be a field name (u[key]) or an accessor function - the
+  // latter is needed for "Overall efficiency", which is derived from
+  // leaf.leafIndexComponents rather than stored under a flat field.
+  const effRow = (label, keyOrFn) => {
+    const accessor = typeof keyOrFn === 'function' ? keyOrFn : (u) => u[keyOrFn];
+    const vals = users.map(accessor);
     const display = vals.map((v) => efficiencyWithLeaf(v));
     return row(label, display, winHigh(vals.map((v) => Number(v))));
   };
@@ -4065,10 +4092,14 @@ function userComparisonPage(ids) {
     return row(label, display, preferHigh ? winHigh(nums) : winLow(nums));
   };
 
+  // Phase 8.1: comparison rows/CSV describe the same rolling 180d window as
+  // LEAF/Savings Opportunity/Recommendations - not lifetime
+  // overallEfficiency/cpuEfficiency/memoryEfficiency/percentileCpu/
+  // percentileEfficiency.
   const tableRows = [
-    effRow('Overall efficiency',  'overallEfficiency'),
-    effRow('CPU efficiency',      'cpuEfficiency'),
-    effRow('Memory efficiency',   'memoryEfficiency'),
+    effRow('Overall efficiency (180d)',  (u) => windowOverallEfficiency(u)),
+    effRow('CPU efficiency (180d)',      'cpuEfficiency180d'),
+    effRow('Memory efficiency (180d)',   'memoryEfficiency180d'),
     numRow('Total jobs',          (u) => fmt(u.totalJobs), (u) => u.totalJobs),
     numRow('Completed',           (u) => fmt(u.completedJobs), (u) => u.completedJobs),
     numRow('Failed',              (u) => u.failedJobs > 0 ? `<span class="pill warn">${fmt(u.failedJobs)}</span>` : '<span class="subtle">0</span>', (u) => -u.failedJobs),
@@ -4088,8 +4119,8 @@ function userComparisonPage(ids) {
     })),
     row('Favourite partition',    users.map((u) => u.favoritePartition ? escapeHtml(u.favoritePartition) : dash)),
     row('Favourite software',     users.map((u) => u.favoriteSoftware ? escapeHtml(u.favoriteSoftware) : dash)),
-    numRow('CPU eff. percentile', (u) => u.percentileCpu !== null ? `${Math.round(u.percentileCpu)}th` : dash, (u) => u.percentileCpu ?? -1),
-    numRow('Eff. percentile',     (u) => u.percentileEfficiency !== null ? `${Math.round(u.percentileEfficiency)}th` : dash, (u) => u.percentileEfficiency ?? -1),
+    numRow('CPU eff. percentile (180d)', (u) => u.percentileCpu180d !== null ? `${Math.round(u.percentileCpu180d)}th` : dash, (u) => u.percentileCpu180d ?? -1),
+    numRow('LEAF percentile (180d)',     (u) => u.leaf?.percentile != null ? `${Math.round(u.leaf.percentile)}th` : dash, (u) => u.leaf?.percentile ?? -1),
   ];
 
   const userHeaders = users.map((u) => {
@@ -4104,9 +4135,9 @@ function userComparisonPage(ids) {
   const currentUrl = window.location.href;
   const csvData = [
     ['Metric', ...users.map((u) => u.displayPseudonym)].join(','),
-    ['Overall efficiency', ...users.map((u) => u.overallEfficiency ?? '')].join(','),
-    ['CPU efficiency', ...users.map((u) => u.cpuEfficiency ?? '')].join(','),
-    ['Memory efficiency', ...users.map((u) => u.memoryEfficiency ?? '')].join(','),
+    ['Overall efficiency (180d)', ...users.map((u) => windowOverallEfficiency(u) ?? '')].join(','),
+    ['CPU efficiency (180d)', ...users.map((u) => u.cpuEfficiency180d ?? '')].join(','),
+    ['Memory efficiency (180d)', ...users.map((u) => u.memoryEfficiency180d ?? '')].join(','),
     ['Total jobs', ...users.map((u) => u.totalJobs)].join(','),
     ['CPU hours', ...users.map((u) => u.cpuHours)].join(','),
     ['GPU hours', ...users.map((u) => u.gpuHours)].join(','),
@@ -4191,7 +4222,7 @@ function prototypeBanner() {
 }
 
 // Phase 7: cluster-context phrasing - turns an already-exported percentile
-// rank (0-100, e.g. su.percentileCpu/percentileEfficiency) into a short,
+// rank (0-100, e.g. su.percentileCpu180d/leaf.percentile) into a short,
 // human sentence ("Top 10%", "Better than 82% of users"). No new
 // computation: purely a presentation layer over existing percentile fields.
 function percentileContext(percentile0to100) {
@@ -4250,13 +4281,18 @@ function savingsBreakdown(recommendations, metrics) {
   return `<div class="savings-summary"><div class="savings-total"><span>Total practical opportunity</span><strong>${money(total)}</strong><em>Estimated from your personal bundle and recommendations.</em></div>${html}</div>`;
 }
 
+// Phase 8.1: the headline CPU/memory efficiency cards read the rolling 180d
+// value (metrics.cpuEfficiency180d/memoryEfficiency180d, sourced from the
+// bundle's leaf block - see data-loader.js normalizePersonalUserViewModel),
+// the same window as Savings Opportunity below and LEAF on the public
+// profile page - not lifetime metrics.cpuEfficiency/memoryEfficiency.
 function personalContextCards(metrics, percentile) {
   const cpuBand = percentileBand(percentile.cpu);
   const memoryBand = percentileBand(percentile.memory);
   const savingsBand = percentileBand(percentile.savings);
   return `<div class="cards-grid">${[
-    statBlock('CPU efficiency', pct(metrics.cpuEfficiency), `Decision signal: ${cpuBand.label}. ${cpuBand.detail}`, cpuBand.tone),
-    statBlock('Memory efficiency', pct(metrics.memoryEfficiency), `Decision signal: ${memoryBand.label}. ${memoryBand.detail}`, memoryBand.tone),
+    statBlock('CPU efficiency', pct(metrics.cpuEfficiency180d), `Decision signal: ${cpuBand.label}. ${cpuBand.detail} · ${LEAF_ROLLING_LABEL}`, cpuBand.tone),
+    statBlock('Memory efficiency', pct(metrics.memoryEfficiency180d), `Decision signal: ${memoryBand.label}. ${memoryBand.detail} · ${LEAF_ROLLING_LABEL}`, memoryBand.tone),
     statBlock('Savings opportunity', money(metrics.potentialSavings), `Prioritize actions with the largest repeatable savings. ${savingsBand.label}.`, 'warn'),
     statBlock('Estimated spend', money(metrics.estimatedCost), 'Context only: use this to size the opportunity, not as a score.'),
     statBlock('Main cost driver', bearerLabel(metrics.costBearer), 'Whichever resource - CPU or memory - drives most of your cost.'),

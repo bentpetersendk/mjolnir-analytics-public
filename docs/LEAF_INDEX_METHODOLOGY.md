@@ -97,3 +97,58 @@ what's actually being measured today.
 - It does not change `underutilized_cost_dkk` or any other existing
   cost/waste field - the LEAF Index is purely additive and does not alter
   the cost model, which is documented separately as "under review."
+
+## Phase 8.1 — Rolling 180-day consistency for efficiency rankings (2026-07-02)
+
+Phase 8 (LEAF 2.0) moved LEAF, Savings Opportunity, and Recommendations to
+the rolling 180-day window, but the "Highest CPU Efficiency" / "Highest
+Memory Efficiency" leaderboards on the Rankings page, the Users Explorer's
+per-metric efficiency displays, the Compare page, and the Personal Analytics
+dashboard's headline efficiency cards were left ranking/displaying by
+lifetime `cpuEfficiency`/`memoryEfficiency`/`overallEfficiency`/
+`percentileCpu`/`percentileEfficiency` - a user could rank #2 in CPU
+Efficiency (lifetime) and #18 in LEAF (180d) simultaneously. This addendum
+closes that gap on the frontend, using the backend's Phase 8.1
+`cpu_efficiency_180d`/`memory_efficiency_180d`/`overall_efficiency_180d`/
+`percentile_cpu_180d`/`percentile_memory_180d` fields (`mjolnir-analytics`
+`scripts/export_analytics_data.py`).
+
+**Audit result** - every reference to `cpuEfficiency`/`memoryEfficiency`/
+`overallEfficiency`/`percentileCpu`/`percentileEfficiency` (and their raw
+`avg_cpu_efficiency`/`avg_memory_efficiency`/`cpu_efficiency`/
+`memory_efficiency`/`overall_efficiency`/`percentile_cpu`/
+`percentile_efficiency` JSON counterparts) was reviewed and classified:
+
+| Surface | Classification | Change |
+|---|---|---|
+| Rankings page "Highest CPU/Memory Efficiency" (`userRankingsPage`) | Current performance | Now sorts/filters/displays `cpuEfficiency180d`/`memoryEfficiency180d`; headings renamed to "Highest CPU Efficiency (180d)" / "Highest Memory Efficiency (180d)" |
+| User profile "Cluster Context" percentile cards (`userProfilePage`) | Current performance | Now reads `percentileCpu180d` and `leaf.percentile` instead of lifetime `percentileCpu`/`percentileEfficiency`; relabeled "LEAF percentile" |
+| Compare page summary bullets, KPI cards, full comparison table, CSV export (`compareSummary`, `compareKpiDashboard`, `compareWithGroup`, `userComparisonPage`) | Current performance | Switched to `windowOverallEfficiency()`/`cpuEfficiency180d`/`memoryEfficiency180d`/`percentileCpu180d`/`leaf.percentile`; row/column labels now say "(180d)" |
+| Personal Analytics dashboard headline CPU/Memory efficiency cards (`personalContextCards`) | Current performance | Now reads `metrics.cpuEfficiency180d`/`memoryEfficiency180d` (sourced from the personal bundle's `leaf.leaf_index_components`), matching the Savings Opportunity card already on the same page |
+| Users Explorer efficiency column/filter | Already current performance | No change needed - already used `windowOverallEfficiency()` since Phase 8 |
+| User profile KPI cards (CPU efficiency, Memory efficiency, Savings Opportunity) | Already current performance | No change needed - already used `leafComponentFromBlock()`/`rolling_summaries["180d"]` since Phase 8 |
+| Profile page "Top 10% benchmark" trend overlay reference lines | Current performance | Switched to the benchmark's `cpuEfficiency180d`/`memoryEfficiency180d` |
+| Executive User Report PDF (`userReportData.js` "Efficiency" section) | **Intentional historical statistic** | Left unchanged - explicitly labeled "All-time average" in the UI, satisfying the "unless explicitly labelled as a lifetime statistic" exception |
+| PI Report PDF (`piReportData.js` "CPU/Memory Efficiency") | **Intentional historical statistic** | Left unchanged - explicitly labeled "All-time average" |
+| Per-job `cpuEfficiency`/`memoryEfficiency` (job tables, job detail cards) | Not applicable | A single job has no lifetime-vs-rolling distinction - left unchanged |
+| Daily trend charts (`avg_cpu_efficiency`/`avg_memory_efficiency` series) | Not applicable | Time series of actual per-day values, not a summarized aggregate - left unchanged |
+
+**Backward compatibility**: `normalizeUserRow()` and
+`normalizePersonalUserViewModel()` in `data-loader.js` detect missing
+`*_180d` fields/leaf blocks (older cached JSON) via key presence, not
+value-nullness, and fall back to the lifetime field without throwing - a
+genuinely null 180d value (no activity in the window) is preserved as "no
+recent activity," never silently replaced by a stale lifetime number.
+
+**New tooltip**: `EFFICIENCY_WINDOW_TOOLTIP` ("Efficiency values reflect the
+previous 180 days unless explicitly marked as lifetime/all-time.") added to
+the Rankings page info panel.
+
+**Validation**: `scripts/validate_ui.py`, `scripts/validate_data.py`
+(re-run against a real 306-user export from the backend, via
+`MJOLNIR_ANALYTICS_DATA_DIR`), and `scripts/validate_reports.py` all pass.
+`node --check` passes on `app.js` and `data-loader.js`. A standalone Node
+harness against the real export confirmed the Rankings leaderboard's top-5
+by `cpuEfficiency180d` genuinely differs from the top-5 by lifetime
+`cpuEfficiency`, and that the backward-compatibility fallback produces the
+lifetime value byte-for-byte when the `*_180d` fields are absent.

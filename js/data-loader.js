@@ -306,6 +306,21 @@ function normalizePersonalUserViewModel(bundle, routeToken) {
   const displayPseudonym = root.display_pseudonym || publicIdentity.display_pseudonym || root.public_pseudonym || '';
   const publicUserId = root.public_user_id || publicIdentity.public_user_id || '';
 
+  const leaf = normalizeLeafBlock(root.leaf);
+  // Phase 8.1: personal dashboard's headline CPU/memory efficiency cards
+  // (js/app.js personalContextCards) must show the same rolling 180d window
+  // as LEAF/Savings Opportunity, not lifetime all_time_summary - sourced from
+  // the same leaf.leafIndexComponents the public user profile page already
+  // uses (see app.js leafComponentFromBlock). Falls back to the lifetime
+  // avg_cpu_efficiency/avg_memory_efficiency only when the bundle predates
+  // the `leaf` block entirely (very old cache) - never for a genuinely null
+  // (no recent activity) component value.
+  const leafComponentValue = (id) => {
+    const c = leaf.leafIndexComponents.find((x) => x.id === id);
+    return c && c.value != null ? Number(c.value) : null;
+  };
+  const hasLeafBlock = leaf.leafIndexComponents.length > 0 || leaf.leafIndex != null;
+
   return {
     visibilityTier: 'personal',
     schemaVersion: root.schema_version || null,
@@ -316,6 +331,8 @@ function normalizePersonalUserViewModel(bundle, routeToken) {
     metrics: {
       cpuEfficiency: summary.avg_cpu_efficiency,
       memoryEfficiency: summary.avg_memory_efficiency,
+      cpuEfficiency180d: hasLeafBlock ? leafComponentValue('cpu') : (summary.avg_cpu_efficiency ?? null),
+      memoryEfficiency180d: hasLeafBlock ? leafComponentValue('memory') : (summary.avg_memory_efficiency ?? null),
       estimatedCost: numberOrZero(summary.estimated_cost_dkk),
       potentialSavings: numberOrZero(summary.underutilized_cost_dkk ?? summary.potential_savings_dkk),
       jobs: numberOrZero(summary.jobs),
@@ -344,7 +361,7 @@ function normalizePersonalUserViewModel(bundle, routeToken) {
       savings: percentile.savings ?? percentile.underutilized_cost_dkk,
     },
     trends,
-    leaf: normalizeLeafBlock(root.leaf),
+    leaf,
     topInefficientJobs: asArray(root.top_inefficient_jobs).map(normalizePersonalJob),
     recommendations: asArray(root.recommendations).map(normalizeRecommendation),
     peerComparisons: asArray(root.peer_comparisons).map(normalizePeer),
@@ -376,6 +393,21 @@ function normalizeLeafBlock(leaf) {
   };
 }
 
+// Phase 8.1: cpu_efficiency_180d/memory_efficiency_180d/overall_efficiency_180d/
+// percentile_cpu_180d/percentile_memory_180d are the rolling-window
+// counterparts to the lifetime cpu_efficiency/memory_efficiency/
+// overall_efficiency/percentile_cpu/percentile_efficiency fields, exported by
+// scripts/export_analytics_data.py so "Highest CPU/Memory Efficiency"
+// rankings describe the same 180d window as LEAF/Savings Opportunity, not
+// lifetime history. Older cached JSON (pre-Phase-8.1) simply won't have
+// these keys at all - detected via `in`, not `!= null`, since a present but
+// null 180d value (no activity in the window) is meaningful and must not be
+// papered over with a stale lifetime figure.
+function effWithFallback(row, key180d, fallbackValue) {
+  const eff = (v) => (v !== null && v !== undefined) ? Number(v) : null;
+  return (key180d in row) ? eff(row[key180d]) : fallbackValue;
+}
+
 function normalizeUserRow(r) {
   const eff = (v) => (v !== null && v !== undefined) ? Number(v) : null;
   return {
@@ -395,6 +427,9 @@ function normalizeUserRow(r) {
     cpuEfficiency:            eff(r.cpu_efficiency),
     memoryEfficiency:         eff(r.memory_efficiency),
     overallEfficiency:        eff(r.overall_efficiency),
+    cpuEfficiency180d:        effWithFallback(r, 'cpu_efficiency_180d', eff(r.cpu_efficiency)),
+    memoryEfficiency180d:     effWithFallback(r, 'memory_efficiency_180d', eff(r.memory_efficiency)),
+    overallEfficiency180d:    effWithFallback(r, 'overall_efficiency_180d', eff(r.overall_efficiency)),
     averageQueueWaitSeconds:  r.average_queue_wait_seconds !== null ? numberOrZero(r.average_queue_wait_seconds) : null,
     medianQueueWaitSeconds:   r.median_queue_wait_seconds !== null ? numberOrZero(r.median_queue_wait_seconds) : null,
     lastActive:               r.last_active || null,
@@ -405,6 +440,8 @@ function normalizeUserRow(r) {
     favoriteSoftware:         r.favorite_software || null,
     percentileCpu:            eff(r.percentile_cpu),
     percentileEfficiency:     eff(r.percentile_efficiency),
+    percentileCpu180d:        effWithFallback(r, 'percentile_cpu_180d', eff(r.percentile_cpu)),
+    percentileMemory180d:     effWithFallback(r, 'percentile_memory_180d', null),
     leafIndex:                r.leaf_index != null ? Number(r.leaf_index) : null,
     leafIndexComponents:      Array.isArray(r.leaf_index_components) ? r.leaf_index_components : [],
     leaf:                     normalizeLeafBlock(r.leaf),
