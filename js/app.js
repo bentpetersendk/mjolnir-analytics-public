@@ -13,8 +13,12 @@ import {
   annotateTimeline,
 } from './charts.js';
 import { OPERATIONAL_EVENTS } from './events.js';
-import { num, fmt, pct, money, escapeHtml, statBlock, tableFromRows } from './ui-helpers.js';
+import {
+  num, fmt, pct, money, escapeHtml, statBlock, tableFromRows,
+  bytesLabel, humanNumber, waitTimeLabel, percentileLabel, resolveFormatter,
+} from './ui-helpers.js';
 import { createRangeSelector, rangeButtonsHtml, filterByRange } from './timeRange.js';
+import { CHART_POLICY, chartRangeSelector } from './chartPolicy.js';
 import {
   executiveReportPage, weeklyReportPage, piReportPage as piReportPageImpl,
   userReportPage as userReportPageImpl, queueReportPage, capacityReportPage,
@@ -138,8 +142,20 @@ const state = {
   personalError: null,
   menuOpen: false,
   nodeFilters: { class: 'all', partition: 'all', state: 'all', sortKey: 'node', sortDir: 'asc' },
+  // Defaults mirror CHART_POLICY.operational/analytical.defaultRangeId
+  // (js/chartPolicy.js) - kept as literals here only because `state` is
+  // initialized before the chartRangeSelector() calls further down this
+  // file; the selectors themselves are the source of truth for the ranges
+  // and validate against the same policy.
   historyRange: '7d',
-  userProfileRange: '90d',
+  userProfileRange: '180d',
+  trendsRange: '180d',
+  projectsRange: '180d',
+  hierarchyRange: '180d',
+  costRange: '180d',
+  personalRange: '180d',
+  softwareTimelineRange: 'all',
+  softwareModuleRange: 'all',
   // Phase 7: off by default so charts stay subtle/uncluttered until a user
   // opts in.
   profileChartOverlays: { clusterAvg: false, benchmark: false },
@@ -263,49 +279,9 @@ function icon(name) {
 function asArray(value) { return Array.isArray(value) ? value : []; }
 function asObject(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
 function annualized(value) { return num(value) * (365 / 90); }
-function bytesLabel(value) {
-  if (value === null || value === undefined) return '-';
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 0) return '-';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let size = n;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
-}
-// Single reusable human-friendly number formatter for the whole app.
-// Below 1,000,000 there is no abbreviation - fmt() already renders "523" and
-// "6,016" exactly as an HPC dashboard should (no "6 thousand"-style wording).
-// At 1,000,000 and above, scales to million/billion/trillion: style:'long'
-// -> "55.1 million" (prose); style:'short' -> "55.1M" (compact KPI tiles).
-// One decimal place by default; if that would round to a deceptively exact
-// "X.0" (hiding that the real value isn't a round number), a second decimal
-// is used instead - so 1,018,000 reads "1.02M", not the misleading "1.0M",
-// while 55,108,521 still reads the cleaner "55.1M".
-const NUMBER_TIERS = [
-  { value: 1e12, long: 'trillion', short: 'T' },
-  { value: 1e9, long: 'billion', short: 'B' },
-  { value: 1e6, long: 'million', short: 'M' },
-];
-function tierScaledLabel(scaledAbs) {
-  const oneDecimal = scaledAbs.toFixed(1);
-  if (!oneDecimal.endsWith('.0')) return oneDecimal;
-  return scaledAbs.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-}
-function humanNumber(value, { style = 'long' } = {}) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
-  const n = Number(value);
-  const sign = n < 0 ? '-' : '';
-  const abs = Math.abs(n);
-  const tier = NUMBER_TIERS.find((t) => abs >= t.value);
-  if (!tier) return `${sign}${fmt(abs)}`;
-  const scaled = tierScaledLabel(abs / tier.value);
-  const suffix = style === 'short' ? tier.short : ` ${tier.long}`;
-  return `${sign}${scaled}${suffix}`;
-}
+// bytesLabel()/humanNumber() moved to ui-helpers.js (Chart Standardization
+// work) so js/charts.js can also use them for axis/tooltip formatting -
+// imported above instead of redefined here.
 function dateLabel(value) {
   if (!value) return '-';
   const date = new Date(`${String(value).slice(0, 10)}T00:00:00Z`);
@@ -680,23 +656,20 @@ function sortableTableFromRows(columns, rows, sortKey, sortDir) {
 // see docs/DASHBOARD_DATA_MIGRATION.md). Charts render with Apache ECharts
 // (CDN <script> in index.html) after each render() pass - see
 // mountCharts() near the bottom of this file.
-// Phase 7: both of these are now instances of the shared createRangeSelector
-// (js/timeRange.js) rather than one-off range/button/filter trios. New
-// dashboards should call createRangeSelector() directly instead of adding
-// another parallel implementation.
-const HISTORY_RANGE_SELECTOR = createRangeSelector({
+// Chart Standardization work: every page-level range selector is now an
+// instance of chartPolicy.js's chartRangeSelector(category, ...), so its
+// ranges/default/KPI-sync behavior come from CHART_POLICY instead of being
+// hand-picked per page. New dashboards should call chartRangeSelector()
+// with the category that matches what the chart answers ("what's happening
+// now" -> operational, "how has behaviour changed" -> analytical, "how has
+// the platform evolved" -> historical) instead of inventing another range
+// array.
+const HISTORY_RANGE = chartRangeSelector('operational', {
   id: 'history',
   stateKey: 'historyRange',
   action: 'set-history-range',
-  defaultId: '7d',
-  ranges: [
-    { id: '24h', label: '24h', ms: 24 * 60 * 60 * 1000 },
-    { id: '7d', label: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
-    { id: '30d', label: '30d', ms: 30 * 24 * 60 * 60 * 1000 },
-    { id: '90d', label: '90d', ms: 90 * 24 * 60 * 60 * 1000 },
-  ],
 });
-const HISTORY_RANGES = HISTORY_RANGE_SELECTOR.ranges;
+const HISTORY_RANGE_SELECTOR = HISTORY_RANGE.selector;
 
 function rangeButtons() {
   return rangeButtonsHtml(HISTORY_RANGE_SELECTOR, state.historyRange);
@@ -706,19 +679,18 @@ function filterPointsByRange(points) {
   return filterByRange(points, HISTORY_RANGE_SELECTOR, state.historyRange, 'timestamp');
 }
 
-const USER_PROFILE_RANGE_SELECTOR = createRangeSelector({
+// kpiSyncs: false is a deliberate override of the 'analytical' policy's
+// default (true) - see the LEAF Index KPI note at this selector's one
+// consumer, userProfilePage(), for why. Declared here (not re-derived as a
+// local flag inside the page) so the selector's own metadata is the single
+// source of truth for "do this page's KPI cards track the selected range."
+const USER_PROFILE_RANGE = chartRangeSelector('analytical', {
   id: 'userProfile',
   stateKey: 'userProfileRange',
   action: 'set-profile-range',
-  defaultId: '90d',
-  ranges: [
-    { id: '30d',  label: '30d',  days: 30 },
-    { id: '90d',  label: '90d',  days: 90 },
-    { id: '180d', label: '180d', days: 180 },
-    { id: '1y',   label: '1y',   days: 365 },
-    { id: 'all',  label: 'All',  days: null },
-  ],
+  kpiSyncs: false,
 });
+const USER_PROFILE_RANGE_SELECTOR = USER_PROFILE_RANGE.selector;
 const USER_PROFILE_RANGES = USER_PROFILE_RANGE_SELECTOR.ranges;
 
 function profileRangeButtons() {
@@ -728,6 +700,50 @@ function profileRangeButtons() {
 function filterTrendsByPeriod(trends) {
   return filterByRange(trends, USER_PROFILE_RANGE_SELECTOR, state.userProfileRange, 'report_date');
 }
+
+// Chart Standardization work: Analytical-category selectors for pages that
+// previously had no range control at all (always the full backend export
+// window). Each page gets its own state key/selector instance since they
+// plot independent data, but all share the same 'analytical' policy
+// (default 180d; 30d/90d/180d/365d/Lifetime) from chartPolicy.js.
+const TRENDS_RANGE = chartRangeSelector('analytical', { id: 'trends', stateKey: 'trendsRange', action: 'set-trends-range' });
+const TRENDS_RANGE_SELECTOR = TRENDS_RANGE.selector;
+function trendsRangeButtons() { return rangeButtonsHtml(TRENDS_RANGE_SELECTOR, state.trendsRange); }
+
+const PROJECTS_RANGE = chartRangeSelector('analytical', { id: 'projects', stateKey: 'projectsRange', action: 'set-projects-range' });
+const PROJECTS_RANGE_SELECTOR = PROJECTS_RANGE.selector;
+function projectsRangeButtons() { return rangeButtonsHtml(PROJECTS_RANGE_SELECTOR, state.projectsRange); }
+
+const HIERARCHY_RANGE = chartRangeSelector('analytical', { id: 'hierarchy', stateKey: 'hierarchyRange', action: 'set-hierarchy-range' });
+const HIERARCHY_RANGE_SELECTOR = HIERARCHY_RANGE.selector;
+function hierarchyRangeButtons() { return rangeButtonsHtml(HIERARCHY_RANGE_SELECTOR, state.hierarchyRange); }
+
+// kpiSyncs: false - Cost Insights' cards above are all-time totals, a
+// different concept from the trend chart's selected window (see costPage()).
+const COST_RANGE = chartRangeSelector('analytical', { id: 'cost', stateKey: 'costRange', action: 'set-cost-range', kpiSyncs: false });
+const COST_RANGE_SELECTOR = COST_RANGE.selector;
+function costRangeButtons() { return rangeButtonsHtml(COST_RANGE_SELECTOR, state.costRange); }
+
+// kpiSyncs: false - personalContextCards() below (percentile/comparison
+// bands) are derived from the peer distribution, not from this one user's
+// trend rows, so they can't be recomputed for an arbitrary selected range
+// the way the trend charts themselves can (same reasoning as
+// USER_PROFILE_RANGE's LEAF cards above).
+const PERSONAL_RANGE = chartRangeSelector('analytical', { id: 'personal', stateKey: 'personalRange', action: 'set-personal-range', kpiSyncs: false });
+const PERSONAL_RANGE_SELECTOR = PERSONAL_RANGE.selector;
+function personalRangeButtons() { return rangeButtonsHtml(PERSONAL_RANGE_SELECTOR, state.personalRange); }
+
+// Historical/Inventory category (default Lifetime; 180d/365d/Lifetime) -
+// "how has the platform evolved". Software Intelligence Timeline/Module
+// Detail already default to full history with no selector; these add the
+// ability to narrow the window without changing that default.
+const SOFTWARE_TIMELINE_RANGE = chartRangeSelector('historical', { id: 'software-timeline', stateKey: 'softwareTimelineRange', action: 'set-software-timeline-range' });
+const SOFTWARE_TIMELINE_RANGE_SELECTOR = SOFTWARE_TIMELINE_RANGE.selector;
+function softwareTimelineRangeButtons() { return rangeButtonsHtml(SOFTWARE_TIMELINE_RANGE_SELECTOR, state.softwareTimelineRange); }
+
+const SOFTWARE_MODULE_RANGE = chartRangeSelector('historical', { id: 'software-module', stateKey: 'softwareModuleRange', action: 'set-software-module-range' });
+const SOFTWARE_MODULE_RANGE_SELECTOR = SOFTWARE_MODULE_RANGE.selector;
+function softwareModuleRangeButtons() { return rangeButtonsHtml(SOFTWARE_MODULE_RANGE_SELECTOR, state.softwareModuleRange); }
 
 function hasCapacityHistory() {
   return Boolean(nodeInsightsHistory && nodeInsightsHistory.available && asArray(nodeInsightsHistory.capacity).length);
@@ -885,7 +901,7 @@ function queueDepthChart() {
   return lineChart('Running / pending jobs', rows, [
     chartSeries(rows, 'running_jobs', 'Running', '#30d5d0'),
     chartSeries(rows, 'pending_jobs', 'Pending', '#ff8a65'),
-  ], fmt, { zeroBase: true });
+  ], 'count', { zeroBase: true });
 }
 
 // Shared by queueOverviewPage() and the Executive Overview's Current Alerts
@@ -913,8 +929,8 @@ function queueOverviewPage() {
         <div class="cards-grid">${[
           statBlock('Running', fmt(queue.running), 'Jobs currently executing', 'good'),
           statBlock('Pending', fmt(queue.pending), 'Jobs waiting to start', num(queue.pending) ? 'info' : 'good'),
-          statBlock('Median wait (latest day)', durationLabel(latestWait && latestWait.median_wait_seconds), 'Cluster-wide, weighted by partition'),
-          statBlock('P90 wait (latest day)', durationLabel(latestWait && latestWait.p90_wait_seconds), 'Cluster-wide, weighted by partition'),
+          statBlock('Median wait (latest day)', waitTimeLabel(latestWait && latestWait.median_wait_seconds), 'Cluster-wide, weighted by partition'),
+          statBlock('P90 wait (latest day)', waitTimeLabel(latestWait && latestWait.p90_wait_seconds), 'Cluster-wide, weighted by partition'),
         ].join('')}</div>
       </section>
       <section class="section"><div class="section-head"><h2>Partitions under pressure</h2><span class="subtle">Pending share of partition's own queue &ge; 60%</span></div>
@@ -962,8 +978,18 @@ function queueWaitTimesPage() {
   if (!queueInsights || !queueInsights.available) return queueInsightsUnavailable('Wait Time Analysis');
   const wth = asObject(queueInsights.waitTimeHistory);
   const series = asArray(wth.series);
-  const clusterRows = clusterWaitSeriesRows(series);
-  const latest = clusterRows.length ? clusterRows[clusterRows.length - 1] : null;
+  const clusterRowsAll = clusterWaitSeriesRows(series);
+  // Operational category: KPI cards below stay on the live/latest-day
+  // snapshot (kpiSyncsByDefault: false for 'operational' in chartPolicy.js)
+  // regardless of the trend chart's selected range - "what's happening
+  // now" shouldn't change when someone widens the trend window.
+  const latest = clusterRowsAll.length ? clusterRowsAll[clusterRowsAll.length - 1] : null;
+  // Chart Standardization work: this page previously showed a static
+  // "N-day window" text label with no real selector (the backend export's
+  // fixed window, unfiltered) - now uses the same shared operational
+  // selector (HISTORY_RANGE_SELECTOR/state.historyRange) as the identical
+  // chart on the Historical Trends page, so both stay consistent.
+  const clusterRows = filterByRange(clusterRowsAll, HISTORY_RANGE_SELECTOR, state.historyRange, 'report_date');
   const byPartition = waitByPartitionRows(series);
   const histogram = asArray(wth.wait_time_histogram);
   const bySize = asArray(wth.wait_time_by_size);
@@ -974,27 +1000,27 @@ function queueWaitTimesPage() {
     <div class="stack">
       <section class="section"><div class="section-head"><h2>Wait Time Analysis</h2><span class="subtle">${wth.histogram_date ? `Distribution as of ${escapeHtml(wth.histogram_date)}` : ''}</span></div>
         <div class="cards-grid">${[
-          statBlock('Median wait', durationLabel(latest && latest.median_wait_seconds), 'Cluster-wide, latest day'),
-          statBlock('Average wait', durationLabel(latest && latest.avg_wait_seconds), 'Cluster-wide, latest day'),
-          statBlock('P90 wait', durationLabel(latest && latest.p90_wait_seconds), 'Cluster-wide, latest day'),
+          statBlock('Median wait', waitTimeLabel(latest && latest.median_wait_seconds), 'Cluster-wide, latest day'),
+          statBlock('Average wait', waitTimeLabel(latest && latest.avg_wait_seconds), 'Cluster-wide, latest day'),
+          statBlock('P90 wait', waitTimeLabel(latest && latest.p90_wait_seconds), 'Cluster-wide, latest day'),
           statBlock('Jobs measured', fmt(latest && latest.jobs), 'With a measurable wait time'),
         ].join('')}</div>
       </section>
-      <section class="section"><div class="section-head"><h2>Wait time trend</h2><span class="subtle">${wth.data_window_days || 90}-day window, daily</span></div>
-        ${clusterRows.length ? lineChart('Median / P90 wait (seconds)', clusterRows, [
+      <section class="section"><div class="section-head"><h2>Wait time trend</h2>${rangeButtons()}</div>
+        ${clusterRows.length ? lineChart('Median / P90 wait time', clusterRows, [
           chartSeries(clusterRows, 'median_wait_seconds', 'Median', '#3e8cff'),
           chartSeries(clusterRows, 'p90_wait_seconds', 'P90', '#ff8a65'),
-        ], fmt) : '<div class="empty-state">No wait-time history yet.</div>'}
+        ], 'waitTime') : '<div class="empty-state">No wait-time history yet.</div>'}
       </section>
       <div class="trend-grid">
-        <section class="section"><div class="section-head"><h2>By partition</h2></div>${tableFromRows(['Partition', 'Median wait', 'P90 wait', 'Jobs'], byPartition.map((p) => [escapeHtml(p.partition), durationLabel(p.median_wait_seconds), durationLabel(p.p90_wait_seconds), fmt(p.jobs)]))}</section>
+        <section class="section"><div class="section-head"><h2>By partition</h2></div>${tableFromRows(['Partition', 'Median wait', 'P90 wait', 'Jobs'], byPartition.map((p) => [escapeHtml(p.partition), waitTimeLabel(p.median_wait_seconds), waitTimeLabel(p.p90_wait_seconds), fmt(p.jobs)]))}</section>
         <section class="section"><div class="section-head"><h2>Wait time distribution (latest day)</h2></div>
           ${histogram.length ? tableFromRows(['Partition', 'Bucket', 'Jobs'], histogram.map((h) => [escapeHtml(h.partition_name), escapeHtml(h.bucket), fmt(h.jobs)])) : '<div class="empty-state">No distribution data yet.</div>'}
         </section>
       </div>
       <div class="trend-grid">
-        <section class="section"><div class="section-head"><h2>By requested CPUs</h2></div>${tableFromRows(['Partition', 'Bucket', 'Jobs', 'Median wait'], cpuBuckets.map((r) => [escapeHtml(r.partition_name), escapeHtml(r.bucket), fmt(r.jobs), durationLabel(r.median_wait_seconds)]))}</section>
-        <section class="section"><div class="section-head"><h2>By requested memory</h2></div>${tableFromRows(['Partition', 'Bucket', 'Jobs', 'Median wait'], memoryBuckets.map((r) => [escapeHtml(r.partition_name), escapeHtml(r.bucket), fmt(r.jobs), durationLabel(r.median_wait_seconds)]))}</section>
+        <section class="section"><div class="section-head"><h2>By requested CPUs</h2></div>${tableFromRows(['Partition', 'Bucket', 'Jobs', 'Median wait'], cpuBuckets.map((r) => [escapeHtml(r.partition_name), escapeHtml(r.bucket), fmt(r.jobs), waitTimeLabel(r.median_wait_seconds)]))}</section>
+        <section class="section"><div class="section-head"><h2>By requested memory</h2></div>${tableFromRows(['Partition', 'Bucket', 'Jobs', 'Median wait'], memoryBuckets.map((r) => [escapeHtml(r.partition_name), escapeHtml(r.bucket), fmt(r.jobs), waitTimeLabel(r.median_wait_seconds)]))}</section>
       </div>
       ${disclaimer('Wait time is measured from job submission to job start (sacct-derived), not a live queue position. Size buckets use allocated CPUs/memory as a proxy for the original request.')}
     </div>`;
@@ -1024,7 +1050,7 @@ function queueAdvisorPage() {
               escapeHtml(w.partition_name),
               escapeHtml(WEEKDAY_NAMES[w.weekday] || String(w.weekday)),
               hourLabel(w.hour_of_day),
-              durationLabel(w.median_wait_seconds),
+              waitTimeLabel(w.median_wait_seconds),
               fmt(w.sample_jobs),
               fmt(totalsByPartition[w.partition_name] || 0),
               `<span class="pill ${w.confidence === 'low' ? 'warn' : 'good'}">${escapeHtml(w.confidence)}</span>`,
@@ -1039,7 +1065,14 @@ function queueTrendsPage() {
   if (!queueInsights || !queueInsights.available) return queueInsightsUnavailable('Historical Trends');
   const healthRows = filterPointsByRange(queueInsights.queueHealthHistory).map((p) => ({ report_date: p.timestamp, score: p.score }));
   const depthRows = queueDepthHistoryRows();
-  const clusterWaitRows = clusterWaitSeriesRows(asObject(queueInsights.waitTimeHistory).series);
+  // Bug fix (Chart Standardization work): this chart's rows were built
+  // straight from clusterWaitSeriesRows() with no range filtering, so the
+  // range buttons rendered above (rangeButtons(), line below) visibly did
+  // nothing to it while every sibling chart on this page respected them.
+  // Rows are keyed by report_date (not timestamp), so filterByRange() is
+  // called directly rather than through filterPointsByRange()'s
+  // 'timestamp'-field assumption.
+  const clusterWaitRows = filterByRange(clusterWaitSeriesRows(asObject(queueInsights.waitTimeHistory).series), HISTORY_RANGE_SELECTOR, state.historyRange, 'report_date');
 
   const reasonHistory = filterPointsByRange(queueInsights.pendingReasonsHistory);
   const reasonTotals = new Map();
@@ -1061,17 +1094,17 @@ function queueTrendsPage() {
         <section class="section"><div class="section-head"><h2>Queue depth</h2></div>${depthRows.length ? lineChart('Running / pending jobs', depthRows, [
           chartSeries(depthRows, 'running_jobs', 'Running', '#30d5d0'),
           chartSeries(depthRows, 'pending_jobs', 'Pending', '#ff8a65'),
-        ], fmt, { zeroBase: true }) : historyUnavailableNote()}</section>
+        ], 'count', { zeroBase: true }) : historyUnavailableNote()}</section>
         <section class="section"><div class="section-head"><h2>Queue Health score</h2><span class="subtle chart-drilldown-hint">Click chart for live Queue Overview</span></div>${healthRows.length ? lineChart('Queue Health score (0-100)', healthRows, [
           chartSeries(healthRows, 'score', 'Score', '#ffb74d'),
-        ], fmt, { zeroBase: true, onClick: '#/queue-overview', csv: true }) : historyUnavailableNote()}</section>
+        ], 'count', { zeroBase: true, onClick: '#/queue-overview', csv: true }) : historyUnavailableNote()}</section>
       </div>
       <div class="trend-grid">
         <section class="section"><div class="section-head"><h2>Top pending reasons</h2></div>${reasonRows.length ? lineChart('Pending jobs by reason', reasonRows, topReasons.map((reason, i) => chartSeries(reasonRows, reason, reason, reasonColors[i % reasonColors.length])), fmt, { zeroBase: true }) : historyUnavailableNote()}</section>
-        <section class="section"><div class="section-head"><h2>Wait time</h2><span class="subtle">Daily, cluster-wide</span></div>${clusterWaitRows.length ? lineChart('Median / P90 wait (seconds)', clusterWaitRows, [
+        <section class="section"><div class="section-head"><h2>Wait time</h2><span class="subtle">Daily, cluster-wide</span></div>${clusterWaitRows.length ? lineChart('Median / P90 wait time', clusterWaitRows, [
           chartSeries(clusterWaitRows, 'median_wait_seconds', 'Median', '#3e8cff'),
           chartSeries(clusterWaitRows, 'p90_wait_seconds', 'P90', '#ff8a65'),
-        ], fmt) : '<div class="empty-state">No wait-time history yet.</div>'}</section>
+        ], 'waitTime') : '<div class="empty-state">No wait-time history yet.</div>'}</section>
       </div>
       ${disclaimer('Queue depth, Queue Health, and pending reasons are hourly (filterable above, up to 90 days); wait time is daily (sacct-derived). Different cadences are expected - see docs/architecture/QUEUE_INSIGHTS_ARCHITECTURE.md Section 1.5.')}
     </div>`;
@@ -1944,14 +1977,14 @@ function softwareIntelligenceOverviewPage() {
   const topChart = createBarChart(
     top10.map((m) => m.moduleName),
     top10.map((m) => m.jobs),
-    (v) => fmt(v),
+    'count',
     { horizontal: true, label: 'Top 10 modules by jobs', csv: true },
   );
   const activityChart = createLineChart(
     'Recent Activity (last 30 days)',
     recentDays,
     [{ label: 'Jobs', color: 'var(--blue)', values: recentDays.map((r) => r.jobs) }],
-    (v) => fmt(v),
+    'count',
     { label: 'Software Intelligence recent activity', csv: true },
   );
 
@@ -2106,7 +2139,7 @@ function softwareIntelligenceTrendingPage() {
     'Cluster-wide Daily Jobs (last 60 days)',
     recentDays,
     [{ label: 'Jobs', color: 'var(--blue)', values: recentDays.map((r) => r.jobs) }],
-    (v) => fmt(v),
+    'count',
     { label: 'Software Intelligence cluster activity context', csv: true },
   );
 
@@ -2139,7 +2172,7 @@ function versionAdoptionRow(moduleName, info) {
   const chart = createBarChart(
     versions.map((v) => v.moduleVersion),
     versions.map((v) => v.jobs),
-    (v) => fmt(v),
+    'count',
     { horizontal: true, height: Math.max(120, versions.length * 32), label: `${moduleName} version distribution`, csv: true },
   );
   const rows = versions.map((v) => [
@@ -2293,12 +2326,22 @@ function softwareIntelligenceTimelinePage() {
     }
   }
 
-  const chartRows = categories.map((c, i) => ({ report_date: c, jobs: series[i] }));
+  // Chart Standardization work: Historical/Inventory category - default
+  // stays "full history" (Lifetime) so existing behavior is unchanged;
+  // this only adds the ability to narrow the window. Daily granularity
+  // rows use report_date (day strings); weekly/monthly rows use
+  // week/month bucket labels that aren't real dates, so range-filtering
+  // only applies at daily granularity (narrowing a weekly/monthly bucket
+  // axis by day-count wouldn't map onto whole buckets cleanly).
+  const chartRowsAll = categories.map((c, i) => ({ report_date: c, jobs: series[i] }));
+  const chartRows = granularity === 'daily'
+    ? filterByRange(chartRowsAll, SOFTWARE_TIMELINE_RANGE_SELECTOR, state.softwareTimelineRange, 'report_date')
+    : chartRowsAll;
   const chart = createLineChart(
     selectedModule === 'all' ? 'Cluster-wide Usage' : `${selectedModule} Usage`,
     chartRows,
-    [{ label: 'Jobs', color: 'var(--blue)', values: series }],
-    (v) => fmt(v),
+    [{ label: 'Jobs', color: 'var(--blue)', values: chartRows.map((r) => r.jobs) }],
+    'count',
     { label: 'Software Intelligence timeline', csv: true, emptyMessage: selectedModule === 'all' ? undefined : 'Loading module history...' },
   );
 
@@ -2315,6 +2358,7 @@ function softwareIntelligenceTimelinePage() {
         <div class="table-toolbar">
           <select data-action="set-timeline-module" aria-label="Filter by module">${moduleOptions}</select>
           <div class="quick-filter-bar" role="group" aria-label="Granularity">${granularityButtons}</div>
+          ${granularity === 'daily' ? softwareTimelineRangeButtons() : ''}
         </div>
         ${typeof chart === 'string' ? chart : chart.html}
       </section>
@@ -2339,17 +2383,22 @@ function softwareIntelligenceModuleDetailPage(moduleName) {
     </div>`;
   }
 
-  const historyRows = detail.dailyHistory.map((r) => ({ report_date: r.date, jobs: r.jobs }));
+  // Chart Standardization work: Historical/Inventory category, same as the
+  // Timeline page - default stays "full history" (Lifetime), selector only
+  // adds the ability to narrow the window.
+  const historyRowsAll = detail.dailyHistory.map((r) => ({ report_date: r.date, jobs: r.jobs }));
+  const historyRows = filterByRange(historyRowsAll, SOFTWARE_MODULE_RANGE_SELECTOR, state.softwareModuleRange, 'report_date');
   const historyChart = createLineChart(
     'Usage History',
     historyRows,
     [{ label: 'Jobs', color: 'var(--blue)', values: historyRows.map((r) => r.jobs) }],
-    (v) => fmt(v),
+    'count',
     { label: `${moduleName} usage history`, csv: true },
   );
 
   const versionNames = Array.from(new Set(detail.versionDailyHistory.map((r) => r.version))).sort();
-  const datesSet = Array.from(new Set(detail.versionDailyHistory.map((r) => r.date))).sort();
+  const datesSetAll = Array.from(new Set(detail.versionDailyHistory.map((r) => r.date))).sort();
+  const datesSet = filterByRange(datesSetAll.map((d) => ({ report_date: d })), SOFTWARE_MODULE_RANGE_SELECTOR, state.softwareModuleRange, 'report_date').map((r) => r.report_date);
   const migrationSeries = versionNames.map((version, i) => {
     const byDate = new Map(detail.versionDailyHistory.filter((r) => r.version === version).map((r) => [r.date, r.jobs]));
     const palette = ['var(--blue)', 'var(--teal)', 'var(--amber)', 'var(--green)', 'var(--red)', 'var(--cyan)'];
@@ -2359,7 +2408,7 @@ function softwareIntelligenceModuleDetailPage(moduleName) {
     'Version Migration Over Time',
     datesSet.map((d) => ({ report_date: d })),
     migrationSeries,
-    (v) => fmt(v),
+    'count',
     { area: true, label: `${moduleName} version migration`, csv: true, emptyMessage: 'No per-version history recorded yet.' },
   );
 
@@ -2402,7 +2451,7 @@ function softwareIntelligenceModuleDetailPage(moduleName) {
           statBlock('Last Seen', formatLocalDateTime(detail.versionInfo.versions?.[0]?.lastSeen, '-'), 'Most recent version last_seen'),
         ].join('')}</div>
       </section>
-      <section class="section"><div class="section-head"><h2>Usage History</h2></div>${typeof historyChart === 'string' ? historyChart : historyChart.html}</section>
+      <section class="section"><div class="section-head"><h2>Usage History</h2>${softwareModuleRangeButtons()}</div>${typeof historyChart === 'string' ? historyChart : historyChart.html}</section>
       <section class="section"><div class="section-head"><h2>Version Migration Over Time</h2></div>${typeof migrationChart === 'string' ? migrationChart : migrationChart.html}</section>
       <section class="section">
         <div class="section-head"><h2>Version Timeline</h2><span class="subtle">Latest: ${escapeHtml(detail.versionInfo.latestVersion || '-')} &middot; Most used: ${escapeHtml(detail.versionInfo.mostUsedVersion || '-')}</span></div>
@@ -2505,7 +2554,7 @@ function executiveKpiSection() {
     statBlock('Running Jobs', fmt(queue.running), 'Across all partitions', 'good'),
     statBlock('Pending Jobs', fmt(queue.pending), 'Waiting to start', num(queue.pending) ? 'info' : 'good'),
     statBlock('Queue Health', cp.queue_health ? escapeHtml(cp.queue_health.label) : '-', cp.queue_health ? `Score ${fmt(cp.queue_health.score)}/100` : 'Unavailable'),
-    statBlock('Current Wait Time', durationLabel(latestWait && latestWait.median_wait_seconds), 'Median, cluster-wide'),
+    statBlock('Current Wait Time', waitTimeLabel(latestWait && latestWait.median_wait_seconds), 'Median, cluster-wide'),
     statBlock('Nodes Online', fmt(totals.nodes_available), 'Not draining, not down', 'good'),
     statBlock('Nodes Draining', fmt(totals.nodes_draining), 'Scheduled for maintenance', totals.nodes_draining ? 'warn' : 'good'),
     statBlock('GPUs Busy', gpuPct !== null ? `${fmt(gpu.alloc)} / ${fmt(gpu.total)}` : '-', gpuPct !== null ? pct(gpuPct) : 'Unavailable'),
@@ -2625,12 +2674,12 @@ function executiveQueueSection() {
     <div class="cards-grid">${[
       statBlock('Running Jobs', fmt(queue.running), 'Across all partitions', 'good'),
       statBlock('Pending Jobs', fmt(queue.pending), 'Waiting to start', num(queue.pending) ? 'info' : 'good'),
-      statBlock('Median Wait', durationLabel(latestWait && latestWait.median_wait_seconds), 'Cluster-wide, latest day'),
-      statBlock('P90 Wait', durationLabel(latestWait && latestWait.p90_wait_seconds), 'Cluster-wide, latest day'),
+      statBlock('Median Wait', waitTimeLabel(latestWait && latestWait.median_wait_seconds), 'Cluster-wide, latest day'),
+      statBlock('P90 Wait', waitTimeLabel(latestWait && latestWait.p90_wait_seconds), 'Cluster-wide, latest day'),
       statBlock('Most Busy Partition', busiest ? escapeHtml(busiest.partition) : '-', busiest ? `${fmt(busiest.running)} running, ${fmt(busiest.pending)} pending` : 'No live data'),
       statBlock('Least Busy Partition', least ? escapeHtml(least.partition) : '-', least ? `${fmt(least.running)} running, ${fmt(least.pending)} pending` : 'No live data'),
       statBlock('Top Pending Reason', topReason ? escapeHtml(topReason.reason) : 'None', topReason ? `${fmt(topReason.count)} jobs` : 'No pending jobs'),
-      statBlock('Best Submission Window', bestWindow ? `${WEEKDAY_NAMES[bestWindow.weekday]} ${hourLabel(bestWindow.hour_of_day)}` : 'Not enough data', bestWindow ? `${escapeHtml(bestWindow.partition_name)}, typical wait ${durationLabel(bestWindow.median_wait_seconds)}` : 'Historical tendency only'),
+      statBlock('Best Submission Window', bestWindow ? `${WEEKDAY_NAMES[bestWindow.weekday]} ${hourLabel(bestWindow.hour_of_day)}` : 'Not enough data', bestWindow ? `${escapeHtml(bestWindow.partition_name)}, typical wait ${waitTimeLabel(bestWindow.median_wait_seconds)}` : 'Historical tendency only'),
     ].join('')}</div>
     <a class="btn" href="#/queue-overview">Full Queue Insights</a>
   </section>`;
@@ -2828,16 +2877,19 @@ function platformStatusPage() {
 }
 
 function clusterPage() {
-  const rows = asArray(data?.clusterSummary?.dailyTrends);
+  // Chart Standardization work: Trends previously had no range selector at
+  // all (always the full backend export window). Analytical category:
+  // default 180d, 30d/90d/180d/365d/Lifetime.
+  const rows = filterByRange(asArray(data?.clusterSummary?.dailyTrends), TRENDS_RANGE_SELECTOR, state.trendsRange, 'report_date');
   return `
     <div class="stack">
       ${analyticsStatusBar()}
-      <section class="section"><div class="section-head"><h2>Efficiency and cost trends</h2><span class="subtle">Daily values with rolling averages</span></div><p class="subtle">Use these charts to spot whether Mjolnir is becoming more efficient or drifting toward larger resource gaps.</p></section>
+      <section class="section"><div class="section-head"><h2>Efficiency and cost trends</h2>${trendsRangeButtons()}</div><p class="subtle">Use these charts to spot whether Mjolnir is becoming more efficient or drifting toward larger resource gaps.</p></section>
       <div class="trend-grid">
-        ${lineChart('CPU efficiency', rows, [chartSeries(rows, 'avg_cpu_efficiency', 'Daily', '#3e8cff'), rollingSeries(rows, 'avg_cpu_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_cpu_efficiency', 30, '30-day', '#ffb84d')], pct, { zeroBase: true, events: OPERATIONAL_EVENTS, unitLabel: 'Share of allocated CPU time actually used' })}
-        ${lineChart('Memory efficiency', rows, [chartSeries(rows, 'avg_memory_efficiency', 'Daily', '#53d88a'), rollingSeries(rows, 'avg_memory_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_memory_efficiency', 30, '30-day', '#ffb84d')], pct, { zeroBase: true })}
-        ${lineChart('Daily cost and optimization opportunity', rows, [chartSeries(rows, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(rows, 'underutilized_cost_dkk', 'Underutilized cost', '#ff6b7a')], money, { zeroBase: true })}
-        ${lineChart('GPU hours', rows, [chartSeries(rows, 'gpu_hours', 'GPU hours', '#9cd0ff'), rollingSeries(rows, 'gpu_hours', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'gpu_hours', 30, '30-day', '#ffb84d')], fmt, { zeroBase: true, emptyMessage: 'No GPU jobs during this period.' })}
+        ${lineChart('CPU efficiency', rows, [chartSeries(rows, 'avg_cpu_efficiency', 'Daily', '#3e8cff'), rollingSeries(rows, 'avg_cpu_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_cpu_efficiency', 30, '30-day', '#ffb84d')], 'percent', { zeroBase: true, events: OPERATIONAL_EVENTS, unitLabel: 'Share of allocated CPU time actually used' })}
+        ${lineChart('Memory efficiency', rows, [chartSeries(rows, 'avg_memory_efficiency', 'Daily', '#53d88a'), rollingSeries(rows, 'avg_memory_efficiency', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'avg_memory_efficiency', 30, '30-day', '#ffb84d')], 'percent', { zeroBase: true })}
+        ${lineChart('Daily cost and optimization opportunity', rows, [chartSeries(rows, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(rows, 'underutilized_cost_dkk', 'Underutilized cost', '#ff6b7a')], 'currency', { zeroBase: true })}
+        ${lineChart('GPU hours', rows, [chartSeries(rows, 'gpu_hours', 'GPU hours', '#9cd0ff'), rollingSeries(rows, 'gpu_hours', 7, '7-day', '#30d5d0'), rollingSeries(rows, 'gpu_hours', 30, '30-day', '#ffb84d')], 'gpuHours', { zeroBase: true, emptyMessage: 'No GPU jobs during this period.' })}
       </div>
       </div>`;
 }
@@ -2923,10 +2975,10 @@ function benchmarkPage() {
       ${infoPanel('How do percentiles work?', 'Percentiles show how a project or user\'s resource usage compares with the broader Mjolnir community. A percentile of 90 means usage is higher than 90% of comparable peers, while a percentile of 10 means usage is lower than most peers. Percentiles provide context, not judgement, and are most useful for spotting unusually high or unusually low resource usage patterns.')}
       <section class="section"><div class="section-head"><h2>How resource usage compares across Mjolnir</h2><span class="subtle">Context, not judgement - anonymized population view</span></div><p class="subtle">Percentiles help put your resource usage in context against peer behavior without showing real peer identities.</p></section>
       <div class="trend-grid">
-        ${percentileBar('CPU efficiency percentiles', asObject(percentiles.cpu), pct, 'info', sampleLabel)}
-        ${percentileBar('Memory efficiency percentiles', asObject(percentiles.memory), pct, 'good', sampleLabel)}
-        ${percentileBar('Cost percentiles', asObject(percentiles.cost), money, 'warn', sampleLabel)}
-        ${percentileBar('GPU hour percentiles', asObject(percentiles.gpu), fmt, 'info', sampleLabel)}
+        ${percentileBar('CPU efficiency percentiles', asObject(percentiles.cpu), 'percent', 'info', sampleLabel)}
+        ${percentileBar('Memory efficiency percentiles', asObject(percentiles.memory), 'percent', 'good', sampleLabel)}
+        ${percentileBar('Cost percentiles', asObject(percentiles.cost), 'currency', 'warn', sampleLabel)}
+        ${percentileBar('GPU hour percentiles', asObject(percentiles.gpu), 'gpuHours', 'info', sampleLabel)}
       </div>
       </div>`;
 }
@@ -2978,13 +3030,31 @@ function inefficientJobsPage() {
       </div>`;
 }
 
-function metricSummaryCards(entity) {
+// Chart Standardization work (Explicit KPI sync, chartPolicy.js §D): these
+// cards sit above the entity's efficiency/cost trend charts, which are now
+// range-selectable (HIERARCHY_RANGE_SELECTOR), so per the 'analytical'
+// policy's kpiSyncsByDefault: true, the cards track the selected range
+// instead of always showing all-time totals. `rangeRows` is the same
+// filtered `entity.dailyTrends` the charts below are plotting;
+// `rangeLabel` is the active range's display label, shown so the card
+// section is explicit about what window it's summarizing (never
+// ambiguous). completedJobs/failedJobs aren't broken out per-day in the
+// export, so that sub-line only appears for the all-time (unfiltered)
+// case; a range-computed card explains its own scope instead.
+function metricSummaryCards(entity, rangeRows, rangeLabel) {
+  const rows = asArray(rangeRows);
+  const totalJobs = rows.reduce((sum, r) => sum + num(r.jobs), 0);
+  const cpu = totalJobs ? rows.reduce((sum, r) => sum + num(r.avg_cpu_efficiency) * num(r.jobs), 0) / totalJobs : null;
+  const memory = totalJobs ? rows.reduce((sum, r) => sum + num(r.avg_memory_efficiency) * num(r.jobs), 0) / totalJobs : null;
+  const cost = rows.reduce((sum, r) => sum + num(r.estimated_cost_dkk), 0);
+  const savings = rows.reduce((sum, r) => sum + num(r.underutilized_cost_dkk), 0);
+  const gpu = rows.reduce((sum, r) => sum + num(r.gpu_hours), 0);
   return `<div class="cards-grid">${[
-    statBlock('Jobs', fmt(entity.jobs), `${fmt(entity.completedJobs)} completed / ${fmt(entity.failedJobs)} failed`),
-    statBlock('CPU efficiency', pct(entity.cpu), 'Average measured CPU efficiency', entity.cpu && entity.cpu >= 0.5 ? 'good' : 'warn'),
-    statBlock('Memory efficiency', pct(entity.memory), 'Average measured memory efficiency', entity.memory && entity.memory >= 0.5 ? 'good' : 'warn'),
-    statBlock('Cost opportunity', money(entity.savings), `${money(entity.cost)} estimated cost`, 'warn'),
-    statBlock('GPU hours', fmt(entity.gpu, 1), 'Allocated GPU time'),
+    statBlock('Jobs', fmt(totalJobs), `${escapeHtml(rangeLabel)}`),
+    statBlock('CPU efficiency', pct(cpu), `Average measured CPU efficiency · ${escapeHtml(rangeLabel)}`, cpu && cpu >= 0.5 ? 'good' : 'warn'),
+    statBlock('Memory efficiency', pct(memory), `Average measured memory efficiency · ${escapeHtml(rangeLabel)}`, memory && memory >= 0.5 ? 'good' : 'warn'),
+    statBlock('Cost opportunity', money(savings), `${money(cost)} estimated cost · ${escapeHtml(rangeLabel)}`, 'warn'),
+    statBlock('GPU hours', fmt(gpu, 1), `Allocated GPU time · ${escapeHtml(rangeLabel)}`),
   ].join('')}</div>`;
 }
 
@@ -3011,7 +3081,10 @@ function projectsPage() {
         statBlock('Home directory rows', fmt(coverage.home_directory_rows), 'Kept in unassigned bucket'),
       ].join('')}</div></section>
       <section class="table-card"><div class="section-head"><h2>Project ranking</h2><span class="subtle">Cost opportunity first</span></div>${tableFromRows(['Rank', 'Project', 'Jobs', 'CPU', 'Memory', 'Cost opportunity', 'GPU hours'], hierarchyRows(projects, 'project'))}</section>
-      <section class="section"><div class="section-head"><h2>Portfolio trends</h2><span class="subtle">Cluster-level context until project export is available</span></div>${lineChart('Project portfolio cost opportunity', asArray(data?.clusterSummary?.dailyTrends), [chartSeries(asArray(data?.clusterSummary?.dailyTrends), 'underutilized_cost_dkk', 'Opportunity', '#ff6b7a'), chartSeries(asArray(data?.clusterSummary?.dailyTrends), 'estimated_cost_dkk', 'Estimated cost', '#3e8cff')], money, { zeroBase: true })}</section>
+      <section class="section"><div class="section-head"><h2>Portfolio trends</h2>${projectsRangeButtons()}</div><p class="subtle">Cluster-level context until project export is available</p>${(() => {
+        const trendRows = filterByRange(asArray(data?.clusterSummary?.dailyTrends), PROJECTS_RANGE_SELECTOR, state.projectsRange, 'report_date');
+        return lineChart('Project portfolio cost opportunity', trendRows, [chartSeries(trendRows, 'underutilized_cost_dkk', 'Opportunity', '#ff6b7a'), chartSeries(trendRows, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff')], 'currency', { zeroBase: true });
+      })()}</section>
       </div>`;
 }
 
@@ -3058,11 +3131,13 @@ function hierarchyDetailPage(type, id) {
         statBlock('Section', escapeHtml(entity.hierarchy.section_label || '-'), 'Section rollup'),
       ].join('')}</div></section>`
     : `<section class="section"><div class="section-head"><h2>Top projects</h2><span class="subtle">Portfolio contributors</span></div>${linkList(entity.topProjects, 'project', 'project_id', 'project_label')}</section>`;
+  const hierarchyRows = filterByRange(asArray(entity.dailyTrends), HIERARCHY_RANGE_SELECTOR, state.hierarchyRange, 'report_date');
+  const hierarchyRangeLabel = (HIERARCHY_RANGE_SELECTOR.ranges.find((r) => r.id === state.hierarchyRange) || {}).label || '';
   return `
     <div class="stack">
-      <section class="section"><div class="section-head"><h2>${escapeHtml(entity.label)}</h2><span class="subtle">${title}</span>${type === 'pi' ? `<a class="btn" href="#/reports/pi/${escapeHtml(id)}">View PI Report</a>` : ''}</div>${metricSummaryCards(entity)}</section>
-      ${lineChart(`${escapeHtml(entity.label)} efficiency trend`, entity.dailyTrends, [chartSeries(entity.dailyTrends, 'avg_cpu_efficiency', 'CPU', '#3e8cff'), chartSeries(entity.dailyTrends, 'avg_memory_efficiency', 'Memory', '#53d88a')], pct, { zeroBase: true })}
-      ${lineChart(`${escapeHtml(entity.label)} cost trend`, entity.dailyTrends, [chartSeries(entity.dailyTrends, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(entity.dailyTrends, 'underutilized_cost_dkk', 'Opportunity', '#ff6b7a')], money, { zeroBase: true })}
+      <section class="section"><div class="section-head"><h2>${escapeHtml(entity.label)}</h2><span class="subtle">${title}</span>${type === 'pi' ? `<a class="btn" href="#/reports/pi/${escapeHtml(id)}">View PI Report</a>` : ''}${hierarchyRangeButtons()}</div>${metricSummaryCards(entity, hierarchyRows, hierarchyRangeLabel)}</section>
+      ${lineChart(`${escapeHtml(entity.label)} efficiency trend`, hierarchyRows, [chartSeries(hierarchyRows, 'avg_cpu_efficiency', 'CPU', '#3e8cff'), chartSeries(hierarchyRows, 'avg_memory_efficiency', 'Memory', '#53d88a')], 'percent', { zeroBase: true })}
+      ${lineChart(`${escapeHtml(entity.label)} cost trend`, hierarchyRows, [chartSeries(hierarchyRows, 'estimated_cost_dkk', 'Estimated cost', '#3e8cff'), chartSeries(hierarchyRows, 'underutilized_cost_dkk', 'Opportunity', '#ff6b7a')], 'currency', { zeroBase: true })}
       ${related}
       <section class="section"><div class="section-head"><h2>Recommendations</h2><span class="subtle">Generated from aggregate efficiency signals</span></div><div class="rec-list">${asArray(entity.recommendations).length ? entity.recommendations.map((rec) => recCard(rec.priority || rec.severity || 'Review', rec.title, rec.detail || rec.category || '', rec.savings ? money(rec.savings) : 'Impact TBD')).join('') : '<div class="empty-state">No hierarchy-level recommendations are available yet.</div>'}</div></section>
     </div>`;
@@ -3710,8 +3785,8 @@ function compareTrendCharts(users) {
   });
   const rows = allDates.map((d) => ({ report_date: d }));
 
-  return `${lineChart('CPU Efficiency (30-day trend)', rows, cpuSeries, pct, { zeroBase: true })}
-    ${lineChart('Memory Efficiency (30-day trend)', rows, memSeries, pct, { zeroBase: true })}`;
+  return `${lineChart('CPU Efficiency (30-day trend)', rows, cpuSeries, 'percent', { zeroBase: true })}
+    ${lineChart('Memory Efficiency (30-day trend)', rows, memSeries, 'percent', { zeroBase: true })}`;
 }
 
 function usersCompareBar() {
@@ -3849,6 +3924,21 @@ function userProfilePage(publicUserId) {
   const topJobs = asArray(bundle.top_inefficient_jobs);
   const rolling = asObject(bundle.rolling_summaries);
   const rolling180 = asObject(rolling['180d']);
+  // The LEAF Index and its Summary/LEAF Dashboard cards below are a
+  // compound, methodology-defined sustainability score (see docs/
+  // LEAF_INDEX_METHODOLOGY), not a simple mean/sum of daily_trends rows -
+  // it is only pre-computed server-side for the 180d rolling window
+  // (bundle.rolling_summaries['180d'], bundle.leaf). Recomputing it
+  // client-side for an arbitrary selected range (30d/365d/Lifetime) would
+  // risk silently diverging from the documented methodology, which is a
+  // worse outcome than a clearly-labeled fixed window. USER_PROFILE_RANGE
+  // is constructed above with kpiSyncs: false for exactly this reason -
+  // already labeled explicitly ("180d rolling") rather than implied, so a
+  // user switching the Daily Trends chart's range below sees the chart
+  // move while this section's own label continues to say exactly what
+  // window it covers. USER_PROFILE_RANGE's own default now matches this
+  // window (analytical policy default is 180d), so the common case shows
+  // no dissonance at all.
 
   const effTone = (v) => (v === null || !Number.isFinite(v)) ? '' : v >= 0.7 ? 'good' : v >= 0.5 ? 'info' : 'warn';
 
@@ -3905,7 +3995,7 @@ function userProfilePage(publicUserId) {
     : '<div class="empty-state">No recommendations for this user.</div>';
 
   const filteredTrends = filterTrendsByPeriod(trends);
-  const rangeLabel = USER_PROFILE_RANGES.find((r) => r.id === state.userProfileRange)?.label || '90d';
+  const rangeLabel = USER_PROFILE_RANGES.find((r) => r.id === state.userProfileRange)?.label || '180d';
   const overlays = state.profileChartOverlays;
   const overlayToggles = `<div class="chip-toggle-row">
     <button type="button" class="chip-toggle${overlays.clusterAvg ? ' active' : ''}" data-action="toggle-chart-overlay" data-overlay="clusterAvg">Cluster average</button>
@@ -3933,12 +4023,12 @@ function userProfilePage(publicUserId) {
          chartSeries(filteredTrends, 'avg_memory_efficiency', 'Memory', '#53d88a'),
          rollingSeries(filteredTrends, 'avg_cpu_efficiency', 7, 'CPU (7d avg)', '#30d5d0'),
          rollingSeries(filteredTrends, 'avg_memory_efficiency', 7, 'Memory (7d avg)', '#9dd8ff')],
-        pct, { zeroBase: true, headlineMode: 'mean', headlineLabel: `Average efficiency (${rangeLabel})`,
+        'percent', { zeroBase: true, headlineMode: 'mean', headlineLabel: `Average efficiency (${rangeLabel})`,
                bands: EFFICIENCY_BANDS, referenceLines: effReferenceLines }) +
       lineChart(`${escapeHtml(pseudonym)} — estimated compute cost`, filteredTrends,
         [chartSeries(filteredTrends, 'estimated_cost_dkk', 'Estimated allocation cost', '#3e8cff'),
          chartSeries(filteredTrends, 'underutilized_cost_dkk', 'Potential savings', '#ff6b7a')],
-        money, { zeroBase: true, headlineMode: 'sum', headlineLabel: `Total estimated cost (${rangeLabel})` })
+        'currency', { zeroBase: true, headlineMode: 'sum', headlineLabel: `Total estimated cost (${rangeLabel})` })
     : '<div class="empty-state">No trend data for this period.</div>';
 
   return `<div class="stack">
@@ -3951,7 +4041,7 @@ function userProfilePage(publicUserId) {
       ${backLink}
     </div>
     ${positiveReinforcementBanner(rolling)}
-    <section class="section"><div class="section-head"><h2>Summary</h2><span class="subtle">LEAF, efficiency & savings: ${LEAF_ROLLING_LABEL} · volume metrics: all-time totals</span></div>${kpiCards}</section>
+    <section class="section"><div class="section-head"><h2>Summary</h2><span class="subtle">LEAF, efficiency & savings: ${USER_PROFILE_RANGE.kpiSyncs ? escapeHtml(rangeLabel) : LEAF_ROLLING_LABEL} · volume metrics: all-time totals</span></div>${kpiCards}</section>
     ${leafDashboardSection(leafBadgeSource, filteredTrends, recs, rolling180.underutilized_cost_dkk)}
     ${leafJourneySection(bundle, su)}
     ${sustainabilityAchievements(bundle, su)}
@@ -4021,15 +4111,15 @@ function userRankingsPage() {
     ${leafNote}
     <div class="trend-grid">
       ${userLeaderboard(`Most Sustainable Users (${LEAF_ROLLING_LABEL})`, measuredUsers, 'leafIndex180', (v) => `<span class="leaf-pair">${leafIndicator(v / 100)}${Math.round(v)} / 100</span>`, 10, false)}
-      ${userLeaderboard('Highest CPU Efficiency (180d)', measuredCpuUsers, 'cpuEfficiency180d', (v) => `<span class="leaf-pair">${leafIndicator(v)}${pct(v)}</span>`, 10, false)}
-      ${userLeaderboard('Highest Memory Efficiency (180d)', measuredMemUsers, 'memoryEfficiency180d', (v) => `<span class="leaf-pair">${leafIndicator(v)}${pct(v)}</span>`, 10, false)}
-      ${userLeaderboard('Highest Savings Opportunity', users, 'underutilizedCostDkk', money)}
-      ${userLeaderboard('Highest CPU Consumption', users, 'cpuHours', (v) => `${fmt(v, 0)} h`)}
+      ${userLeaderboard('Highest CPU Efficiency (180d)', measuredCpuUsers, 'cpuEfficiency180d', (v) => `<span class="leaf-pair">${leafIndicator(v)}${resolveFormatter('percent')(v)}</span>`, 10, false)}
+      ${userLeaderboard('Highest Memory Efficiency (180d)', measuredMemUsers, 'memoryEfficiency180d', (v) => `<span class="leaf-pair">${leafIndicator(v)}${resolveFormatter('percent')(v)}</span>`, 10, false)}
+      ${userLeaderboard('Highest Savings Opportunity', users, 'underutilizedCostDkk', resolveFormatter('currency'))}
+      ${userLeaderboard('Highest CPU Consumption', users, 'cpuHours', (v) => `${fmt(v, 1)} h`)}
       ${userLeaderboard('Highest GPU Consumption', users, 'gpuHours', (v) => `${fmt(v, 1)} h`)}
-      ${userLeaderboard('Most Active Users', users, 'totalJobs', (v) => `${fmt(v)} jobs`)}
+      ${userLeaderboard('Most Active Users', users, 'totalJobs', (v) => `${resolveFormatter('count')(v)} jobs`)}
       ${userLeaderboard('Largest Memory Consumers', users, 'memoryGbHours', (v) => `${fmt(v, 0)} GB·h`)}
-      ${userLeaderboard('Most Software Diversity', swUsers, 'softwareCount', (v) => `${fmt(v)} modules`)}
-      ${userLeaderboard('Most Active Days', users, 'activeDays', (v) => `${fmt(v)} days`)}
+      ${userLeaderboard('Most Software Diversity', swUsers, 'softwareCount', (v) => `${resolveFormatter('count')(v)} modules`)}
+      ${userLeaderboard('Most Active Days', users, 'activeDays', (v) => `${resolveFormatter('count')(v)} days`)}
     </div>
   </div>`;
 }
@@ -4176,14 +4266,15 @@ function userComparisonPage(ids) {
 
 function costPage() {
   const allTime = asObject(data?.clusterSummary?.allTime);
-  const rows = asArray(data?.clusterSummary?.dailyTrends);
+  const rows = filterByRange(asArray(data?.clusterSummary?.dailyTrends), COST_RANGE_SELECTOR, state.costRange, 'report_date');
+  const costRangeLabel = (COST_RANGE_SELECTOR.ranges.find((r) => r.id === state.costRange) || {}).label || '';
   const windowDays = data?.datasetMeta?.dataWindowDays;
   const windowLabel = windowDays ? `${fmt(windowDays)}-day` : 'recent';
   return `
     <div class="stack">
       ${analyticsStatusBar()}
       ${infoPanel('What drives cost on Mjolnir?', 'Jobs are billed by whichever resource is larger relative to demand: reserved CPU cores or reserved memory. Memory often ends up driving cost because it is easy to over-request "just in case." The Cost-Bearer model looks at each job, decides whether CPU or memory is the dominant cost driver, and estimates the optimization opportunity only on that resource - a conservative, defensible savings number. GPU optimization opportunity is not shown below because GPU utilization is not yet measured on Mjolnir. Future versions of Analytics may also include storage usage and sustainability metrics.')}
-      <section class="section"><div class="section-head"><h2>Resource Cost Insights</h2><span class="subtle">Spend, cost drivers, and optimization opportunities</span></div><div class="cards-grid">${[
+      <section class="section"><div class="section-head"><h2>Resource Cost Insights</h2><span class="subtle">${COST_RANGE.kpiSyncs ? `Synced with the trend chart's selected range (${costRangeLabel})` : "All-time totals - independent of the trend chart's selected range below"}</span></div><div class="cards-grid">${[
         statBlock('Estimated cost', money(allTime.estimated_cost_dkk), `${windowLabel} observed cost`),
         statBlock('Potential savings', money(allTime.underutilized_cost_dkk), `${money(annualized(allTime.underutilized_cost_dkk))} annualized run-rate`, 'warn'),
         statBlock('Optimization opportunity share', pct(num(allTime.underutilized_cost_dkk) / Math.max(1, num(allTime.estimated_cost_dkk)), 1), 'Share of cost with potential savings'),
@@ -4195,7 +4286,7 @@ function costPage() {
         statBlock('Driver-resource potential savings', money(allTime.cost_bearer_waste_dkk ?? allTime.underutilized_cost_dkk), 'Estimated potential savings from the main cost driver (Cost-Bearer model)'),
       ].join('')}</div>${disclaimer(LOWER_BOUND_NOTE)}${disclaimer(GPU_WASTE_NOTE)}${disclaimer(AGGREGATE_NOTE)}</section>
       <section class="section"><div class="section-head"><h2>Measurement coverage</h2><span class="subtle">Measured vs unmeasured jobs by main cost driver</span></div>${coverageCards(data?.clusterSummary?.measurementCoverage)}</section>
-      ${lineChart('Estimated Compute Cost vs. Potential Savings', rows, [chartSeries(rows, 'estimated_cost_dkk', 'Estimated allocation cost', '#3e8cff'), chartSeries(rows, 'underutilized_cost_dkk', 'Potential savings', '#ff6b7a')], money, { zeroBase: true })}
+      <section class="section"><div class="section-head"><h2>Cost trend</h2>${costRangeButtons()}</div>${lineChart('Estimated Compute Cost vs. Potential Savings', rows, [chartSeries(rows, 'estimated_cost_dkk', 'Estimated allocation cost', '#3e8cff'), chartSeries(rows, 'underutilized_cost_dkk', 'Potential savings', '#ff6b7a')], 'currency', { zeroBase: true })}</section>
       <section class="section"><div class="section-head"><h2>Cost actions</h2><span class="subtle">Impact-ranked</span></div><div class="rec-list">${recommendationCards(5).join('')}</div></section>
       </div>`;
 }
@@ -4277,7 +4368,7 @@ function savingsBreakdown(recommendations, metrics) {
   if (!rows.length && !total) return '<div class="empty-state">No savings breakdown is available yet.</div>';
   const residual = Math.max(0, total - rows.reduce((sum, [, value]) => sum + value, 0));
   const allRows = residual > 0 ? rows.concat([['Unassigned opportunity', residual]]) : rows;
-  const { html } = createBarChart(allRows.map(([label]) => label), allRows.map(([, value]) => value), money, { horizontal: true, color: '#53d88a', label: 'Savings opportunity breakdown', emptyMessage: 'No savings breakdown is available yet.' });
+  const { html } = createBarChart(allRows.map(([label]) => label), allRows.map(([, value]) => value), 'currency', { horizontal: true, color: '#53d88a', label: 'Savings opportunity breakdown', emptyMessage: 'No savings breakdown is available yet.' });
   return `<div class="savings-summary"><div class="savings-total"><span>Total practical opportunity</span><strong>${money(total)}</strong><em>Estimated from your personal bundle and recommendations.</em></div>${html}</div>`;
 }
 
@@ -4365,9 +4456,12 @@ function personalAnalyticsPage() {
       <section class="section"><div class="section-head"><h2>Priority Actions</h2><span class="subtle">What should I do?</span></div>${priorityActions(vm.recommendations)}</section>
       <section class="section"><div class="section-head"><h2>Potential Savings Breakdown${infoTip('Estimated savings if historical jobs had requested closer to the optimal CPU and memory resources while performing the same work. Based on historical allocation behavior, not a billing figure.')}</h2><span class="subtle">How much can I save?</span></div>${savingsBreakdown(vm.recommendations, metrics)}</section>
       <section class="section"><div class="section-head"><h2>How do I compare?</h2><span class="subtle">Percentile bands, not rank numbers</span></div>${personalContextCards(metrics, percentile)}<div class="metric-explain wide"><strong>How to read these bands</strong><span>Percentile bands summarize position among exported users without exposing exact ranks. Higher savings opportunity means more room to improve, not a badge of failure.</span></div></section>
-      <section class="section"><div class="section-head"><h2>Trend evidence</h2><span class="subtle">Why these actions are being recommended</span></div><div class="trend-grid">
-        ${lineChart('Efficiency trend evidence', trends, [chartSeries(trends, 'avg_cpu_efficiency', 'CPU efficiency', '#3e8cff'), chartSeries(trends, 'avg_memory_efficiency', 'Memory efficiency', '#53d88a')], pct, { zeroBase: true, bands: EFFICIENCY_BANDS })}
-        ${lineChart('Estimated Compute Cost Trend', trends, [chartSeries(trends, 'estimated_cost_dkk', 'Estimated allocation cost', '#3e8cff'), chartSeries(trends, 'underutilized_cost_dkk', 'Potential savings', '#ff6b7a')], money, { zeroBase: true })}
+      <section class="section"><div class="section-head"><h2>Trend evidence</h2>${personalRangeButtons()}</div><p class="subtle">Why these actions are being recommended</p><div class="trend-grid">
+        ${(() => {
+          const personalTrendRows = filterByRange(trends, PERSONAL_RANGE_SELECTOR, state.personalRange, 'report_date');
+          return `${lineChart('Efficiency trend evidence', personalTrendRows, [chartSeries(personalTrendRows, 'avg_cpu_efficiency', 'CPU efficiency', '#3e8cff'), chartSeries(personalTrendRows, 'avg_memory_efficiency', 'Memory efficiency', '#53d88a')], 'percent', { zeroBase: true, bands: EFFICIENCY_BANDS })}
+          ${lineChart('Estimated Compute Cost Trend', personalTrendRows, [chartSeries(personalTrendRows, 'estimated_cost_dkk', 'Estimated allocation cost', '#3e8cff'), chartSeries(personalTrendRows, 'underutilized_cost_dkk', 'Potential savings', '#ff6b7a')], 'currency', { zeroBase: true })}`;
+        })()}
       </div></section>
       <section class="section"><div class="section-head"><h2>Keep perspective: anonymous peers</h2><span class="subtle">Peer comparison stays pseudonymous</span></div>${peerComparisonTable(vm.peerComparisons)}</section>
       <section class="section"><div class="section-head"><h2>Highest-Impact Jobs to Review</h2><span class="subtle">Which jobs offer the most room to improve?</span></div><p class="subtle" style="line-height:1.7">These jobs are shown because they combine cost with low CPU or memory use. Reviewing them can help you adjust similar submissions in the future.</p>${personalJobsTable(vm.topInefficientJobs)}</section>
@@ -4696,6 +4790,31 @@ function wireEvents() {
       state.userProfileRange = event.currentTarget.dataset.range;
       render();
     });
+  });
+  // Chart Standardization work: one listener block per new Analytical/
+  // Historical range selector, following the exact pattern above - each
+  // data-action gets its own block, no shared dispatcher, consistent with
+  // every other data-action in this file.
+  document.querySelectorAll('[data-action="set-trends-range"]').forEach((el) => {
+    el.addEventListener('click', (event) => { state.trendsRange = event.currentTarget.dataset.range; render(); });
+  });
+  document.querySelectorAll('[data-action="set-projects-range"]').forEach((el) => {
+    el.addEventListener('click', (event) => { state.projectsRange = event.currentTarget.dataset.range; render(); });
+  });
+  document.querySelectorAll('[data-action="set-hierarchy-range"]').forEach((el) => {
+    el.addEventListener('click', (event) => { state.hierarchyRange = event.currentTarget.dataset.range; render(); });
+  });
+  document.querySelectorAll('[data-action="set-cost-range"]').forEach((el) => {
+    el.addEventListener('click', (event) => { state.costRange = event.currentTarget.dataset.range; render(); });
+  });
+  document.querySelectorAll('[data-action="set-personal-range"]').forEach((el) => {
+    el.addEventListener('click', (event) => { state.personalRange = event.currentTarget.dataset.range; render(); });
+  });
+  document.querySelectorAll('[data-action="set-software-timeline-range"]').forEach((el) => {
+    el.addEventListener('click', (event) => { state.softwareTimelineRange = event.currentTarget.dataset.range; render(); });
+  });
+  document.querySelectorAll('[data-action="set-software-module-range"]').forEach((el) => {
+    el.addEventListener('click', (event) => { state.softwareModuleRange = event.currentTarget.dataset.range; render(); });
   });
   document.querySelectorAll('[data-action="toggle-chart-overlay"]').forEach((el) => {
     el.addEventListener('click', (event) => {
