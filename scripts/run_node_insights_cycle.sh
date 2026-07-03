@@ -34,6 +34,14 @@ if [ -n "$APP_ROOT" ] && [ -r "$MJOLNIR_ENV" ]; then
   # shellcheck disable=SC1090
   . "$MJOLNIR_ENV"
   set +a
+  # Stage D: this pipeline's dashboard-data publish clone, set at the
+  # runner level (not inside the shared mjolnir.env) because every
+  # publish_*.sh script - across every pipeline - reads the same generic
+  # MJOLNIR_DASHBOARD_DATA_DIR. Each runner is responsible for pointing it
+  # at its own independent clone (ADR-3) before invoking any publish step;
+  # the publish scripts themselves stay pipeline-agnostic. Guarded by
+  # ${VAR:-default} so an explicit override still wins.
+  export MJOLNIR_DASHBOARD_DATA_DIR="${MJOLNIR_DASHBOARD_DATA_DIR:-$APP_ROOT/publish/node-insights}"
 fi
 
 echo "=== Node Insights cycle: collect ==="
