@@ -15,6 +15,7 @@
 // per render() pass, before any page-render function runs, so stale chart
 // options from the previous route don't leak into the next mount.
 import { chartTimeLabel, chartTimeTooltipLabel } from './status.js';
+import { resolveFormatter, humanNumber } from './ui-helpers.js';
 
 function asArray(value) { return Array.isArray(value) ? value : []; }
 function num(value) { const n = Number(value); return Number.isFinite(n) ? n : 0; }
@@ -101,8 +102,12 @@ function exportToolbox(mobile) {
 // factory and by the Node Insights history option builders below.
 // `unitLabel`, when given, is appended once to every tooltip so values read
 // with context ("CPU pressure: 61% (allocated cores)") instead of a bare
-// number.
-function baseChartOption(categories, extraGrid, { unitLabel } = {}) {
+// number. `formatter`, when given, renders each series value the same way
+// the chart's headline number/axis already does (Chart Standardization
+// work) - defaults to identity so callers that build their own tooltip
+// (gauge/funnel/bar/distribution) or that legitimately want the raw number
+// are unaffected.
+function baseChartOption(categories, extraGrid, { unitLabel, formatter = (v) => v } = {}) {
   const mobile = isMobileChartViewport();
   // containLabel lets ECharts grow the grid to fit whatever the y-axis
   // formatter actually produces (e.g. "40,000 DKK") instead of clipping it
@@ -140,7 +145,7 @@ function baseChartOption(categories, extraGrid, { unitLabel } = {}) {
         const header = smartTooltipLabel(list[0].axisValue);
         const rows = list
           .filter((p) => p.value !== null && p.value !== undefined)
-          .map((p) => `${p.marker}${p.seriesName}: <strong>${p.value}</strong>`)
+          .map((p) => `${p.marker}${p.seriesName}: <strong>${formatter(p.value)}</strong>`)
           .join('<br/>');
         return `${header}<br/>${rows}${unitLabel ? `<br/><span style="opacity:.7">${escapeHtml(unitLabel)}</span>` : ''}`;
       },
@@ -158,6 +163,17 @@ function baseChartOption(categories, extraGrid, { unitLabel } = {}) {
       ),
     },
   });
+}
+
+// Every chart factory's `formatter` parameter accepts either a function
+// (legacy call sites - pct/money/fmt passed directly) or a valueType string
+// (e.g. 'percent'/'currency'/'count'), resolved through the shared
+// VALUE_TYPES registry (js/ui-helpers.js) - one place so createLineChart(),
+// createBarChart(), and createDistribution() all resolve a valueType
+// string identically instead of each factory growing its own copy of this
+// check.
+function resolveChartFormatter(formatter) {
+  return typeof formatter === 'string' ? resolveFormatter(formatter) : formatter;
 }
 
 function lineSeries(def, data) {
@@ -379,6 +395,7 @@ export function setupChartResize() {
 //                markLines (e.g. cluster average or benchmark overlays),
 //                drawn on the first series
 export function createLineChart(title, rows, series, formatter = (v) => v, options = {}) {
+  const resolvedFormatter = resolveChartFormatter(formatter);
   const allValues = series.flatMap((s) => s.values).filter((v) => Number.isFinite(Number(v)));
   if (!allValues.length) return emptyState(options.emptyMessage || `No data available for ${escapeHtml(title)} yet.`);
   const categories = asArray(rows).map((r) => r.report_date ?? r.timestamp);
@@ -386,11 +403,11 @@ export function createLineChart(title, rows, series, formatter = (v) => v, optio
   if (options.events?.length) annotateTimeline(seriesDefs[0], categories, options.events);
   if (options.bands?.length) applyBands(seriesDefs[0], options.bands);
   if (options.referenceLines?.length) applyReferenceLines(seriesDefs[0], options.referenceLines);
-  const option = Object.assign(baseChartOption(categories, {}, { unitLabel: options.unitLabel }), {
+  const option = Object.assign(baseChartOption(categories, {}, { unitLabel: options.unitLabel, formatter: resolvedFormatter }), {
     yAxis: {
       type: 'value',
       min: options.zeroBase === false ? undefined : 0,
-      axisLabel: { color: chartTextColor() },
+      axisLabel: { color: chartTextColor(), formatter: (v) => resolvedFormatter(v) },
       splitLine: { lineStyle: { color: chartLineColor() } },
     },
     series: seriesDefs,
@@ -405,7 +422,7 @@ export function createLineChart(title, rows, series, formatter = (v) => v, optio
   const headlineLabel = options.headlineLabel || `${asArray(rows).length} data points`;
   const { html } = registerChart(option, { label: options.label || title, onClick: options.onClick, csv: options.csv !== false });
   return `<article class="chart-card">
-    <div class="chart-head"><div><h3>${escapeHtml(title)}</h3><span class="subtle">${headlineLabel}</span></div><strong>${headlineValue !== null && headlineValue !== undefined ? formatter(headlineValue) : '—'}</strong></div>
+    <div class="chart-head"><div><h3>${escapeHtml(title)}</h3><span class="subtle">${headlineLabel}</span></div><strong>${headlineValue !== null && headlineValue !== undefined ? resolvedFormatter(headlineValue) : '—'}</strong></div>
     ${html}
   </article>`;
 }
@@ -490,7 +507,7 @@ export function createGauge(pctValue, tone = 'info', meta = {}) {
       confine: true,
       formatter: () => {
         const lines = [`<strong>${meta.label || 'Allocation'}</strong>`];
-        lines.push(pctValue === null ? 'No data' : `${value}% allocated`);
+        lines.push(pctValue === null ? 'No data' : `${resolveFormatter('percentScaled')(value)} allocated`);
         if (meta.allocLabel) lines.push(meta.allocLabel);
         if (rangeMin != null && rangeMax != null) lines.push(`Healthy operating range: ${rangeMin}-${rangeMax}%`);
         if (meta.updatedLabel) lines.push(`<span style="opacity:.7">Updated ${meta.updatedLabel}</span>`);
@@ -514,7 +531,7 @@ export function createGauge(pctValue, tone = 'info', meta = {}) {
       title: { show: false },
       detail: {
         valueAnimation: true,
-        formatter: () => (pctValue === null ? '-' : `${value}%`),
+        formatter: () => (pctValue === null ? '-' : resolveFormatter('percentScaled')(value)),
         color: chartTextColor(),
         fontSize: 22,
         offsetCenter: [0, '4%'],
@@ -530,6 +547,7 @@ export function createGauge(pctValue, tone = 'info', meta = {}) {
 // is optional rich-tooltip context. Returns the registerChart() fragment
 // only - callers build the surrounding card.
 export function createDistribution(values, formatter, tone = 'info', { sampleLabel, label, csv } = {}) {
+  const resolvedFormatter = resolveChartFormatter(formatter);
   const keys = ['5', '25', '50', '75', '95'];
   const nums = keys.map((key) => num(values[key]));
   if (!nums.some((n) => n !== 0)) return emptyState('No distribution data available for this period.');
@@ -538,7 +556,7 @@ export function createDistribution(values, formatter, tone = 'info', { sampleLab
       trigger: 'axis',
       confine: true,
       formatter: (params) => {
-        const lines = [`p${params[0].name}`, `${params[0].marker}${formatter(nums[params[0].dataIndex])}`];
+        const lines = [`p${params[0].name}`, `${params[0].marker}${resolvedFormatter(nums[params[0].dataIndex])}`];
         if (sampleLabel) lines.push(`<span style="opacity:.7">${escapeHtml(sampleLabel)}</span>`);
         return lines.join('<br/>');
       },
@@ -552,7 +570,7 @@ export function createDistribution(values, formatter, tone = 'info', { sampleLab
     },
     yAxis: {
       type: 'value',
-      axisLabel: { color: chartTextColor(), formatter: (v) => formatter(v) },
+      axisLabel: { color: chartTextColor(), formatter: (v) => resolvedFormatter(v) },
       splitLine: { lineStyle: { color: chartLineColor() } },
     },
     series: [{
@@ -593,11 +611,12 @@ export function createFunnel(steps, options = {}) {
 // Generic bar chart (vertical or horizontal). Replaces the CSS
 // width-percentage rows in the old savingsBreakdown().
 export function createBarChart(categories, values, formatter, options = {}) {
+  const resolvedFormatter = resolveChartFormatter(formatter);
   if (!categories.length || !values.some((v) => num(v) !== 0)) return emptyState(options.emptyMessage || 'No data available for this breakdown yet.');
   const horizontal = Boolean(options.horizontal);
   const valueAxis = {
     type: 'value',
-    axisLabel: { color: chartTextColor(), formatter: (v) => formatter(v) },
+    axisLabel: { color: chartTextColor(), formatter: (v) => resolvedFormatter(v) },
     splitLine: { lineStyle: { color: chartLineColor() } },
   };
   const categoryAxis = {
@@ -611,7 +630,7 @@ export function createBarChart(categories, values, formatter, options = {}) {
       trigger: 'axis',
       confine: true,
       axisPointer: { type: 'shadow' },
-      formatter: (params) => `${params[0].name}<br/>${params[0].marker}${formatter(params[0].value)}`,
+      formatter: (params) => `${params[0].name}<br/>${params[0].marker}${resolvedFormatter(params[0].value)}`,
     },
     grid: horizontal
       ? { left: 12, right: 24, top: 16, bottom: 16, containLabel: true }
@@ -636,6 +655,24 @@ export function createBarChart(categories, values, formatter, options = {}) {
 // --- Node Insights history option builders (unchanged math, now routed
 // through the same registerChart()/mountCharts() path as every other
 // chart instead of being special-cased). ---------------------------------
+// Mixed-unit tooltip: the pct-series (CPU/Memory/GPU pressure, already
+// pre-rounded to 1 decimal by chartPct()) need a '%' suffix; the count
+// series (jobs/nodes) are plain integers. baseChartOption()'s single
+// `formatter` option can't distinguish series by name, so this option
+// builds its own axis-trigger tooltip instead of relying on the shared one.
+function mixedUnitTooltipFormatter(pctSeriesNames) {
+  return (params) => {
+    const list = Array.isArray(params) ? params : [params];
+    if (!list.length) return '';
+    const header = list[0].axisValueLabel ?? list[0].axisValue;
+    const rows = list
+      .filter((p) => p.value !== null && p.value !== undefined)
+      .map((p) => `${p.marker}${p.seriesName}: <strong>${pctSeriesNames.has(p.seriesName) ? resolveFormatter('percentScaled')(p.value) : resolveFormatter('count')(p.value)}</strong>`)
+      .join('<br/>');
+    return `${header}<br/>${rows}`;
+  };
+}
+
 export function capacityHistoryChartOption(points) {
   const categories = points.map((p) => p.timestamp);
   const seriesDefs = [
@@ -646,13 +683,16 @@ export function capacityHistoryChartOption(points) {
     { key: 'pending_jobs', name: 'Pending jobs', color: cssVar('--red', '#ff6b7a'), axis: 1 },
     { key: 'draining_nodes', name: 'Draining nodes', color: cssVar('--cyan', '#30d5d0'), axis: 1 },
   ];
-  return Object.assign(baseChartOption(categories, { right: 48 }), {
+  const pctSeriesNames = new Set(seriesDefs.filter((d) => d.pct).map((d) => d.name));
+  const option = Object.assign(baseChartOption(categories, { right: 48 }), {
     yAxis: [
       { type: 'value', name: '%', min: 0, max: 100, axisLabel: { color: chartTextColor(), formatter: '{value}%' }, splitLine: { lineStyle: { color: chartLineColor() } } },
-      { type: 'value', name: 'jobs / nodes', min: 0, axisLabel: { color: chartTextColor() }, splitLine: { show: false } },
+      { type: 'value', name: 'jobs / nodes', min: 0, axisLabel: { color: chartTextColor(), formatter: (v) => humanNumber(v, { style: 'short' }) }, splitLine: { show: false } },
     ],
     series: seriesDefs.map((def) => lineSeries(def, points.map((p) => (def.pct ? chartPct(p[def.key]) : (p[def.key] === null || p[def.key] === undefined ? null : Number(p[def.key])))))),
   });
+  option.tooltip = Object.assign({}, option.tooltip, { formatter: mixedUnitTooltipFormatter(pctSeriesNames) });
+  return option;
 }
 
 export function drainingHistoryChartOption(points) {
@@ -662,8 +702,8 @@ export function drainingHistoryChartOption(points) {
     { key: 'draining_nodes', name: 'Draining', color: cssVar('--amber', '#ffb84d') },
     { key: 'down_nodes', name: 'Down', color: cssVar('--red', '#ff6b7a') },
   ];
-  return Object.assign(baseChartOption(categories, {}), {
-    yAxis: { type: 'value', name: 'nodes', min: 0, axisLabel: { color: chartTextColor() }, splitLine: { lineStyle: { color: chartLineColor() } } },
+  return Object.assign(baseChartOption(categories, {}, { formatter: resolveFormatter('count') }), {
+    yAxis: { type: 'value', name: 'nodes', min: 0, axisLabel: { color: chartTextColor(), formatter: (v) => humanNumber(v, { style: 'short' }) }, splitLine: { lineStyle: { color: chartLineColor() } } },
     series: seriesDefs.map((def) => lineSeries(def, points.map((p) => (p[def.key] === null || p[def.key] === undefined ? null : Number(p[def.key]))))),
   });
 }
@@ -675,7 +715,7 @@ export function nodeHistoryChartOption(points) {
     { key: 'mem_pct', name: 'Memory utilization', color: cssVar('--teal', '#2dd4bf') },
     { key: 'gpu_pct', name: 'GPU utilization', color: cssVar('--amber', '#ffb84d') },
   ];
-  return Object.assign(baseChartOption(categories, {}), {
+  return Object.assign(baseChartOption(categories, {}, { formatter: resolveFormatter('percentScaled') }), {
     yAxis: { type: 'value', name: '%', min: 0, max: 100, axisLabel: { color: chartTextColor(), formatter: '{value}%' }, splitLine: { lineStyle: { color: chartLineColor() } } },
     series: seriesDefs.map((def) => lineSeries(def, points.map((p) => chartPct(p[def.key])))),
   });
