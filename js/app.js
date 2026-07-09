@@ -2577,7 +2577,7 @@ function overnightSummarySection() {
   const headline = [
     statBlock('New Accounting Records', o.new_accounting_records != null ? humanNumber(o.new_accounting_records) : 'N/A', o.report_date ? `Imported for ${dateLabel(o.report_date)}` : 'No import recorded yet'),
     statBlock('New Job Steps', o.new_job_steps != null ? humanNumber(o.new_job_steps) : 'N/A', 'Step records within those imports'),
-    statBlock('New Canonical Jobs', o.new_canonical_jobs != null ? humanNumber(o.new_canonical_jobs) : 'N/A', 'Materialized into the warehouse'),
+    statBlock('Canonical Jobs Materialized', o.new_canonical_jobs != null ? humanNumber(o.new_canonical_jobs) : 'N/A', 'Written or updated by the latest warehouse materialization'),
   ];
   const growthRows = [
     ['New Users', o.new_users], ['New Projects', o.new_projects],
