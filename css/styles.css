@@ -420,13 +420,41 @@ td:last-child, th:last-child { text-align: right; }
 
 .platform-status .section-head .pill { flex: none; }
 .platform-module-list { display: grid; gap: 10px; margin: 14px 0; }
+/* Three-column status row: name (flexible, truncates), age/timing (fixed
+   column, right-aligned), health pill (right-aligned, flush to row edge).
+   The name column's flex-grow absorbs all leftover width so the pill -
+   always the last flex item - lands on the same right edge on every row
+   regardless of label/pill text length; the fixed-width timing column keeps
+   those values in a consistent vertical column too. Some callers (Platform
+   Status page's Module Status list) omit the middle timing span entirely -
+   this layout degrades gracefully to a two-column name/pill row without any
+   markup-specific selectors. */
 .platform-module-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 12px 14px; background: var(--surface-3); border-radius: var(--radius-sm);
+  display: flex; align-items: center; gap: 12px;
+  min-height: 44px;
+  padding: 12px 16px; background: var(--surface-3); border-radius: var(--radius-sm);
 }
 .platform-module-row span:first-child,
-.platform-module-row a:first-child { font-weight: 600; font-size: 13px; color: var(--text); text-decoration: none; }
+.platform-module-row a:first-child {
+  flex: 1 1 auto; min-width: 0;
+  font-weight: 600; font-size: 13px; color: var(--text); text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .platform-module-row a:first-child:hover { text-decoration: underline; }
+.platform-module-row .subtle { flex: 0 0 112px; text-align: right; }
+.platform-module-row .pill { flex: 0 0 auto; }
+
+@media (max-width: 720px) {
+  .platform-module-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    min-height: 0;
+  }
+  .platform-module-row span:first-child,
+  .platform-module-row a:first-child { flex: 1 1 100%; white-space: normal; }
+  .platform-module-row .subtle { flex: 1 1 auto; text-align: left; }
+  .platform-module-row .pill { margin-left: auto; }
+}
 .platform-status-meta {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
   margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--border);
@@ -476,8 +504,16 @@ td:last-child, th:last-child { text-align: right; }
 }
 .alert-row .pill { flex: none; }
 
-.rec-simple-list { display: grid; gap: 10px; margin: 0; padding-left: 20px; }
-.rec-simple-list li { font-size: 14px; line-height: 1.5; }
+/* Custom dot markers (rather than default <ul> bullet indent) so list text
+   starts flush with the section's own left padding - the same left edge
+   every other section's content (module rows, cards) uses - instead of
+   sitting ~20px further right than the Platform Overview card below it. */
+.rec-simple-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.rec-simple-list li { position: relative; padding-left: 16px; font-size: 14px; line-height: 1.5; }
+.rec-simple-list li::before {
+  content: ''; position: absolute; left: 0; top: 0.55em;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
+}
 
 @media (max-width: 1024px) {
   .cluster-health-hero { padding: 28px 18px; }
