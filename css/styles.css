@@ -247,6 +247,41 @@ a.metric-card:hover { border-color: var(--accent, #3e8cff); }
 .stat-card .value { font-size: 1.5rem; font-weight: 800; margin-top: 6px; }
 .stat-card .label { color: var(--muted); font-size: 12px; }
 
+/* Overnight Summary: scoped to this section only (not the shared
+   .stat-card/.cards-grid rules above, which are also used by Current
+   Cluster Status, Warehouse Summary, etc.) so every card in this
+   component gets identical height/padding/radius and its label -> value
+   -> subtitle baselines line up across a row, without changing the
+   look of cards elsewhere on the site. */
+.overnight-summary .cards-grid { gap: 20px; }
+.overnight-summary .cards-grid + .cards-grid { margin-top: 20px; }
+.overnight-summary .stat-card {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border-radius: var(--radius);
+  min-height: 148px;
+}
+.overnight-summary .stat-card .label {
+  min-height: 2.4em;
+  line-height: 1.2;
+  display: flex;
+  align-items: flex-end;
+}
+.overnight-summary .stat-card .value { margin-top: 8px; line-height: 1.15; }
+.overnight-summary .stat-card .subtle { margin-top: 10px; line-height: 1.35; }
+
+@media (max-width: 1200px) {
+  .overnight-summary .cards-grid { gap: 16px; }
+  .overnight-summary .cards-grid + .cards-grid { margin-top: 16px; }
+}
+
+@media (max-width: 720px) {
+  .overnight-summary .stat-card { min-height: 128px; }
+  .overnight-summary .cards-grid { gap: 14px; }
+  .overnight-summary .cards-grid + .cards-grid { margin-top: 14px; }
+}
+
 .percentiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .percentile-card { padding: 14px; }
 .percentile-card strong { font-size: 1.6rem; display: block; margin-top: 6px; }

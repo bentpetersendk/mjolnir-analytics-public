@@ -2592,7 +2592,7 @@ function overnightSummarySection() {
     ['Publication Duration', w.lastPublishDurationSeconds],
   ].map(([label, seconds]) => statBlock(label, seconds != null ? durationLabel(seconds) : 'N/A', 'Last nightly run'));
 
-  return `<section class="section"><div class="section-head"><h2>Overnight Summary</h2><span class="subtle">${o.report_date ? `Since ${dateLabel(o.report_date)}` : 'Since the last import'}</span></div>
+  return `<section class="section overnight-summary"><div class="section-head"><h2>Overnight Summary</h2><span class="subtle">${o.report_date ? `Since ${dateLabel(o.report_date)}` : 'Since the last import'}</span></div>
     <div class="cards-grid">${headline.join('')}</div>
     ${growthRows.length ? `<div class="cards-grid">${growthRows.join('')}</div>` : ''}
     <div class="cards-grid">${durations.join('')}</div>
