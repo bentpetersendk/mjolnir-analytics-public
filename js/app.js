@@ -2577,7 +2577,7 @@ function overnightSummarySection() {
   const headline = [
     statBlock('New Accounting Records', o.new_accounting_records != null ? humanNumber(o.new_accounting_records) : 'N/A', o.report_date ? `Imported for ${dateLabel(o.report_date)}` : 'No import recorded yet'),
     statBlock('New Job Steps', o.new_job_steps != null ? humanNumber(o.new_job_steps) : 'N/A', 'Step records within those imports'),
-    statBlock('New Canonical Jobs', o.new_canonical_jobs != null ? humanNumber(o.new_canonical_jobs) : 'N/A', 'Materialized into the warehouse'),
+    statBlock('New Canonical Jobs', o.new_canonical_jobs != null ? humanNumber(o.new_canonical_jobs) : 'N/A', 'Written or updated by the latest warehouse materialization'),
   ];
   const growthRows = [
     ['New Users', o.new_users], ['New Projects', o.new_projects],
@@ -2592,7 +2592,7 @@ function overnightSummarySection() {
     ['Publication Duration', w.lastPublishDurationSeconds],
   ].map(([label, seconds]) => statBlock(label, seconds != null ? durationLabel(seconds) : 'N/A', 'Last nightly run'));
 
-  return `<section class="section"><div class="section-head"><h2>Overnight Summary</h2><span class="subtle">${o.report_date ? `Since ${dateLabel(o.report_date)}` : 'Since the last import'}</span></div>
+  return `<section class="section overnight-summary"><div class="section-head"><h2>Overnight Summary</h2><span class="subtle">${o.report_date ? `Since ${dateLabel(o.report_date)}` : 'Since the last import'}</span></div>
     <div class="cards-grid">${headline.join('')}</div>
     ${growthRows.length ? `<div class="cards-grid">${growthRows.join('')}</div>` : ''}
     <div class="cards-grid">${durations.join('')}</div>
