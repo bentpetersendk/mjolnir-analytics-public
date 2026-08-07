@@ -1,102 +1,117 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-08-06T22:24:16Z",
+  "generated_at": "2026-08-07T22:24:56Z",
   "all_time_summary": {
-    "jobs": 475075,
-    "completed_jobs": 463846,
+    "jobs": 475839,
+    "completed_jobs": 464610,
     "failed_jobs": 11229,
-    "cpu_hours_allocated": 449369.973333,
-    "measured_cpu_hours": 111340.363056,
-    "avg_cpu_efficiency": 0.192085,
-    "jobs_with_measured_cpu": 24629,
-    "requested_mem_gb_hours": 7367443.373438,
-    "measured_mem_gb_max_sum": 45169.089625,
-    "avg_memory_efficiency": 0.019656,
-    "jobs_with_measured_memory": 25426,
-    "estimated_cost_dkk": 120840.803266,
-    "underutilized_cost_dkk": 35416.845164,
+    "cpu_hours_allocated": 449376.500833,
+    "measured_cpu_hours": 111343.083056,
+    "avg_cpu_efficiency": 0.188738,
+    "jobs_with_measured_cpu": 25378,
+    "requested_mem_gb_hours": 7369288.019549,
+    "measured_mem_gb_max_sum": 50592.255885,
+    "avg_memory_efficiency": 0.019439,
+    "jobs_with_measured_memory": 26190,
+    "estimated_cost_dkk": 120870.787675,
+    "underutilized_cost_dkk": 35444.534596,
     "gpu_hours": 0.0,
-    "cpu_cost_dkk": 29209.048267,
-    "mem_cost_dkk": 119720.954818,
+    "cpu_cost_dkk": 29209.472554,
+    "mem_cost_dkk": 119750.930318,
     "gpu_cost_dkk": 0.0,
     "cost_bearer": "memory",
-    "cost_bearer_cost_dkk": 119720.954818,
-    "cost_bearer_efficiency": 0.019656,
-    "cost_bearer_waste_dkk": 35416.845164,
+    "cost_bearer_cost_dkk": 119750.930318,
+    "cost_bearer_efficiency": 0.019439,
+    "cost_bearer_waste_dkk": 35444.534596,
     "leaf_index": 12,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.1921,
+        "value": 0.1887,
         "weight": 0.6,
-        "contribution": 0.1153
+        "contribution": 0.1132
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0197,
+        "value": 0.0194,
         "weight": 0.4,
-        "contribution": 0.0079
+        "contribution": 0.0078
       }
     ]
   },
   "rolling_summaries": {
     "7d": {
-      "jobs": 0,
-      "completed_jobs": 0,
+      "jobs": 764,
+      "completed_jobs": 764,
       "failed_jobs": 0,
-      "cpu_hours_allocated": 0.0,
-      "measured_cpu_hours": 0.0,
-      "avg_cpu_efficiency": null,
-      "jobs_with_measured_cpu": 0,
-      "requested_mem_gb_hours": 0.0,
-      "measured_mem_gb_max_sum": 0.0,
-      "avg_memory_efficiency": null,
-      "jobs_with_measured_memory": 0,
-      "estimated_cost_dkk": 0.0,
-      "underutilized_cost_dkk": 0.0,
+      "cpu_hours_allocated": 6.5275,
+      "measured_cpu_hours": 2.72,
+      "avg_cpu_efficiency": 0.078678,
+      "jobs_with_measured_cpu": 749,
+      "requested_mem_gb_hours": 1844.646111,
+      "measured_mem_gb_max_sum": 5423.16626,
+      "avg_memory_efficiency": 0.012221,
+      "jobs_with_measured_memory": 764,
+      "estimated_cost_dkk": 29.98441,
+      "underutilized_cost_dkk": 27.689432,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 0.0,
-      "mem_cost_dkk": 0.0,
-      "gpu_cost_dkk": 0.0,
-      "cost_bearer": "cpu",
-      "cost_bearer_cost_dkk": 0.0,
-      "cost_bearer_efficiency": null,
-      "cost_bearer_waste_dkk": 0.0,
-      "leaf_index": null,
-      "leaf_index_components": []
-    },
-    "30d": {
-      "jobs": 409,
-      "completed_jobs": 342,
-      "failed_jobs": 67,
-      "cpu_hours_allocated": 1375.913056,
-      "measured_cpu_hours": 1077.619444,
-      "avg_cpu_efficiency": 0.185186,
-      "jobs_with_measured_cpu": 390,
-      "requested_mem_gb_hours": 26453.517413,
-      "measured_mem_gb_max_sum": 611.853719,
-      "avg_memory_efficiency": 0.01235,
-      "jobs_with_measured_memory": 391,
-      "estimated_cost_dkk": 430.034654,
-      "underutilized_cost_dkk": 404.740403,
-      "gpu_hours": 0.0,
-      "cpu_cost_dkk": 89.434349,
-      "mem_cost_dkk": 429.869658,
+      "cpu_cost_dkk": 0.424288,
+      "mem_cost_dkk": 29.975499,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 429.869658,
-      "cost_bearer_efficiency": 0.01235,
-      "cost_bearer_waste_dkk": 404.740403,
-      "leaf_index": 12,
+      "cost_bearer_cost_dkk": 29.975499,
+      "cost_bearer_efficiency": 0.012221,
+      "cost_bearer_waste_dkk": 27.689432,
+      "leaf_index": 5,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.1852,
+          "value": 0.0787,
           "weight": 0.6,
-          "contribution": 0.1111
+          "contribution": 0.0472
+        },
+        {
+          "id": "memory",
+          "label": "Memory efficiency",
+          "value": 0.0122,
+          "weight": 0.4,
+          "contribution": 0.0049
+        }
+      ]
+    },
+    "30d": {
+      "jobs": 1047,
+      "completed_jobs": 1007,
+      "failed_jobs": 40,
+      "cpu_hours_allocated": 1377.580833,
+      "measured_cpu_hours": 1078.460278,
+      "avg_cpu_efficiency": 0.10374,
+      "jobs_with_measured_cpu": 1014,
+      "requested_mem_gb_hours": 27978.479913,
+      "measured_mem_gb_max_sum": 5981.660182,
+      "avg_memory_efficiency": 0.012269,
+      "jobs_with_measured_memory": 1030,
+      "estimated_cost_dkk": 454.823948,
+      "underutilized_cost_dkk": 427.254264,
+      "gpu_hours": 0.0,
+      "cpu_cost_dkk": 89.542754,
+      "mem_cost_dkk": 454.650299,
+      "gpu_cost_dkk": 0.0,
+      "cost_bearer": "memory",
+      "cost_bearer_cost_dkk": 454.650299,
+      "cost_bearer_efficiency": 0.012269,
+      "cost_bearer_waste_dkk": 427.254264,
+      "leaf_index": 7,
+      "leaf_index_components": [
+        {
+          "id": "cpu",
+          "label": "CPU efficiency",
+          "value": 0.1037,
+          "weight": 0.6,
+          "contribution": 0.0622
         },
         {
           "id": "memory",
@@ -108,82 +123,82 @@
       ]
     },
     "90d": {
-      "jobs": 6129,
-      "completed_jobs": 5091,
+      "jobs": 6810,
+      "completed_jobs": 5772,
       "failed_jobs": 1038,
-      "cpu_hours_allocated": 2478.006944,
-      "measured_cpu_hours": 1962.374722,
-      "avg_cpu_efficiency": 0.157098,
-      "jobs_with_measured_cpu": 5897,
-      "requested_mem_gb_hours": 55807.833933,
-      "measured_mem_gb_max_sum": 12320.443602,
-      "avg_memory_efficiency": 0.013006,
-      "jobs_with_measured_memory": 6087,
-      "estimated_cost_dkk": 907.83653,
-      "underutilized_cost_dkk": 847.281469,
+      "cpu_hours_allocated": 2468.525278,
+      "measured_cpu_hours": 1954.275833,
+      "avg_cpu_efficiency": 0.14631,
+      "jobs_with_measured_cpu": 6563,
+      "requested_mem_gb_hours": 57620.4931,
+      "measured_mem_gb_max_sum": 17742.527201,
+      "avg_memory_efficiency": 0.013054,
+      "jobs_with_measured_memory": 6768,
+      "estimated_cost_dkk": 936.780344,
+      "underutilized_cost_dkk": 874.633533,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 161.070451,
-      "mem_cost_dkk": 906.877301,
+      "cpu_cost_dkk": 160.454143,
+      "mem_cost_dkk": 936.333013,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 906.877301,
-      "cost_bearer_efficiency": 0.013006,
-      "cost_bearer_waste_dkk": 847.281469,
-      "leaf_index": 10,
+      "cost_bearer_cost_dkk": 936.333013,
+      "cost_bearer_efficiency": 0.013054,
+      "cost_bearer_waste_dkk": 874.633533,
+      "leaf_index": 9,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.1571,
+          "value": 0.1463,
           "weight": 0.6,
-          "contribution": 0.0943
+          "contribution": 0.0878
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.013,
+          "value": 0.0131,
           "weight": 0.4,
           "contribution": 0.0052
         }
       ]
     },
     "180d": {
-      "jobs": 24011,
-      "completed_jobs": 21006,
+      "jobs": 24775,
+      "completed_jobs": 21770,
       "failed_jobs": 3005,
-      "cpu_hours_allocated": 128164.971944,
-      "measured_cpu_hours": 95341.474722,
-      "avg_cpu_efficiency": 0.19084,
-      "jobs_with_measured_cpu": 18624,
-      "requested_mem_gb_hours": 2146873.890159,
-      "measured_mem_gb_max_sum": 39770.616279,
-      "avg_memory_efficiency": 0.015657,
-      "jobs_with_measured_memory": 19391,
-      "estimated_cost_dkk": 34903.092311,
-      "underutilized_cost_dkk": 30572.271082,
+      "cpu_hours_allocated": 128171.499444,
+      "measured_cpu_hours": 95344.194722,
+      "avg_cpu_efficiency": 0.186504,
+      "jobs_with_measured_cpu": 19373,
+      "requested_mem_gb_hours": 2148718.53627,
+      "measured_mem_gb_max_sum": 45193.782538,
+      "avg_memory_efficiency": 0.015527,
+      "jobs_with_measured_memory": 20155,
+      "estimated_cost_dkk": 34933.076721,
+      "underutilized_cost_dkk": 30599.960514,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 8330.723176,
-      "mem_cost_dkk": 34886.700715,
+      "cpu_cost_dkk": 8331.147464,
+      "mem_cost_dkk": 34916.676214,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 34886.700715,
-      "cost_bearer_efficiency": 0.015657,
-      "cost_bearer_waste_dkk": 30572.271082,
+      "cost_bearer_cost_dkk": 34916.676214,
+      "cost_bearer_efficiency": 0.015527,
+      "cost_bearer_waste_dkk": 30599.960514,
       "leaf_index": 12,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.1908,
+          "value": 0.1865,
           "weight": 0.6,
-          "contribution": 0.1145
+          "contribution": 0.1119
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0157,
+          "value": 0.0155,
           "weight": 0.4,
-          "contribution": 0.0063
+          "contribution": 0.0062
         }
       ]
     }
@@ -4793,6 +4808,21 @@
       "measured_cpu_hours": 0.07722222222222222,
       "requested_mem_gb_hours": 39.941111111111105,
       "measured_mem_gb_max_sum": 101.19115829467773
+    },
+    {
+      "report_date": "2026-08-06",
+      "avg_cpu_efficiency": 0.07867824097382438,
+      "avg_memory_efficiency": 0.012220865648246352,
+      "estimated_cost_dkk": 29.984409722222097,
+      "underutilized_cost_dkk": 27.689431850000105,
+      "gpu_hours": 0.0,
+      "jobs": 764,
+      "jobs_with_measured_cpu": 749,
+      "jobs_with_measured_memory": 764,
+      "cpu_hours_allocated": 6.5275000000000025,
+      "measured_cpu_hours": 2.7200000000000037,
+      "requested_mem_gb_hours": 1844.6461111111073,
+      "measured_mem_gb_max_sum": 5423.166259765625
     }
   ],
   "recommendations": [
@@ -4803,8 +4833,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.19084,
-        "jobs_with_measured_cpu": 18624
+        "avg_cpu_efficiency": 0.186504,
+        "jobs_with_measured_cpu": 19373
       }
     },
     {
@@ -4814,8 +4844,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.015657,
-        "jobs_with_measured_memory": 19391
+        "avg_memory_efficiency": 0.015527,
+        "jobs_with_measured_memory": 20155
       }
     }
   ],
@@ -5019,27 +5049,27 @@
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.1908,
+        "value": 0.1865,
         "weight": 0.6,
-        "contribution": 0.1145
+        "contribution": 0.1119
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0157,
+        "value": 0.0155,
         "weight": 0.4,
-        "contribution": 0.0063
+        "contribution": 0.0062
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 19391,
+      "jobs_measured": 20155,
       "jobs_excluded": 4620,
-      "jobs_measured_pct": 80.76,
+      "jobs_measured_pct": 81.35,
       "cpu_hours_measured_pct": 74.39,
-      "memory_measured_pct": 1.85
+      "memory_measured_pct": 2.1
     },
-    "percentile": 34.8
+    "percentile": 35.6
   },
   "public_user_id": "usr_1fe927bd691f",
   "display_pseudonym": "Crimson Aster",
@@ -5047,8 +5077,8 @@
   "username": "tmk528",
   "percentile_position": {
     "overall": 38.5,
-    "cpu": 40.2,
-    "memory": 19.6,
+    "cpu": 39.2,
+    "memory": 20.6,
     "savings": 55.7
   },
   "peer_comparisons": [
@@ -5071,7 +5101,7 @@
       "avg_cpu_efficiency": 0.026549622102753006,
       "avg_memory_efficiency": 0.3296317986079625,
       "underutilized_cost_dkk": 43.11707626128262,
-      "percentile_position": 21.6
+      "percentile_position": 20.6
     }
   ]
 }
