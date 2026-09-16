@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-09-15T22:28:20Z",
+  "generated_at": "2026-09-16T22:34:33Z",
   "all_time_summary": {
     "jobs": 75232,
     "completed_jobs": 55757,
@@ -93,67 +93,67 @@
       "leaf_index_components": []
     },
     "90d": {
-      "jobs": 2177,
-      "completed_jobs": 1762,
-      "failed_jobs": 415,
-      "cpu_hours_allocated": 4477.603611,
-      "measured_cpu_hours": 4066.293889,
-      "avg_cpu_efficiency": 0.288243,
-      "jobs_with_measured_cpu": 2119,
-      "requested_mem_gb_hours": 514194.091124,
-      "measured_mem_gb_max_sum": 213.47602,
-      "avg_memory_efficiency": 0.003777,
-      "jobs_with_measured_memory": 2119,
-      "estimated_cost_dkk": 8356.621776,
-      "underutilized_cost_dkk": 8349.080005,
+      "jobs": 2018,
+      "completed_jobs": 1647,
+      "failed_jobs": 371,
+      "cpu_hours_allocated": 4062.043333,
+      "measured_cpu_hours": 3683.445833,
+      "avg_cpu_efficiency": 0.276271,
+      "jobs_with_measured_cpu": 1978,
+      "requested_mem_gb_hours": 465395.596311,
+      "measured_mem_gb_max_sum": 200.366423,
+      "avg_memory_efficiency": 0.003971,
+      "jobs_with_measured_memory": 1978,
+      "estimated_cost_dkk": 7563.646235,
+      "underutilized_cost_dkk": 7556.557266,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 291.044235,
-      "mem_cost_dkk": 8355.653981,
+      "cpu_cost_dkk": 264.032817,
+      "mem_cost_dkk": 7562.67844,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 8355.653981,
-      "cost_bearer_efficiency": 0.003777,
-      "cost_bearer_waste_dkk": 8349.080005,
+      "cost_bearer_cost_dkk": 7562.67844,
+      "cost_bearer_efficiency": 0.003971,
+      "cost_bearer_waste_dkk": 7556.557266,
       "leaf_index": 17,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.2882,
+          "value": 0.2763,
           "weight": 0.6,
-          "contribution": 0.1729
+          "contribution": 0.1658
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0038,
+          "value": 0.004,
           "weight": 0.4,
-          "contribution": 0.0015
+          "contribution": 0.0016
         }
       ]
     },
     "180d": {
-      "jobs": 14458,
+      "jobs": 14453,
       "completed_jobs": 10600,
-      "failed_jobs": 3858,
-      "cpu_hours_allocated": 67252.213889,
+      "failed_jobs": 3853,
+      "cpu_hours_allocated": 57251.858333,
       "measured_cpu_hours": 39463.412222,
-      "avg_cpu_efficiency": 0.200472,
-      "jobs_with_measured_cpu": 14017,
-      "requested_mem_gb_hours": 1573364.934449,
-      "measured_mem_gb_max_sum": 1165.423403,
-      "avg_memory_efficiency": 0.002182,
-      "jobs_with_measured_memory": 13996,
-      "estimated_cost_dkk": 25568.989573,
-      "underutilized_cost_dkk": 25113.513672,
+      "avg_cpu_efficiency": 0.200544,
+      "jobs_with_measured_cpu": 14012,
+      "requested_mem_gb_hours": 1493362.090004,
+      "measured_mem_gb_max_sum": 1108.282429,
+      "avg_memory_efficiency": 0.002158,
+      "jobs_with_measured_memory": 13991,
+      "estimated_cost_dkk": 24268.943351,
+      "underutilized_cost_dkk": 23906.324689,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 4371.393903,
-      "mem_cost_dkk": 25567.180185,
+      "cpu_cost_dkk": 3721.370792,
+      "mem_cost_dkk": 24267.133963,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 25567.180185,
-      "cost_bearer_efficiency": 0.002182,
-      "cost_bearer_waste_dkk": 25113.513672,
+      "cost_bearer_cost_dkk": 24267.133963,
+      "cost_bearer_efficiency": 0.002158,
+      "cost_bearer_waste_dkk": 23906.324689,
       "leaf_index": 12,
       "leaf_index_components": [
         {
@@ -6153,8 +6153,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.200472,
-        "jobs_with_measured_cpu": 14017
+        "avg_cpu_efficiency": 0.200544,
+        "jobs_with_measured_cpu": 14012
       }
     },
     {
@@ -6164,8 +6164,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.002182,
-        "jobs_with_measured_memory": 13996
+        "avg_memory_efficiency": 0.002158,
+        "jobs_with_measured_memory": 13991
       }
     }
   ],
@@ -6383,38 +6383,38 @@
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 14017,
+      "jobs_measured": 14012,
       "jobs_excluded": 441,
       "jobs_measured_pct": 96.95,
-      "cpu_hours_measured_pct": 58.68,
+      "cpu_hours_measured_pct": 68.93,
       "memory_measured_pct": 0.07
     },
-    "percentile": 33.6
+    "percentile": 34.2
   },
   "public_user_id": "usr_bc1afc89459f",
   "display_pseudonym": "Steel Summit",
   "personal_route_token": "u_563856a1916910540ef29698090f4ad4",
   "username": "pkb156",
   "percentile_position": {
-    "overall": 52.9,
-    "cpu": 60.2,
-    "memory": 11.7,
+    "overall": 51.5,
+    "cpu": 57.1,
+    "memory": 10.6,
     "savings": 86.7
   },
   "peer_comparisons": [
     {
       "display_pseudonym": "Steel Hawk",
-      "avg_cpu_efficiency": 0.0989715785321945,
-      "avg_memory_efficiency": 0.016297350272267405,
-      "underutilized_cost_dkk": 147.86464358387323,
-      "percentile_position": 44.8
+      "avg_cpu_efficiency": 0.09859006951555324,
+      "avg_memory_efficiency": 0.01601786316958547,
+      "underutilized_cost_dkk": 147.8373773036016,
+      "percentile_position": 46.7
     },
     {
       "display_pseudonym": "Bright Marlin",
       "avg_cpu_efficiency": 0.022580994715319744,
       "avg_memory_efficiency": 0.2894760727882385,
       "underutilized_cost_dkk": 0.44626955550511677,
-      "percentile_position": 17.1
+      "percentile_position": 19.0
     },
     {
       "display_pseudonym": "Granite Beacon",
