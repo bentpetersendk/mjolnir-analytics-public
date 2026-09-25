@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-09-24T22:24:54Z",
+  "generated_at": "2026-09-25T22:24:48Z",
   "all_time_summary": {
     "jobs": 1185,
     "completed_jobs": 973,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 119,
-      "completed_jobs": 87,
-      "failed_jobs": 32,
-      "cpu_hours_allocated": 1025.697222,
-      "measured_cpu_hours": 135.181667,
-      "avg_cpu_efficiency": 0.042442,
-      "jobs_with_measured_cpu": 100,
-      "requested_mem_gb_hours": 16220.95861,
-      "measured_mem_gb_max_sum": 46.376642,
-      "avg_memory_efficiency": 0.045585,
-      "jobs_with_measured_memory": 114,
-      "estimated_cost_dkk": 1895.310506,
-      "underutilized_cost_dkk": 260.809396,
-      "gpu_hours": 125.484722,
-      "cpu_cost_dkk": 66.670319,
-      "mem_cost_dkk": 263.590577,
-      "gpu_cost_dkk": 1631.301389,
+      "jobs": 116,
+      "completed_jobs": 85,
+      "failed_jobs": 31,
+      "cpu_hours_allocated": 516.791667,
+      "measured_cpu_hours": 69.736389,
+      "avg_cpu_efficiency": 0.037349,
+      "jobs_with_measured_cpu": 97,
+      "requested_mem_gb_hours": 8174.513499,
+      "measured_mem_gb_max_sum": 45.355,
+      "avg_memory_efficiency": 0.038294,
+      "jobs_with_measured_memory": 111,
+      "estimated_cost_dkk": 946.981956,
+      "underutilized_cost_dkk": 130.812377,
+      "gpu_hours": 62.624167,
+      "cpu_cost_dkk": 33.591458,
+      "mem_cost_dkk": 132.835844,
+      "gpu_cost_dkk": 814.114167,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 263.590577,
-      "cost_bearer_efficiency": 0.045585,
-      "cost_bearer_waste_dkk": 260.809396,
+      "cost_bearer_cost_dkk": 132.835844,
+      "cost_bearer_efficiency": 0.038294,
+      "cost_bearer_waste_dkk": 130.812377,
       "leaf_index": 4,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.0424,
+          "value": 0.0373,
           "weight": 0.6,
-          "contribution": 0.0255
+          "contribution": 0.0224
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0456,
+          "value": 0.0383,
           "weight": 0.4,
-          "contribution": 0.0182
+          "contribution": 0.0153
         }
       ]
     }
@@ -1278,8 +1278,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.042442,
-        "jobs_with_measured_cpu": 100
+        "avg_cpu_efficiency": 0.037349,
+        "jobs_with_measured_cpu": 97
       }
     },
     {
@@ -1289,8 +1289,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.045585,
-        "jobs_with_measured_memory": 114
+        "avg_memory_efficiency": 0.038294,
+        "jobs_with_measured_memory": 111
       }
     }
   ],
@@ -1494,27 +1494,27 @@
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.0424,
+        "value": 0.0373,
         "weight": 0.6,
-        "contribution": 0.0255
+        "contribution": 0.0224
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0456,
+        "value": 0.0383,
         "weight": 0.4,
-        "contribution": 0.0182
+        "contribution": 0.0153
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 114,
+      "jobs_measured": 111,
       "jobs_excluded": 5,
-      "jobs_measured_pct": 95.8,
-      "cpu_hours_measured_pct": 13.18,
-      "memory_measured_pct": 0.29
+      "jobs_measured_pct": 95.69,
+      "cpu_hours_measured_pct": 13.49,
+      "memory_measured_pct": 0.55
     },
-    "percentile": 18.7
+    "percentile": 19.2
   },
   "public_user_id": "usr_f29ecdf0173d",
   "display_pseudonym": "Obsidian Fern",
