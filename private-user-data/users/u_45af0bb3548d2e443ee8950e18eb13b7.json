@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-01T22:24:48Z",
+  "generated_at": "2026-10-02T22:25:35Z",
   "all_time_summary": {
     "jobs": 1816,
     "completed_jobs": 1306,
@@ -148,40 +148,40 @@
       ]
     },
     "180d": {
-      "jobs": 944,
+      "jobs": 943,
       "completed_jobs": 651,
-      "failed_jobs": 293,
-      "cpu_hours_allocated": 32453.818056,
+      "failed_jobs": 292,
+      "cpu_hours_allocated": 27653.790278,
       "measured_cpu_hours": 1093.425278,
-      "avg_cpu_efficiency": 0.29474,
-      "jobs_with_measured_cpu": 879,
-      "requested_mem_gb_hours": 167959.431111,
-      "measured_mem_gb_max_sum": 23075.669712,
-      "avg_memory_efficiency": 0.146743,
-      "jobs_with_measured_memory": 895,
-      "estimated_cost_dkk": 3439.489923,
-      "underutilized_cost_dkk": 2310.336839,
+      "avg_cpu_efficiency": 0.295076,
+      "jobs_with_measured_cpu": 878,
+      "requested_mem_gb_hours": 158359.375556,
+      "measured_mem_gb_max_sum": 23072.691995,
+      "avg_memory_efficiency": 0.146823,
+      "jobs_with_measured_memory": 894,
+      "estimated_cost_dkk": 3127.488117,
+      "underutilized_cost_dkk": 1998.335034,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 2109.498174,
-      "mem_cost_dkk": 2729.340756,
+      "cpu_cost_dkk": 1797.496368,
+      "mem_cost_dkk": 2573.339853,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 2729.340756,
-      "cost_bearer_efficiency": 0.146743,
-      "cost_bearer_waste_dkk": 2310.336839,
+      "cost_bearer_cost_dkk": 2573.339853,
+      "cost_bearer_efficiency": 0.146823,
+      "cost_bearer_waste_dkk": 1998.335034,
       "leaf_index": 24,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.2947,
+          "value": 0.2951,
           "weight": 0.6,
-          "contribution": 0.1768
+          "contribution": 0.177
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.1467,
+          "value": 0.1468,
           "weight": 0.4,
           "contribution": 0.0587
         }
@@ -3123,8 +3123,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.146743,
-        "jobs_with_measured_memory": 895
+        "avg_memory_efficiency": 0.146823,
+        "jobs_with_measured_memory": 894
       }
     }
   ],
@@ -3328,25 +3328,25 @@
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.2947,
+        "value": 0.2951,
         "weight": 0.6,
-        "contribution": 0.1768
+        "contribution": 0.177
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.1467,
+        "value": 0.1468,
         "weight": 0.4,
         "contribution": 0.0587
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 895,
+      "jobs_measured": 894,
       "jobs_excluded": 49,
-      "jobs_measured_pct": 94.81,
-      "cpu_hours_measured_pct": 3.37,
-      "memory_measured_pct": 13.74
+      "jobs_measured_pct": 94.8,
+      "cpu_hours_measured_pct": 3.95,
+      "memory_measured_pct": 14.57
     },
     "percentile": 69.6
   },
@@ -3355,17 +3355,17 @@
   "personal_route_token": "u_45af0bb3548d2e443ee8950e18eb13b7",
   "username": "lzh623",
   "percentile_position": {
-    "overall": 81.0,
-    "cpu": 90.2,
+    "overall": 80.5,
+    "cpu": 89.4,
     "memory": 90.8,
-    "savings": 62.0
+    "savings": 61.2
   },
   "peer_comparisons": [
     {
       "display_pseudonym": "Coral Comet",
-      "avg_cpu_efficiency": 0.156454133019811,
-      "avg_memory_efficiency": 0.2572172155283918,
-      "underutilized_cost_dkk": 26.247650284692313,
+      "avg_cpu_efficiency": 0.14884553744327778,
+      "avg_memory_efficiency": 0.24863324871769654,
+      "underutilized_cost_dkk": 27.9335516735812,
       "percentile_position": 48.1
     },
     {
