@@ -1,5 +1,11 @@
 const SAMPLE_BASE = './sample-data/';
 const PERSONAL_DATA_BASE = window.MJOLNIR_PERSONAL_DATA_BASE || './private-user-data/';
+// Synthetic demo bundles served from test-fixtures/, not private-user-data/users/:
+// publish_analytics_data.sh rsyncs that directory with --delete on every real
+// publish, so a fixture placed there is removed by the next nightly run.
+const DEMO_PERSONAL_BUNDLES = new Map([
+  ['mock-token-alex', 'test-fixtures/personal-analytics/mock-token-alex.json'],
+]);
 // Generated Node Insights JSON (both the latest snapshot and history) lives
 // in the dashboard-data repo (bentpetersendk/dashboard-data, mjolnir/
 // directory), not in this repo - see docs/DASHBOARD_DATA_MIGRATION.md.
@@ -671,7 +677,11 @@ export async function loadPersonalData(routeToken) {
   }
 
   const base = PERSONAL_DATA_BASE.endsWith('/') ? PERSONAL_DATA_BASE : `${PERSONAL_DATA_BASE}/`;
-  const personalBundle = await loadJson(`${base}users/${encodeURIComponent(token)}.json`);
+  const personalBundle = await loadJson(
+    DEMO_PERSONAL_BUNDLES.has(token)
+      ? `./${DEMO_PERSONAL_BUNDLES.get(token)}`
+      : `${base}users/${encodeURIComponent(token)}.json`,
+  );
   return {
     configured: true,
     loaded: true,
