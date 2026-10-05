@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-04T22:28:31Z",
+  "generated_at": "2026-10-05T22:26:56Z",
   "all_time_summary": {
     "jobs": 1178020,
     "completed_jobs": 1086249,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 45458,
-      "completed_jobs": 30905,
-      "failed_jobs": 14553,
-      "cpu_hours_allocated": 57960.858333,
-      "measured_cpu_hours": 39855.521389,
-      "avg_cpu_efficiency": 0.210387,
-      "jobs_with_measured_cpu": 44499,
-      "requested_mem_gb_hours": 304089.272778,
-      "measured_mem_gb_max_sum": 7619.310016,
-      "avg_memory_efficiency": 0.03499,
-      "jobs_with_measured_memory": 44462,
-      "estimated_cost_dkk": 6745.909679,
-      "underutilized_cost_dkk": 5416.872814,
+      "jobs": 43724,
+      "completed_jobs": 29187,
+      "failed_jobs": 14537,
+      "cpu_hours_allocated": 57602.877778,
+      "measured_cpu_hours": 39684.136944,
+      "avg_cpu_efficiency": 0.215449,
+      "jobs_with_measured_cpu": 42765,
+      "requested_mem_gb_hours": 303600.205,
+      "measured_mem_gb_max_sum": 7408.788134,
+      "avg_memory_efficiency": 0.034492,
+      "jobs_with_measured_memory": 42728,
+      "estimated_cost_dkk": 6722.640943,
+      "underutilized_cost_dkk": 5404.744067,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 3767.455792,
-      "mem_cost_dkk": 4941.450683,
+      "cpu_cost_dkk": 3744.187056,
+      "mem_cost_dkk": 4933.503331,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 4941.450683,
-      "cost_bearer_efficiency": 0.03499,
-      "cost_bearer_waste_dkk": 5416.872814,
+      "cost_bearer_cost_dkk": 4933.503331,
+      "cost_bearer_efficiency": 0.034492,
+      "cost_bearer_waste_dkk": 5404.744067,
       "leaf_index": 14,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.2104,
+          "value": 0.2154,
           "weight": 0.6,
-          "contribution": 0.1262
+          "contribution": 0.1293
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.035,
+          "value": 0.0345,
           "weight": 0.4,
-          "contribution": 0.014
+          "contribution": 0.0138
         }
       ]
     }
@@ -5283,8 +5283,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.210387,
-        "jobs_with_measured_cpu": 44499
+        "avg_cpu_efficiency": 0.215449,
+        "jobs_with_measured_cpu": 42765
       }
     },
     {
@@ -5294,8 +5294,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.03499,
-        "jobs_with_measured_memory": 44462
+        "avg_memory_efficiency": 0.034492,
+        "jobs_with_measured_memory": 42728
       }
     }
   ],
@@ -5499,27 +5499,27 @@
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.2104,
+        "value": 0.2154,
         "weight": 0.6,
-        "contribution": 0.1262
+        "contribution": 0.1293
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.035,
+        "value": 0.0345,
         "weight": 0.4,
-        "contribution": 0.014
+        "contribution": 0.0138
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 44499,
+      "jobs_measured": 42765,
       "jobs_excluded": 959,
-      "jobs_measured_pct": 97.89,
-      "cpu_hours_measured_pct": 68.76,
-      "memory_measured_pct": 2.51
+      "jobs_measured_pct": 97.81,
+      "cpu_hours_measured_pct": 68.89,
+      "memory_measured_pct": 2.44
     },
-    "percentile": 46.2
+    "percentile": 47.1
   },
   "public_user_id": "usr_df6a6852c658",
   "display_pseudonym": "Indigo Thistle",
