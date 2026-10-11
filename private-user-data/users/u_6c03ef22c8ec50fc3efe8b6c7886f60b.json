@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-10T22:25:29Z",
+  "generated_at": "2026-10-11T22:25:38Z",
   "all_time_summary": {
     "jobs": 1662,
     "completed_jobs": 1021,
@@ -163,42 +163,42 @@
       ]
     },
     "180d": {
-      "jobs": 80,
-      "completed_jobs": 40,
-      "failed_jobs": 40,
-      "cpu_hours_allocated": 705.371667,
-      "measured_cpu_hours": 184.209167,
-      "avg_cpu_efficiency": 0.297126,
-      "jobs_with_measured_cpu": 74,
-      "requested_mem_gb_hours": 26328.312778,
-      "measured_mem_gb_max_sum": 951.264101,
-      "avg_memory_efficiency": 0.117554,
-      "jobs_with_measured_memory": 78,
-      "estimated_cost_dkk": 427.916793,
-      "underutilized_cost_dkk": 328.975872,
+      "jobs": 78,
+      "completed_jobs": 39,
+      "failed_jobs": 39,
+      "cpu_hours_allocated": 700.402778,
+      "measured_cpu_hours": 183.278611,
+      "avg_cpu_efficiency": 0.301422,
+      "jobs_with_measured_cpu": 72,
+      "requested_mem_gb_hours": 26221.623889,
+      "measured_mem_gb_max_sum": 934.501597,
+      "avg_memory_efficiency": 0.110724,
+      "jobs_with_measured_memory": 76,
+      "estimated_cost_dkk": 426.183099,
+      "underutilized_cost_dkk": 327.458922,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 45.849158,
-      "mem_cost_dkk": 427.835083,
+      "cpu_cost_dkk": 45.526181,
+      "mem_cost_dkk": 426.101388,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 427.835083,
-      "cost_bearer_efficiency": 0.117554,
-      "cost_bearer_waste_dkk": 328.975872,
+      "cost_bearer_cost_dkk": 426.101388,
+      "cost_bearer_efficiency": 0.110724,
+      "cost_bearer_waste_dkk": 327.458922,
       "leaf_index": 23,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.2971,
+          "value": 0.3014,
           "weight": 0.6,
-          "contribution": 0.1783
+          "contribution": 0.1809
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.1176,
+          "value": 0.1107,
           "weight": 0.4,
-          "contribution": 0.047
+          "contribution": 0.0443
         }
       ]
     }
@@ -2103,8 +2103,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.117554,
-        "jobs_with_measured_memory": 78
+        "avg_memory_efficiency": 0.110724,
+        "jobs_with_measured_memory": 76
       }
     }
   ],
@@ -2308,27 +2308,27 @@
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.2971,
+        "value": 0.3014,
         "weight": 0.6,
-        "contribution": 0.1783
+        "contribution": 0.1809
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.1176,
+        "value": 0.1107,
         "weight": 0.4,
-        "contribution": 0.047
+        "contribution": 0.0443
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 78,
+      "jobs_measured": 76,
       "jobs_excluded": 2,
-      "jobs_measured_pct": 97.5,
-      "cpu_hours_measured_pct": 26.12,
-      "memory_measured_pct": 3.61
+      "jobs_measured_pct": 97.44,
+      "cpu_hours_measured_pct": 26.17,
+      "memory_measured_pct": 3.56
     },
-    "percentile": 65.5
+    "percentile": 64.9
   },
   "public_user_id": "usr_0d1a84c8aa98",
   "display_pseudonym": "Sapphire Beacon",
@@ -2343,9 +2343,9 @@
   "peer_comparisons": [
     {
       "display_pseudonym": "White Ibis",
-      "avg_cpu_efficiency": 0.2297869129141365,
-      "avg_memory_efficiency": 0.09333365753892017,
-      "underutilized_cost_dkk": 4725.012413478453,
+      "avg_cpu_efficiency": 0.2439094024234034,
+      "avg_memory_efficiency": 0.09850693340983635,
+      "underutilized_cost_dkk": 4788.212515553351,
       "percentile_position": 86.0
     },
     {

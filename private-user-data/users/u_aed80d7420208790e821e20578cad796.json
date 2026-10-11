@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-10T22:25:22Z",
+  "generated_at": "2026-10-11T22:25:32Z",
   "all_time_summary": {
     "jobs": 38,
     "completed_jobs": 8,
@@ -118,17 +118,17 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 25,
-      "completed_jobs": 7,
+      "jobs": 24,
+      "completed_jobs": 6,
       "failed_jobs": 18,
       "cpu_hours_allocated": 28541.505833,
       "measured_cpu_hours": 4294.7975,
       "avg_cpu_efficiency": 0.202014,
       "jobs_with_measured_cpu": 21,
       "requested_mem_gb_hours": 453792.747222,
-      "measured_mem_gb_max_sum": 613.169494,
-      "avg_memory_efficiency": 0.126409,
-      "jobs_with_measured_memory": 22,
+      "measured_mem_gb_max_sum": 613.167617,
+      "avg_memory_efficiency": 0.132428,
+      "jobs_with_measured_memory": 21,
       "estimated_cost_dkk": 7374.132151,
       "underutilized_cost_dkk": 5660.222552,
       "gpu_hours": 0.0,
@@ -137,7 +137,7 @@
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
       "cost_bearer_cost_dkk": 7374.132142,
-      "cost_bearer_efficiency": 0.126409,
+      "cost_bearer_efficiency": 0.132428,
       "cost_bearer_waste_dkk": 5660.222552,
       "leaf_index": 17,
       "leaf_index_components": [
@@ -151,9 +151,9 @@
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.1264,
+          "value": 0.1324,
           "weight": 0.4,
-          "contribution": 0.0506
+          "contribution": 0.053
         }
       ]
     }
@@ -584,8 +584,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.126409,
-        "jobs_with_measured_memory": 22
+        "avg_memory_efficiency": 0.132428,
+        "jobs_with_measured_memory": 21
       }
     }
   ],
@@ -796,20 +796,20 @@
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.1264,
+        "value": 0.1324,
         "weight": 0.4,
-        "contribution": 0.0506
+        "contribution": 0.053
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 22,
+      "jobs_measured": 21,
       "jobs_excluded": 3,
-      "jobs_measured_pct": 88.0,
+      "jobs_measured_pct": 87.5,
       "cpu_hours_measured_pct": 15.05,
       "memory_measured_pct": 0.14
     },
-    "percentile": 52.4
+    "percentile": 53.0
   },
   "public_user_id": "usr_e573449750bb",
   "display_pseudonym": "Ivory Tundra",
