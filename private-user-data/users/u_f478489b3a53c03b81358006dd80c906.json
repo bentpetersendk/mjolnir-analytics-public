@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-11T22:25:27Z",
+  "generated_at": "2026-10-12T22:25:23Z",
   "all_time_summary": {
     "jobs": 76,
     "completed_jobs": 43,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 17,
-      "completed_jobs": 9,
-      "failed_jobs": 8,
-      "cpu_hours_allocated": 164.394444,
-      "measured_cpu_hours": 19.111111,
-      "avg_cpu_efficiency": 0.172153,
-      "jobs_with_measured_cpu": 16,
-      "requested_mem_gb_hours": 1080.638889,
-      "measured_mem_gb_max_sum": 396.556805,
-      "avg_memory_efficiency": 0.127629,
-      "jobs_with_measured_memory": 17,
-      "estimated_cost_dkk": 17.567514,
-      "underutilized_cost_dkk": 8.749075,
+      "jobs": 10,
+      "completed_jobs": 6,
+      "failed_jobs": 4,
+      "cpu_hours_allocated": 155.349722,
+      "measured_cpu_hours": 14.9775,
+      "avg_cpu_efficiency": 0.206955,
+      "jobs_with_measured_cpu": 9,
+      "requested_mem_gb_hours": 1030.849444,
+      "measured_mem_gb_max_sum": 381.952402,
+      "avg_memory_efficiency": 0.190421,
+      "jobs_with_measured_memory": 10,
+      "estimated_cost_dkk": 16.752649,
+      "underutilized_cost_dkk": 8.198492,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 10.685639,
-      "mem_cost_dkk": 17.560382,
+      "cpu_cost_dkk": 10.097732,
+      "mem_cost_dkk": 16.751303,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 17.560382,
-      "cost_bearer_efficiency": 0.127629,
-      "cost_bearer_waste_dkk": 8.749075,
-      "leaf_index": 15,
+      "cost_bearer_cost_dkk": 16.751303,
+      "cost_bearer_efficiency": 0.190421,
+      "cost_bearer_waste_dkk": 8.198492,
+      "leaf_index": 20,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.1722,
+          "value": 0.207,
           "weight": 0.6,
-          "contribution": 0.1033
+          "contribution": 0.1242
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.1276,
+          "value": 0.1904,
           "weight": 0.4,
-          "contribution": 0.0511
+          "contribution": 0.0762
         }
       ]
     }
@@ -273,8 +273,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.172153,
-        "jobs_with_measured_cpu": 16
+        "avg_cpu_efficiency": 0.206955,
+        "jobs_with_measured_cpu": 9
       }
     },
     {
@@ -284,8 +284,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.127629,
-        "jobs_with_measured_memory": 17
+        "avg_memory_efficiency": 0.190421,
+        "jobs_with_measured_memory": 10
       }
     }
   ],
@@ -484,32 +484,32 @@
   "leaf": {
     "version": "2.0",
     "window_days": 180,
-    "leaf_index": 15,
+    "leaf_index": 20,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.1722,
+        "value": 0.207,
         "weight": 0.6,
-        "contribution": 0.1033
+        "contribution": 0.1242
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.1276,
+        "value": 0.1904,
         "weight": 0.4,
-        "contribution": 0.0511
+        "contribution": 0.0762
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 17,
+      "jobs_measured": 10,
       "jobs_excluded": 0,
       "jobs_measured_pct": 100.0,
-      "cpu_hours_measured_pct": 11.63,
-      "memory_measured_pct": 36.7
+      "cpu_hours_measured_pct": 9.64,
+      "memory_measured_pct": 37.05
     },
-    "percentile": 48.8
+    "percentile": 59.5
   },
   "public_user_id": "usr_37ae251a4b19",
   "display_pseudonym": "Violet Falcon",
