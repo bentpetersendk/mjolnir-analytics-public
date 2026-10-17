@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-16T22:26:14Z",
+  "generated_at": "2026-10-17T22:27:40Z",
   "all_time_summary": {
     "jobs": 857,
     "completed_jobs": 20,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 826,
+      "jobs": 45,
       "completed_jobs": 11,
-      "failed_jobs": 815,
-      "cpu_hours_allocated": 437.517222,
+      "failed_jobs": 34,
+      "cpu_hours_allocated": 412.701389,
       "measured_cpu_hours": 214.582778,
-      "avg_cpu_efficiency": 0.039178,
-      "jobs_with_measured_cpu": 59,
-      "requested_mem_gb_hours": 6267.621111,
-      "measured_mem_gb_max_sum": 320.014923,
-      "avg_memory_efficiency": 0.029157,
-      "jobs_with_measured_memory": 66,
-      "estimated_cost_dkk": 101.849493,
-      "underutilized_cost_dkk": 87.056181,
+      "avg_cpu_efficiency": 0.067986,
+      "jobs_with_measured_cpu": 34,
+      "requested_mem_gb_hours": 6056.359444,
+      "measured_mem_gb_max_sum": 319.905071,
+      "avg_memory_efficiency": 0.046885,
+      "jobs_with_measured_memory": 41,
+      "estimated_cost_dkk": 98.416491,
+      "underutilized_cost_dkk": 83.623442,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 28.438619,
-      "mem_cost_dkk": 101.848843,
+      "cpu_cost_dkk": 26.82559,
+      "mem_cost_dkk": 98.415841,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 101.848843,
-      "cost_bearer_efficiency": 0.029157,
-      "cost_bearer_waste_dkk": 87.056181,
-      "leaf_index": 4,
+      "cost_bearer_cost_dkk": 98.415841,
+      "cost_bearer_efficiency": 0.046885,
+      "cost_bearer_waste_dkk": 83.623442,
+      "leaf_index": 6,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.0392,
+          "value": 0.068,
           "weight": 0.6,
-          "contribution": 0.0235
+          "contribution": 0.0408
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0292,
+          "value": 0.0469,
           "weight": 0.4,
-          "contribution": 0.0117
+          "contribution": 0.0188
         }
       ]
     }
@@ -318,8 +318,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.039178,
-        "jobs_with_measured_cpu": 59
+        "avg_cpu_efficiency": 0.067986,
+        "jobs_with_measured_cpu": 34
       }
     },
     {
@@ -329,8 +329,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.029157,
-        "jobs_with_measured_memory": 66
+        "avg_memory_efficiency": 0.046885,
+        "jobs_with_measured_memory": 41
       }
     }
   ],
@@ -529,32 +529,32 @@
   "leaf": {
     "version": "2.0",
     "window_days": 180,
-    "leaf_index": 4,
+    "leaf_index": 6,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.0392,
+        "value": 0.068,
         "weight": 0.6,
-        "contribution": 0.0235
+        "contribution": 0.0408
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0292,
+        "value": 0.0469,
         "weight": 0.4,
-        "contribution": 0.0117
+        "contribution": 0.0188
       }
     ],
-    "confidence": "very_low",
+    "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 66,
-      "jobs_excluded": 760,
-      "jobs_measured_pct": 7.99,
-      "cpu_hours_measured_pct": 49.05,
-      "memory_measured_pct": 5.11
+      "jobs_measured": 41,
+      "jobs_excluded": 4,
+      "jobs_measured_pct": 91.11,
+      "cpu_hours_measured_pct": 51.99,
+      "memory_measured_pct": 5.28
     },
-    "percentile": 17.2
+    "percentile": 21.9
   },
   "public_user_id": "usr_8905d7dc6f6f",
   "display_pseudonym": "Bright Aster",
