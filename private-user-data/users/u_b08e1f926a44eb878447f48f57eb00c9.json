@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-17T22:27:43Z",
+  "generated_at": "2026-10-18T22:43:15Z",
   "all_time_summary": {
     "jobs": 33296,
     "completed_jobs": 16528,
@@ -133,40 +133,40 @@
       ]
     },
     "180d": {
-      "jobs": 23587,
-      "completed_jobs": 10823,
-      "failed_jobs": 12764,
-      "cpu_hours_allocated": 52723.014722,
-      "measured_cpu_hours": 25039.9825,
-      "avg_cpu_efficiency": 0.09135,
-      "jobs_with_measured_cpu": 21478,
-      "requested_mem_gb_hours": 1173895.762501,
-      "measured_mem_gb_max_sum": 49979.904787,
-      "avg_memory_efficiency": 0.032574,
-      "jobs_with_measured_memory": 20972,
-      "estimated_cost_dkk": 19760.312068,
-      "underutilized_cost_dkk": 18574.438897,
+      "jobs": 23565,
+      "completed_jobs": 10812,
+      "failed_jobs": 12753,
+      "cpu_hours_allocated": 52317.166389,
+      "measured_cpu_hours": 24779.310278,
+      "avg_cpu_efficiency": 0.091165,
+      "jobs_with_measured_cpu": 21459,
+      "requested_mem_gb_hours": 1167403.150834,
+      "measured_mem_gb_max_sum": 49763.526318,
+      "avg_memory_efficiency": 0.032516,
+      "jobs_with_measured_memory": 20951,
+      "estimated_cost_dkk": 19654.806776,
+      "underutilized_cost_dkk": 18521.338636,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 3426.995957,
-      "mem_cost_dkk": 19075.806141,
+      "cpu_cost_dkk": 3400.615815,
+      "mem_cost_dkk": 18970.301201,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 19075.806141,
-      "cost_bearer_efficiency": 0.032574,
-      "cost_bearer_waste_dkk": 18574.438897,
+      "cost_bearer_cost_dkk": 18970.301201,
+      "cost_bearer_efficiency": 0.032516,
+      "cost_bearer_waste_dkk": 18521.338636,
       "leaf_index": 7,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.0914,
+          "value": 0.0912,
           "weight": 0.6,
-          "contribution": 0.0548
+          "contribution": 0.0547
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0326,
+          "value": 0.0325,
           "weight": 0.4,
           "contribution": 0.013
         }
@@ -1383,8 +1383,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.09135,
-        "jobs_with_measured_cpu": 21478
+        "avg_cpu_efficiency": 0.091165,
+        "jobs_with_measured_cpu": 21459
       }
     },
     {
@@ -1394,8 +1394,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.032574,
-        "jobs_with_measured_memory": 20972
+        "avg_memory_efficiency": 0.032516,
+        "jobs_with_measured_memory": 20951
       }
     }
   ],
@@ -1599,24 +1599,24 @@
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.0914,
+        "value": 0.0912,
         "weight": 0.6,
-        "contribution": 0.0548
+        "contribution": 0.0547
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0326,
+        "value": 0.0325,
         "weight": 0.4,
         "contribution": 0.013
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 21478,
-      "jobs_excluded": 2109,
+      "jobs_measured": 21459,
+      "jobs_excluded": 2106,
       "jobs_measured_pct": 91.06,
-      "cpu_hours_measured_pct": 47.49,
+      "cpu_hours_measured_pct": 47.36,
       "memory_measured_pct": 4.26
     },
     "percentile": 24.3
@@ -1626,10 +1626,10 @@
   "personal_route_token": "u_b08e1f926a44eb878447f48f57eb00c9",
   "username": "pgk128",
   "percentile_position": {
-    "overall": 31.0,
-    "cpu": 14.5,
+    "overall": 31.5,
+    "cpu": 15.3,
     "memory": 11.6,
-    "savings": 66.9
+    "savings": 67.7
   },
   "peer_comparisons": [
     {
