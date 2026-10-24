@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-23T23:47:55Z",
+  "generated_at": "2026-10-24T23:16:54Z",
   "all_time_summary": {
     "jobs": 19,
     "completed_jobs": 6,
@@ -118,17 +118,17 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 19,
+      "jobs": 16,
       "completed_jobs": 6,
-      "failed_jobs": 13,
+      "failed_jobs": 10,
       "cpu_hours_allocated": 46.035833,
       "measured_cpu_hours": 23.3325,
       "avg_cpu_efficiency": 0.235161,
       "jobs_with_measured_cpu": 9,
       "requested_mem_gb_hours": 276.236111,
-      "measured_mem_gb_max_sum": 23.056211,
-      "avg_memory_efficiency": 0.027651,
-      "jobs_with_measured_memory": 12,
+      "measured_mem_gb_max_sum": 23.055353,
+      "avg_memory_efficiency": 0.030164,
+      "jobs_with_measured_memory": 11,
       "estimated_cost_dkk": 4.488846,
       "underutilized_cost_dkk": 4.138033,
       "gpu_hours": 0.0,
@@ -137,7 +137,7 @@
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
       "cost_bearer_cost_dkk": 4.488837,
-      "cost_bearer_efficiency": 0.027651,
+      "cost_bearer_efficiency": 0.030164,
       "cost_bearer_waste_dkk": 4.138033,
       "leaf_index": 15,
       "leaf_index_components": [
@@ -151,9 +151,9 @@
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0277,
+          "value": 0.0302,
           "weight": 0.4,
-          "contribution": 0.0111
+          "contribution": 0.0121
         }
       ]
     }
@@ -254,8 +254,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.027651,
-        "jobs_with_measured_memory": 12
+        "avg_memory_efficiency": 0.030164,
+        "jobs_with_measured_memory": 11
       }
     }
   ],
@@ -428,20 +428,20 @@
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0277,
+        "value": 0.0302,
         "weight": 0.4,
-        "contribution": 0.0111
+        "contribution": 0.0121
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 12,
-      "jobs_excluded": 7,
-      "jobs_measured_pct": 63.16,
+      "jobs_measured": 11,
+      "jobs_excluded": 5,
+      "jobs_measured_pct": 68.75,
       "cpu_hours_measured_pct": 50.68,
       "memory_measured_pct": 8.35
     },
-    "percentile": 49.1
+    "percentile": 50.0
   },
   "public_user_id": "usr_def460c25862",
   "display_pseudonym": "Dusty Nova",

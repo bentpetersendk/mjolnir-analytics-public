@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-23T23:47:43Z",
+  "generated_at": "2026-10-24T23:16:39Z",
   "all_time_summary": {
     "jobs": 28,
     "completed_jobs": 13,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 28,
-      "completed_jobs": 13,
-      "failed_jobs": 15,
-      "cpu_hours_allocated": 90.926111,
-      "measured_cpu_hours": 23.855556,
-      "avg_cpu_efficiency": 0.242139,
-      "jobs_with_measured_cpu": 13,
-      "requested_mem_gb_hours": 555.201111,
-      "measured_mem_gb_max_sum": 158.484295,
-      "avg_memory_efficiency": 0.03763,
-      "jobs_with_measured_memory": 28,
-      "estimated_cost_dkk": 9.022018,
-      "underutilized_cost_dkk": 5.044079,
+      "jobs": 14,
+      "completed_jobs": 8,
+      "failed_jobs": 6,
+      "cpu_hours_allocated": 88.515,
+      "measured_cpu_hours": 22.638611,
+      "avg_cpu_efficiency": 0.18439,
+      "jobs_with_measured_cpu": 9,
+      "requested_mem_gb_hours": 531.09,
+      "measured_mem_gb_max_sum": 154.424237,
+      "avg_memory_efficiency": 0.07236,
+      "jobs_with_measured_memory": 14,
+      "estimated_cost_dkk": 8.630212,
+      "underutilized_cost_dkk": 4.657544,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 5.910197,
-      "mem_cost_dkk": 9.022018,
+      "cpu_cost_dkk": 5.753475,
+      "mem_cost_dkk": 8.630212,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 9.022018,
-      "cost_bearer_efficiency": 0.03763,
-      "cost_bearer_waste_dkk": 5.044079,
-      "leaf_index": 16,
+      "cost_bearer_cost_dkk": 8.630212,
+      "cost_bearer_efficiency": 0.07236,
+      "cost_bearer_waste_dkk": 4.657544,
+      "leaf_index": 14,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.2421,
+          "value": 0.1844,
           "weight": 0.6,
-          "contribution": 0.1453
+          "contribution": 0.1106
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0376,
+          "value": 0.0724,
           "weight": 0.4,
-          "contribution": 0.0151
+          "contribution": 0.0289
         }
       ]
     }
@@ -228,8 +228,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.242139,
-        "jobs_with_measured_cpu": 13
+        "avg_cpu_efficiency": 0.18439,
+        "jobs_with_measured_cpu": 9
       }
     },
     {
@@ -239,8 +239,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.03763,
-        "jobs_with_measured_memory": 28
+        "avg_memory_efficiency": 0.07236,
+        "jobs_with_measured_memory": 14
       }
     }
   ],
@@ -439,32 +439,32 @@
   "leaf": {
     "version": "2.0",
     "window_days": 180,
-    "leaf_index": 16,
+    "leaf_index": 14,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.2421,
+        "value": 0.1844,
         "weight": 0.6,
-        "contribution": 0.1453
+        "contribution": 0.1106
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0376,
+        "value": 0.0724,
         "weight": 0.4,
-        "contribution": 0.0151
+        "contribution": 0.0289
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 28,
+      "jobs_measured": 14,
       "jobs_excluded": 0,
       "jobs_measured_pct": 100.0,
-      "cpu_hours_measured_pct": 26.24,
-      "memory_measured_pct": 28.55
+      "cpu_hours_measured_pct": 25.58,
+      "memory_measured_pct": 29.08
     },
-    "percentile": 52.1
+    "percentile": 46.4
   },
   "public_user_id": "usr_fb1365b8137b",
   "display_pseudonym": "Silver Otter",
