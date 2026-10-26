@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-24T23:16:54Z",
+  "generated_at": "2026-10-26T00:26:56Z",
   "all_time_summary": {
     "jobs": 25,
     "completed_jobs": 8,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 23,
-      "completed_jobs": 8,
-      "failed_jobs": 15,
-      "cpu_hours_allocated": 87.642778,
-      "measured_cpu_hours": 36.064444,
-      "avg_cpu_efficiency": 0.24914,
-      "jobs_with_measured_cpu": 16,
-      "requested_mem_gb_hours": 652.910556,
-      "measured_mem_gb_max_sum": 187.606983,
-      "avg_memory_efficiency": 0.04948,
-      "jobs_with_measured_memory": 23,
-      "estimated_cost_dkk": 10.609896,
-      "underutilized_cost_dkk": 6.269165,
+      "jobs": 18,
+      "completed_jobs": 5,
+      "failed_jobs": 13,
+      "cpu_hours_allocated": 53.263611,
+      "measured_cpu_hours": 6.073333,
+      "avg_cpu_efficiency": 0.077567,
+      "jobs_with_measured_cpu": 11,
+      "requested_mem_gb_hours": 309.118889,
+      "measured_mem_gb_max_sum": 151.299461,
+      "avg_memory_efficiency": 0.049777,
+      "jobs_with_measured_memory": 18,
+      "estimated_cost_dkk": 5.023281,
+      "underutilized_cost_dkk": 1.126309,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 5.696781,
-      "mem_cost_dkk": 10.609797,
+      "cpu_cost_dkk": 3.462135,
+      "mem_cost_dkk": 5.023182,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 10.609797,
-      "cost_bearer_efficiency": 0.04948,
-      "cost_bearer_waste_dkk": 6.269165,
-      "leaf_index": 17,
+      "cost_bearer_cost_dkk": 5.023182,
+      "cost_bearer_efficiency": 0.049777,
+      "cost_bearer_waste_dkk": 1.126309,
+      "leaf_index": 7,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.2491,
+          "value": 0.0776,
           "weight": 0.6,
-          "contribution": 0.1495
+          "contribution": 0.0465
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0495,
+          "value": 0.0498,
           "weight": 0.4,
-          "contribution": 0.0198
+          "contribution": 0.0199
         }
       ]
     }
@@ -243,8 +243,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.24914,
-        "jobs_with_measured_cpu": 16
+        "avg_cpu_efficiency": 0.077567,
+        "jobs_with_measured_cpu": 11
       }
     },
     {
@@ -254,8 +254,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.04948,
-        "jobs_with_measured_memory": 23
+        "avg_memory_efficiency": 0.049777,
+        "jobs_with_measured_memory": 18
       }
     }
   ],
@@ -454,32 +454,32 @@
   "leaf": {
     "version": "2.0",
     "window_days": 180,
-    "leaf_index": 17,
+    "leaf_index": 7,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.2491,
+        "value": 0.0776,
         "weight": 0.6,
-        "contribution": 0.1495
+        "contribution": 0.0465
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0495,
+        "value": 0.0498,
         "weight": 0.4,
-        "contribution": 0.0198
+        "contribution": 0.0199
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 23,
+      "jobs_measured": 18,
       "jobs_excluded": 0,
       "jobs_measured_pct": 100.0,
-      "cpu_hours_measured_pct": 41.15,
-      "memory_measured_pct": 28.73
+      "cpu_hours_measured_pct": 11.4,
+      "memory_measured_pct": 48.95
     },
-    "percentile": 53.6
+    "percentile": 23.6
   },
   "public_user_id": "usr_0587cdf9bdc2",
   "display_pseudonym": "Tidal Nova",

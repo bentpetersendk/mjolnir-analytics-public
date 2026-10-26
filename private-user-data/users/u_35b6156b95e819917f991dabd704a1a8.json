@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-24T23:16:54Z",
+  "generated_at": "2026-10-26T00:26:56Z",
   "all_time_summary": {
     "jobs": 19,
     "completed_jobs": 6,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 16,
+      "jobs": 11,
       "completed_jobs": 6,
-      "failed_jobs": 10,
-      "cpu_hours_allocated": 46.035833,
+      "failed_jobs": 5,
+      "cpu_hours_allocated": 46.030278,
       "measured_cpu_hours": 23.3325,
-      "avg_cpu_efficiency": 0.235161,
-      "jobs_with_measured_cpu": 9,
-      "requested_mem_gb_hours": 276.236111,
-      "measured_mem_gb_max_sum": 23.055353,
-      "avg_memory_efficiency": 0.030164,
-      "jobs_with_measured_memory": 11,
-      "estimated_cost_dkk": 4.488846,
-      "underutilized_cost_dkk": 4.138033,
+      "avg_cpu_efficiency": 0.30235,
+      "jobs_with_measured_cpu": 7,
+      "requested_mem_gb_hours": 276.180556,
+      "measured_mem_gb_max_sum": 23.049986,
+      "avg_memory_efficiency": 0.055294,
+      "jobs_with_measured_memory": 6,
+      "estimated_cost_dkk": 4.487943,
+      "underutilized_cost_dkk": 4.13713,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 2.992329,
-      "mem_cost_dkk": 4.488837,
+      "cpu_cost_dkk": 2.991968,
+      "mem_cost_dkk": 4.487934,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 4.488837,
-      "cost_bearer_efficiency": 0.030164,
-      "cost_bearer_waste_dkk": 4.138033,
-      "leaf_index": 15,
+      "cost_bearer_cost_dkk": 4.487934,
+      "cost_bearer_efficiency": 0.055294,
+      "cost_bearer_waste_dkk": 4.13713,
+      "leaf_index": 20,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.2352,
+          "value": 0.3024,
           "weight": 0.6,
-          "contribution": 0.1411
+          "contribution": 0.1814
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0302,
+          "value": 0.0553,
           "weight": 0.4,
-          "contribution": 0.0121
+          "contribution": 0.0221
         }
       ]
     }
@@ -237,25 +237,14 @@
   ],
   "recommendations": [
     {
-      "type": "cpu_efficiency",
-      "severity": "high",
-      "title": "Low measured CPU utilization",
-      "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-      "confidence": "medium",
-      "evidence": {
-        "avg_cpu_efficiency": 0.235161,
-        "jobs_with_measured_cpu": 9
-      }
-    },
-    {
       "type": "memory_efficiency",
       "severity": "medium",
       "title": "Requested memory is much higher than MaxRSS",
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.030164,
-        "jobs_with_measured_memory": 11
+        "avg_memory_efficiency": 0.055294,
+        "jobs_with_measured_memory": 6
       }
     }
   ],
@@ -416,32 +405,32 @@
   "leaf": {
     "version": "2.0",
     "window_days": 180,
-    "leaf_index": 15,
+    "leaf_index": 20,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.2352,
+        "value": 0.3024,
         "weight": 0.6,
-        "contribution": 0.1411
+        "contribution": 0.1814
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0302,
+        "value": 0.0553,
         "weight": 0.4,
-        "contribution": 0.0121
+        "contribution": 0.0221
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 11,
-      "jobs_excluded": 5,
-      "jobs_measured_pct": 68.75,
-      "cpu_hours_measured_pct": 50.68,
+      "jobs_measured": 7,
+      "jobs_excluded": 4,
+      "jobs_measured_pct": 63.64,
+      "cpu_hours_measured_pct": 50.69,
       "memory_measured_pct": 8.35
     },
-    "percentile": 50.0
+    "percentile": 61.2
   },
   "public_user_id": "usr_def460c25862",
   "display_pseudonym": "Dusty Nova",
