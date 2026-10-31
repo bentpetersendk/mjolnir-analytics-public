@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-30T00:16:40Z",
+  "generated_at": "2026-10-31T00:16:30Z",
   "all_time_summary": {
     "jobs": 271,
     "completed_jobs": 150,
@@ -133,42 +133,42 @@
       ]
     },
     "180d": {
-      "jobs": 143,
-      "completed_jobs": 89,
+      "jobs": 139,
+      "completed_jobs": 85,
       "failed_jobs": 54,
-      "cpu_hours_allocated": 1199.588056,
-      "measured_cpu_hours": 407.854444,
-      "avg_cpu_efficiency": 0.207231,
-      "jobs_with_measured_cpu": 138,
-      "requested_mem_gb_hours": 16422.496111,
-      "measured_mem_gb_max_sum": 1056.939143,
-      "avg_memory_efficiency": 0.059224,
-      "jobs_with_measured_memory": 138,
-      "estimated_cost_dkk": 266.865571,
-      "underutilized_cost_dkk": 250.476935,
+      "cpu_hours_allocated": 1112.490278,
+      "measured_cpu_hours": 382.844722,
+      "avg_cpu_efficiency": 0.204206,
+      "jobs_with_measured_cpu": 134,
+      "requested_mem_gb_hours": 14986.365,
+      "measured_mem_gb_max_sum": 1052.90717,
+      "avg_memory_efficiency": 0.060762,
+      "jobs_with_measured_memory": 134,
+      "estimated_cost_dkk": 243.52844,
+      "underutilized_cost_dkk": 227.341816,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 77.973224,
-      "mem_cost_dkk": 266.865562,
+      "cpu_cost_dkk": 72.311868,
+      "mem_cost_dkk": 243.528431,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 266.865562,
-      "cost_bearer_efficiency": 0.059224,
-      "cost_bearer_waste_dkk": 250.476935,
+      "cost_bearer_cost_dkk": 243.528431,
+      "cost_bearer_efficiency": 0.060762,
+      "cost_bearer_waste_dkk": 227.341816,
       "leaf_index": 15,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.2072,
+          "value": 0.2042,
           "weight": 0.6,
-          "contribution": 0.1243
+          "contribution": 0.1225
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0592,
+          "value": 0.0608,
           "weight": 0.4,
-          "contribution": 0.0237
+          "contribution": 0.0243
         }
       ]
     }
@@ -708,8 +708,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.207231,
-        "jobs_with_measured_cpu": 138
+        "avg_cpu_efficiency": 0.204206,
+        "jobs_with_measured_cpu": 134
       }
     },
     {
@@ -719,8 +719,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.059224,
-        "jobs_with_measured_memory": 138
+        "avg_memory_efficiency": 0.060762,
+        "jobs_with_measured_memory": 134
       }
     }
   ],
@@ -924,35 +924,35 @@
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.2072,
+        "value": 0.2042,
         "weight": 0.6,
-        "contribution": 0.1243
+        "contribution": 0.1225
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0592,
+        "value": 0.0608,
         "weight": 0.4,
-        "contribution": 0.0237
+        "contribution": 0.0243
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 138,
+      "jobs_measured": 134,
       "jobs_excluded": 5,
-      "jobs_measured_pct": 96.5,
-      "cpu_hours_measured_pct": 34.0,
-      "memory_measured_pct": 6.44
+      "jobs_measured_pct": 96.4,
+      "cpu_hours_measured_pct": 34.41,
+      "memory_measured_pct": 7.03
     },
-    "percentile": 51.5
+    "percentile": 52.5
   },
   "public_user_id": "usr_30079e49effb",
   "display_pseudonym": "Azure Condor",
   "personal_route_token": "u_8a638daecbd4d6d9b886f44aad052908",
   "username": "krg114",
   "percentile_position": {
-    "overall": 44.8,
-    "cpu": 46.3,
+    "overall": 44.5,
+    "cpu": 45.5,
     "memory": 40.8,
     "savings": 47.3
   },
