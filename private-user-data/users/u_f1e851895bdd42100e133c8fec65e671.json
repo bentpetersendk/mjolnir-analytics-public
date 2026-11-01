@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-31T00:16:31Z",
+  "generated_at": "2026-11-01T00:15:36Z",
   "all_time_summary": {
     "jobs": 159,
     "completed_jobs": 88,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 25,
-      "completed_jobs": 9,
-      "failed_jobs": 16,
-      "cpu_hours_allocated": 69.325833,
-      "measured_cpu_hours": 35.518611,
-      "avg_cpu_efficiency": 0.125811,
-      "jobs_with_measured_cpu": 16,
-      "requested_mem_gb_hours": 415.255,
-      "measured_mem_gb_max_sum": 17.663257,
-      "avg_memory_efficiency": 0.022198,
-      "jobs_with_measured_memory": 17,
-      "estimated_cost_dkk": 6.754719,
-      "underutilized_cost_dkk": 6.1073,
+      "jobs": 9,
+      "completed_jobs": 4,
+      "failed_jobs": 5,
+      "cpu_hours_allocated": 66.929167,
+      "measured_cpu_hours": 34.860556,
+      "avg_cpu_efficiency": 0.214423,
+      "jobs_with_measured_cpu": 5,
+      "requested_mem_gb_hours": 400.875,
+      "measured_mem_gb_max_sum": 11.370073,
+      "avg_memory_efficiency": 0.04893,
+      "jobs_with_measured_memory": 5,
+      "estimated_cost_dkk": 6.521044,
+      "underutilized_cost_dkk": 5.88194,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 4.506179,
-      "mem_cost_dkk": 6.747894,
+      "cpu_cost_dkk": 4.350396,
+      "mem_cost_dkk": 6.514219,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 6.747894,
-      "cost_bearer_efficiency": 0.022198,
-      "cost_bearer_waste_dkk": 6.1073,
-      "leaf_index": 8,
+      "cost_bearer_cost_dkk": 6.514219,
+      "cost_bearer_efficiency": 0.04893,
+      "cost_bearer_waste_dkk": 5.88194,
+      "leaf_index": 15,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.1258,
+          "value": 0.2144,
           "weight": 0.6,
-          "contribution": 0.0755
+          "contribution": 0.1287
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0222,
+          "value": 0.0489,
           "weight": 0.4,
-          "contribution": 0.0089
+          "contribution": 0.0196
         }
       ]
     }
@@ -288,8 +288,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.125811,
-        "jobs_with_measured_cpu": 16
+        "avg_cpu_efficiency": 0.214423,
+        "jobs_with_measured_cpu": 5
       }
     },
     {
@@ -299,8 +299,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.022198,
-        "jobs_with_measured_memory": 17
+        "avg_memory_efficiency": 0.04893,
+        "jobs_with_measured_memory": 5
       }
     }
   ],
@@ -499,32 +499,32 @@
   "leaf": {
     "version": "2.0",
     "window_days": 180,
-    "leaf_index": 8,
+    "leaf_index": 15,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.1258,
+        "value": 0.2144,
         "weight": 0.6,
-        "contribution": 0.0755
+        "contribution": 0.1287
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0222,
+        "value": 0.0489,
         "weight": 0.4,
-        "contribution": 0.0089
+        "contribution": 0.0196
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 17,
-      "jobs_excluded": 8,
-      "jobs_measured_pct": 68.0,
-      "cpu_hours_measured_pct": 51.23,
-      "memory_measured_pct": 4.25
+      "jobs_measured": 5,
+      "jobs_excluded": 4,
+      "jobs_measured_pct": 55.56,
+      "cpu_hours_measured_pct": 52.09,
+      "memory_measured_pct": 2.84
     },
-    "percentile": 24.7
+    "percentile": 51.6
   },
   "public_user_id": "usr_2faee330946a",
   "display_pseudonym": "Polar Raven",

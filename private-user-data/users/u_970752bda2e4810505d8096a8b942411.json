@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-10-31T00:16:35Z",
+  "generated_at": "2026-11-01T00:15:40Z",
   "all_time_summary": {
     "jobs": 37949,
     "completed_jobs": 37111,
@@ -148,27 +148,27 @@
       ]
     },
     "180d": {
-      "jobs": 37731,
-      "completed_jobs": 36906,
-      "failed_jobs": 825,
-      "cpu_hours_allocated": 129410.164444,
-      "measured_cpu_hours": 12409.794722,
-      "avg_cpu_efficiency": 0.013237,
-      "jobs_with_measured_cpu": 37617,
-      "requested_mem_gb_hours": 1611178.498221,
-      "measured_mem_gb_max_sum": 125895.489135,
-      "avg_memory_efficiency": 0.01453,
-      "jobs_with_measured_memory": 37687,
-      "estimated_cost_dkk": 26274.373245,
-      "underutilized_cost_dkk": 3824.426437,
+      "jobs": 37725,
+      "completed_jobs": 36903,
+      "failed_jobs": 822,
+      "cpu_hours_allocated": 129410.112778,
+      "measured_cpu_hours": 12409.793056,
+      "avg_cpu_efficiency": 0.013235,
+      "jobs_with_measured_cpu": 37612,
+      "requested_mem_gb_hours": 1611177.464888,
+      "measured_mem_gb_max_sum": 125895.098402,
+      "avg_memory_efficiency": 0.014532,
+      "jobs_with_measured_memory": 37682,
+      "estimated_cost_dkk": 26274.356454,
+      "underutilized_cost_dkk": 3824.40972,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 8411.660689,
-      "mem_cost_dkk": 26181.650596,
+      "cpu_cost_dkk": 8411.657331,
+      "mem_cost_dkk": 26181.633804,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 26181.650596,
-      "cost_bearer_efficiency": 0.01453,
-      "cost_bearer_waste_dkk": 3824.426437,
+      "cost_bearer_cost_dkk": 26181.633804,
+      "cost_bearer_efficiency": 0.014532,
+      "cost_bearer_waste_dkk": 3824.40972,
       "leaf_index": 1,
       "leaf_index_components": [
         {
@@ -1143,8 +1143,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.013237,
-        "jobs_with_measured_cpu": 37617
+        "avg_cpu_efficiency": 0.013235,
+        "jobs_with_measured_cpu": 37612
       }
     },
     {
@@ -1154,8 +1154,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.01453,
-        "jobs_with_measured_memory": 37687
+        "avg_memory_efficiency": 0.014532,
+        "jobs_with_measured_memory": 37682
       }
     }
   ],
@@ -1373,13 +1373,13 @@
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 37687,
-      "jobs_excluded": 44,
-      "jobs_measured_pct": 99.88,
+      "jobs_measured": 37682,
+      "jobs_excluded": 43,
+      "jobs_measured_pct": 99.89,
       "cpu_hours_measured_pct": 9.59,
       "memory_measured_pct": 7.81
     },
-    "percentile": 7.4
+    "percentile": 7.8
   },
   "public_user_id": "usr_e22b263fffae",
   "display_pseudonym": "Solar Wolf",
@@ -1387,24 +1387,24 @@
   "username": "tbw433",
   "percentile_position": {
     "overall": 37.3,
-    "cpu": 8.1,
-    "memory": 20.0,
+    "cpu": 8.9,
+    "memory": 19.2,
     "savings": 83.7
   },
   "peer_comparisons": [
     {
       "display_pseudonym": "Crimson Aster",
-      "avg_cpu_efficiency": 0.11745715681301487,
-      "avg_memory_efficiency": 0.11145307943457508,
-      "underutilized_cost_dkk": 15164.757031896497,
-      "percentile_position": 96.1
+      "avg_cpu_efficiency": 0.11783786867850103,
+      "avg_memory_efficiency": 0.11176226544478811,
+      "underutilized_cost_dkk": 17269.13148762909,
+      "percentile_position": 96.9
     },
     {
       "display_pseudonym": "Golden Wolf",
       "avg_cpu_efficiency": 0.20222875172581506,
       "avg_memory_efficiency": 0.056341234241213116,
       "underutilized_cost_dkk": 0.4708265507857005,
-      "percentile_position": 14.0
+      "percentile_position": 14.7
     },
     {
       "display_pseudonym": "Granite Quartz",
