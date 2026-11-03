@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-11-02T00:16:05Z",
+  "generated_at": "2026-11-03T03:52:44Z",
   "all_time_summary": {
     "jobs": 180,
     "completed_jobs": 149,
@@ -133,42 +133,42 @@
       ]
     },
     "180d": {
-      "jobs": 55,
-      "completed_jobs": 52,
+      "jobs": 54,
+      "completed_jobs": 51,
       "failed_jobs": 3,
-      "cpu_hours_allocated": 3574.745,
-      "measured_cpu_hours": 2444.188333,
-      "avg_cpu_efficiency": 0.626184,
-      "jobs_with_measured_cpu": 52,
-      "requested_mem_gb_hours": 95847.822222,
-      "measured_mem_gb_max_sum": 1204.329975,
-      "avg_memory_efficiency": 0.090469,
-      "jobs_with_measured_memory": 52,
-      "estimated_cost_dkk": 1557.527111,
-      "underutilized_cost_dkk": 1407.806426,
+      "cpu_hours_allocated": 3520.697778,
+      "measured_cpu_hours": 2398.740556,
+      "avg_cpu_efficiency": 0.621974,
+      "jobs_with_measured_cpu": 51,
+      "requested_mem_gb_hours": 93080.604444,
+      "measured_mem_gb_max_sum": 1190.612223,
+      "avg_memory_efficiency": 0.091193,
+      "jobs_with_measured_memory": 51,
+      "estimated_cost_dkk": 1512.559822,
+      "underutilized_cost_dkk": 1365.248708,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 232.358425,
-      "mem_cost_dkk": 1557.527111,
+      "cpu_cost_dkk": 228.845356,
+      "mem_cost_dkk": 1512.559822,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 1557.527111,
-      "cost_bearer_efficiency": 0.090469,
-      "cost_bearer_waste_dkk": 1407.806426,
+      "cost_bearer_cost_dkk": 1512.559822,
+      "cost_bearer_efficiency": 0.091193,
+      "cost_bearer_waste_dkk": 1365.248708,
       "leaf_index": 41,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.6262,
+          "value": 0.622,
           "weight": 0.6,
-          "contribution": 0.3757
+          "contribution": 0.3732
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0905,
+          "value": 0.0912,
           "weight": 0.4,
-          "contribution": 0.0362
+          "contribution": 0.0365
         }
       ]
     }
@@ -1473,8 +1473,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.090469,
-        "jobs_with_measured_memory": 52
+        "avg_memory_efficiency": 0.091193,
+        "jobs_with_measured_memory": 51
       }
     }
   ],
@@ -1678,27 +1678,27 @@
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.6262,
+        "value": 0.622,
         "weight": 0.6,
-        "contribution": 0.3757
+        "contribution": 0.3732
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0905,
+        "value": 0.0912,
         "weight": 0.4,
-        "contribution": 0.0362
+        "contribution": 0.0365
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 52,
+      "jobs_measured": 51,
       "jobs_excluded": 3,
-      "jobs_measured_pct": 94.55,
-      "cpu_hours_measured_pct": 68.37,
-      "memory_measured_pct": 1.26
+      "jobs_measured_pct": 94.44,
+      "cpu_hours_measured_pct": 68.13,
+      "memory_measured_pct": 1.28
     },
-    "percentile": 90.1
+    "percentile": 90.0
   },
   "public_user_id": "usr_8a1818cf01c2",
   "display_pseudonym": "Scarlet Ridge",
@@ -1727,10 +1727,10 @@
     },
     {
       "display_pseudonym": "Violet Glacier",
-      "avg_cpu_efficiency": 0.3816578595326951,
-      "avg_memory_efficiency": 0.13731908442245588,
-      "underutilized_cost_dkk": 4.288134573130806,
-      "percentile_position": 29.7
+      "avg_cpu_efficiency": 0.36099164298191944,
+      "avg_memory_efficiency": 0.15083644185692835,
+      "underutilized_cost_dkk": 3.704253089877963,
+      "percentile_position": 25.8
     }
   ]
 }

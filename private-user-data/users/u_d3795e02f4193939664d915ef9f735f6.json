@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-11-02T00:16:04Z",
+  "generated_at": "2026-11-03T03:52:33Z",
   "all_time_summary": {
     "jobs": 123486,
     "completed_jobs": 110072,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 68,
-      "completed_jobs": 63,
-      "failed_jobs": 5,
-      "cpu_hours_allocated": 1457.313333,
-      "measured_cpu_hours": 182.183056,
-      "avg_cpu_efficiency": 0.087533,
-      "jobs_with_measured_cpu": 68,
-      "requested_mem_gb_hours": 10695.178889,
-      "measured_mem_gb_max_sum": 103.482593,
-      "avg_memory_efficiency": 0.034526,
-      "jobs_with_measured_memory": 68,
-      "estimated_cost_dkk": 174.481468,
-      "underutilized_cost_dkk": 173.463346,
+      "jobs": 7,
+      "completed_jobs": 3,
+      "failed_jobs": 4,
+      "cpu_hours_allocated": 574.168889,
+      "measured_cpu_hours": 44.703056,
+      "avg_cpu_efficiency": 0.030835,
+      "jobs_with_measured_cpu": 7,
+      "requested_mem_gb_hours": 4122.311111,
+      "measured_mem_gb_max_sum": 0.283493,
+      "avg_memory_efficiency": 0.000468,
+      "jobs_with_measured_memory": 7,
+      "estimated_cost_dkk": 66.987556,
+      "underutilized_cost_dkk": 66.939501,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 94.725367,
-      "mem_cost_dkk": 173.796657,
+      "cpu_cost_dkk": 37.320978,
+      "mem_cost_dkk": 66.987556,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 173.796657,
-      "cost_bearer_efficiency": 0.034526,
-      "cost_bearer_waste_dkk": 173.463346,
-      "leaf_index": 7,
+      "cost_bearer_cost_dkk": 66.987556,
+      "cost_bearer_efficiency": 0.000468,
+      "cost_bearer_waste_dkk": 66.939501,
+      "leaf_index": 2,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.0875,
+          "value": 0.0308,
           "weight": 0.6,
-          "contribution": 0.0525
+          "contribution": 0.0185
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0345,
+          "value": 0.0005,
           "weight": 0.4,
-          "contribution": 0.0138
+          "contribution": 0.0002
         }
       ]
     }
@@ -1428,8 +1428,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.087533,
-        "jobs_with_measured_cpu": 68
+        "avg_cpu_efficiency": 0.030835,
+        "jobs_with_measured_cpu": 7
       }
     },
     {
@@ -1439,8 +1439,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.034526,
-        "jobs_with_measured_memory": 68
+        "avg_memory_efficiency": 0.000468,
+        "jobs_with_measured_memory": 7
       }
     }
   ],
@@ -1639,32 +1639,32 @@
   "leaf": {
     "version": "2.0",
     "window_days": 180,
-    "leaf_index": 7,
+    "leaf_index": 2,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.0875,
+        "value": 0.0308,
         "weight": 0.6,
-        "contribution": 0.0525
+        "contribution": 0.0185
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0345,
+        "value": 0.0005,
         "weight": 0.4,
-        "contribution": 0.0138
+        "contribution": 0.0002
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 68,
+      "jobs_measured": 7,
       "jobs_excluded": 0,
       "jobs_measured_pct": 100.0,
-      "cpu_hours_measured_pct": 12.5,
-      "memory_measured_pct": 0.97
+      "cpu_hours_measured_pct": 7.79,
+      "memory_measured_pct": 0.01
     },
-    "percentile": 23.0
+    "percentile": 13.3
   },
   "public_user_id": "usr_c051c0310e8d",
   "display_pseudonym": "Obsidian Falcon",
