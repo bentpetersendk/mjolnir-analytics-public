@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-11-08T00:19:28Z",
+  "generated_at": "2026-11-09T00:16:00Z",
   "all_time_summary": {
     "jobs": 53775,
     "completed_jobs": 28224,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 68,
-      "completed_jobs": 52,
-      "failed_jobs": 16,
-      "cpu_hours_allocated": 16.3575,
-      "measured_cpu_hours": 4.518333,
-      "avg_cpu_efficiency": 0.183373,
-      "jobs_with_measured_cpu": 66,
-      "requested_mem_gb_hours": 102.272222,
-      "measured_mem_gb_max_sum": 115.054109,
-      "avg_memory_efficiency": 0.079626,
-      "jobs_with_measured_memory": 67,
-      "estimated_cost_dkk": 1.746694,
-      "underutilized_cost_dkk": 1.599342,
+      "jobs": 55,
+      "completed_jobs": 45,
+      "failed_jobs": 10,
+      "cpu_hours_allocated": 14.5425,
+      "measured_cpu_hours": 3.882778,
+      "avg_cpu_efficiency": 0.155761,
+      "jobs_with_measured_cpu": 53,
+      "requested_mem_gb_hours": 79.232222,
+      "measured_mem_gb_max_sum": 85.788281,
+      "avg_memory_efficiency": 0.081859,
+      "jobs_with_measured_memory": 54,
+      "estimated_cost_dkk": 1.372294,
+      "underutilized_cost_dkk": 1.257776,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 1.063238,
-      "mem_cost_dkk": 1.661924,
+      "cpu_cost_dkk": 0.945263,
+      "mem_cost_dkk": 1.287524,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 1.661924,
-      "cost_bearer_efficiency": 0.079626,
-      "cost_bearer_waste_dkk": 1.599342,
-      "leaf_index": 14,
+      "cost_bearer_cost_dkk": 1.287524,
+      "cost_bearer_efficiency": 0.081859,
+      "cost_bearer_waste_dkk": 1.257776,
+      "leaf_index": 13,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.1834,
+          "value": 0.1558,
           "weight": 0.6,
-          "contribution": 0.11
+          "contribution": 0.0935
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0796,
+          "value": 0.0819,
           "weight": 0.4,
-          "contribution": 0.0319
+          "contribution": 0.0327
         }
       ]
     }
@@ -1173,8 +1173,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.183373,
-        "jobs_with_measured_cpu": 66
+        "avg_cpu_efficiency": 0.155761,
+        "jobs_with_measured_cpu": 53
       }
     },
     {
@@ -1184,8 +1184,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.079626,
-        "jobs_with_measured_memory": 67
+        "avg_memory_efficiency": 0.081859,
+        "jobs_with_measured_memory": 54
       }
     }
   ],
@@ -1384,32 +1384,32 @@
   "leaf": {
     "version": "2.0",
     "window_days": 180,
-    "leaf_index": 14,
+    "leaf_index": 13,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.1834,
+        "value": 0.1558,
         "weight": 0.6,
-        "contribution": 0.11
+        "contribution": 0.0935
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0796,
+        "value": 0.0819,
         "weight": 0.4,
-        "contribution": 0.0319
+        "contribution": 0.0327
       }
     ],
     "confidence": "medium",
     "measurement_coverage": {
-      "jobs_measured": 67,
+      "jobs_measured": 54,
       "jobs_excluded": 1,
-      "jobs_measured_pct": 98.53,
-      "cpu_hours_measured_pct": 27.62,
+      "jobs_measured_pct": 98.18,
+      "cpu_hours_measured_pct": 26.7,
       "memory_measured_pct": 100.0
     },
-    "percentile": 47.9
+    "percentile": 45.1
   },
   "public_user_id": "usr_ef629af0dfbb",
   "display_pseudonym": "Lunar Nova",
