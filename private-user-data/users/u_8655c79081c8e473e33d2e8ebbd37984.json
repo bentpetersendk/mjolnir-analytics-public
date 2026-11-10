@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-11-09T00:16:03Z",
+  "generated_at": "2026-11-10T00:16:07Z",
   "all_time_summary": {
     "jobs": 74,
     "completed_jobs": 41,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 8,
-      "completed_jobs": 7,
-      "failed_jobs": 1,
-      "cpu_hours_allocated": 141.183611,
-      "measured_cpu_hours": 41.806944,
-      "avg_cpu_efficiency": 0.182414,
-      "jobs_with_measured_cpu": 7,
-      "requested_mem_gb_hours": 853.262222,
-      "measured_mem_gb_max_sum": 155.62459,
-      "avg_memory_efficiency": 0.145066,
-      "jobs_with_measured_memory": 7,
-      "estimated_cost_dkk": 13.865547,
-      "underutilized_cost_dkk": 9.40621,
+      "jobs": 4,
+      "completed_jobs": 4,
+      "failed_jobs": 0,
+      "cpu_hours_allocated": 62.564167,
+      "measured_cpu_hours": 23.232222,
+      "avg_cpu_efficiency": 0.173005,
+      "jobs_with_measured_cpu": 4,
+      "requested_mem_gb_hours": 381.55,
+      "measured_mem_gb_max_sum": 7.186573,
+      "avg_memory_efficiency": 0.021399,
+      "jobs_with_measured_memory": 4,
+      "estimated_cost_dkk": 6.200188,
+      "underutilized_cost_dkk": 5.909023,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 9.176935,
-      "mem_cost_dkk": 13.865511,
+      "cpu_cost_dkk": 4.066671,
+      "mem_cost_dkk": 6.200188,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 13.865511,
-      "cost_bearer_efficiency": 0.145066,
-      "cost_bearer_waste_dkk": 9.40621,
-      "leaf_index": 17,
+      "cost_bearer_cost_dkk": 6.200188,
+      "cost_bearer_efficiency": 0.021399,
+      "cost_bearer_waste_dkk": 5.909023,
+      "leaf_index": 11,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.1824,
+          "value": 0.173,
           "weight": 0.6,
-          "contribution": 0.1094
+          "contribution": 0.1038
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.1451,
+          "value": 0.0214,
           "weight": 0.4,
-          "contribution": 0.058
+          "contribution": 0.0086
         }
       ]
     }
@@ -340,30 +340,7 @@
       "measured_mem_gb_max_sum": 6.72023868560791
     }
   ],
-  "recommendations": [
-    {
-      "type": "cpu_efficiency",
-      "severity": "high",
-      "title": "Low measured CPU utilization",
-      "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
-      "confidence": "medium",
-      "evidence": {
-        "avg_cpu_efficiency": 0.182414,
-        "jobs_with_measured_cpu": 7
-      }
-    },
-    {
-      "type": "memory_efficiency",
-      "severity": "medium",
-      "title": "Requested memory is much higher than MaxRSS",
-      "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
-      "confidence": "medium",
-      "evidence": {
-        "avg_memory_efficiency": 0.145066,
-        "jobs_with_measured_memory": 7
-      }
-    }
-  ],
+  "recommendations": [],
   "top_inefficient_jobs": [
     {
       "report_date": "2026-05-05",
@@ -559,32 +536,32 @@
   "leaf": {
     "version": "2.0",
     "window_days": 180,
-    "leaf_index": 17,
+    "leaf_index": 11,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.1824,
+        "value": 0.173,
         "weight": 0.6,
-        "contribution": 0.1094
+        "contribution": 0.1038
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.1451,
+        "value": 0.0214,
         "weight": 0.4,
-        "contribution": 0.058
+        "contribution": 0.0086
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 7,
-      "jobs_excluded": 1,
-      "jobs_measured_pct": 87.5,
-      "cpu_hours_measured_pct": 29.61,
-      "memory_measured_pct": 18.24
+      "jobs_measured": 4,
+      "jobs_excluded": 0,
+      "jobs_measured_pct": 100.0,
+      "cpu_hours_measured_pct": 37.13,
+      "memory_measured_pct": 1.88
     },
-    "percentile": 56.3
+    "percentile": 38.0
   },
   "public_user_id": "usr_585c276329fa",
   "display_pseudonym": "Golden Summit",
