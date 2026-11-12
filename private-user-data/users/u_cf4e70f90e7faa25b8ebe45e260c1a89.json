@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-11-11T06:45:38Z",
+  "generated_at": "2026-11-12T00:28:52Z",
   "all_time_summary": {
     "jobs": 7594,
     "completed_jobs": 5383,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 2019,
-      "completed_jobs": 2019,
+      "jobs": 347,
+      "completed_jobs": 347,
       "failed_jobs": 0,
-      "cpu_hours_allocated": 1694.676389,
-      "measured_cpu_hours": 1494.725833,
-      "avg_cpu_efficiency": 0.092576,
-      "jobs_with_measured_cpu": 2018,
-      "requested_mem_gb_hours": 16869.866389,
-      "measured_mem_gb_max_sum": 929.282912,
-      "avg_memory_efficiency": 0.010904,
-      "jobs_with_measured_memory": 2019,
-      "estimated_cost_dkk": 274.510248,
-      "underutilized_cost_dkk": 255.792615,
+      "cpu_hours_allocated": 403.275556,
+      "measured_cpu_hours": 361.196389,
+      "avg_cpu_efficiency": 0.053839,
+      "jobs_with_measured_cpu": 347,
+      "requested_mem_gb_hours": 4017.1425,
+      "measured_mem_gb_max_sum": 69.355675,
+      "avg_memory_efficiency": 0.021053,
+      "jobs_with_measured_memory": 347,
+      "estimated_cost_dkk": 65.358944,
+      "underutilized_cost_dkk": 57.58645,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 110.153965,
-      "mem_cost_dkk": 274.135329,
+      "cpu_cost_dkk": 26.212911,
+      "mem_cost_dkk": 65.278566,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 274.135329,
-      "cost_bearer_efficiency": 0.010904,
-      "cost_bearer_waste_dkk": 255.792615,
-      "leaf_index": 6,
+      "cost_bearer_cost_dkk": 65.278566,
+      "cost_bearer_efficiency": 0.021053,
+      "cost_bearer_waste_dkk": 57.58645,
+      "leaf_index": 4,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.0926,
+          "value": 0.0538,
           "weight": 0.6,
-          "contribution": 0.0555
+          "contribution": 0.0323
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0109,
+          "value": 0.0211,
           "weight": 0.4,
-          "contribution": 0.0044
+          "contribution": 0.0084
         }
       ]
     }
@@ -1128,8 +1128,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.092576,
-        "jobs_with_measured_cpu": 2018
+        "avg_cpu_efficiency": 0.053839,
+        "jobs_with_measured_cpu": 347
       }
     },
     {
@@ -1139,8 +1139,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.010904,
-        "jobs_with_measured_memory": 2019
+        "avg_memory_efficiency": 0.021053,
+        "jobs_with_measured_memory": 347
       }
     }
   ],
@@ -1339,32 +1339,32 @@
   "leaf": {
     "version": "2.0",
     "window_days": 180,
-    "leaf_index": 6,
+    "leaf_index": 4,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.0926,
+        "value": 0.0538,
         "weight": 0.6,
-        "contribution": 0.0555
+        "contribution": 0.0323
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0109,
+        "value": 0.0211,
         "weight": 0.4,
-        "contribution": 0.0044
+        "contribution": 0.0084
       }
     ],
     "confidence": "medium",
     "measurement_coverage": {
-      "jobs_measured": 2019,
+      "jobs_measured": 347,
       "jobs_excluded": 0,
       "jobs_measured_pct": 100.0,
-      "cpu_hours_measured_pct": 88.2,
-      "memory_measured_pct": 5.51
+      "cpu_hours_measured_pct": 89.57,
+      "memory_measured_pct": 1.73
     },
-    "percentile": 19.7
+    "percentile": 16.1
   },
   "public_user_id": "usr_8ce21d5084ea",
   "display_pseudonym": "Lunar Otter",
