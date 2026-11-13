@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-11-12T00:28:41Z",
+  "generated_at": "2026-11-13T02:48:19Z",
   "all_time_summary": {
     "jobs": 88949,
     "completed_jobs": 87541,
@@ -148,42 +148,42 @@
       ]
     },
     "180d": {
-      "jobs": 39,
-      "completed_jobs": 27,
+      "jobs": 38,
+      "completed_jobs": 26,
       "failed_jobs": 12,
-      "cpu_hours_allocated": 149.7025,
-      "measured_cpu_hours": 117.371944,
-      "avg_cpu_efficiency": 0.513546,
-      "jobs_with_measured_cpu": 37,
-      "requested_mem_gb_hours": 2995.638889,
-      "measured_mem_gb_max_sum": 224.907253,
-      "avg_memory_efficiency": 0.23148,
-      "jobs_with_measured_memory": 37,
-      "estimated_cost_dkk": 48.679132,
-      "underutilized_cost_dkk": 45.948401,
+      "cpu_hours_allocated": 23.835,
+      "measured_cpu_hours": 9.668333,
+      "avg_cpu_efficiency": 0.504042,
+      "jobs_with_measured_cpu": 36,
+      "requested_mem_gb_hours": 478.288889,
+      "measured_mem_gb_max_sum": 223.091616,
+      "avg_memory_efficiency": 0.237069,
+      "jobs_with_measured_memory": 36,
+      "estimated_cost_dkk": 7.772194,
+      "underutilized_cost_dkk": 6.279333,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 9.730662,
-      "mem_cost_dkk": 48.679132,
+      "cpu_cost_dkk": 1.549275,
+      "mem_cost_dkk": 7.772194,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 48.679132,
-      "cost_bearer_efficiency": 0.23148,
-      "cost_bearer_waste_dkk": 45.948401,
+      "cost_bearer_cost_dkk": 7.772194,
+      "cost_bearer_efficiency": 0.237069,
+      "cost_bearer_waste_dkk": 6.279333,
       "leaf_index": 40,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.5135,
+          "value": 0.504,
           "weight": 0.6,
-          "contribution": 0.3081
+          "contribution": 0.3024
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.2315,
+          "value": 0.2371,
           "weight": 0.4,
-          "contribution": 0.0926
+          "contribution": 0.0948
         }
       ]
     }
@@ -2898,8 +2898,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.23148,
-        "jobs_with_measured_memory": 37
+        "avg_memory_efficiency": 0.237069,
+        "jobs_with_measured_memory": 36
       }
     }
   ],
@@ -3103,27 +3103,27 @@
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.5135,
+        "value": 0.504,
         "weight": 0.6,
-        "contribution": 0.3081
+        "contribution": 0.3024
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.2315,
+        "value": 0.2371,
         "weight": 0.4,
-        "contribution": 0.0926
+        "contribution": 0.0948
       }
     ],
     "confidence": "medium",
     "measurement_coverage": {
-      "jobs_measured": 37,
+      "jobs_measured": 36,
       "jobs_excluded": 2,
-      "jobs_measured_pct": 94.87,
-      "cpu_hours_measured_pct": 78.4,
-      "memory_measured_pct": 7.51
+      "jobs_measured_pct": 94.74,
+      "cpu_hours_measured_pct": 40.56,
+      "memory_measured_pct": 46.64
     },
-    "percentile": 89.5
+    "percentile": 89.4
   },
   "public_user_id": "usr_bff422ed8cfc",
   "display_pseudonym": "Solar Lynx",
@@ -3132,8 +3132,8 @@
   "percentile_position": {
     "overall": 43.1,
     "cpu": 52.8,
-    "memory": 60.8,
-    "savings": 15.6
+    "memory": 61.7,
+    "savings": 14.8
   },
   "peer_comparisons": [
     {
@@ -3141,7 +3141,7 @@
       "avg_cpu_efficiency": 0.46783783469507745,
       "avg_memory_efficiency": 0.07833579977353414,
       "underutilized_cost_dkk": 1.5115804141561193,
-      "percentile_position": 18.0
+      "percentile_position": 17.2
     },
     {
       "display_pseudonym": "Steel Orion",
