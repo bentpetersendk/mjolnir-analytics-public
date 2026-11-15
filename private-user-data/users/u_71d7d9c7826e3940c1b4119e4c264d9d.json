@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-11-14T00:20:13Z",
+  "generated_at": "2026-11-15T00:37:24Z",
   "all_time_summary": {
     "jobs": 5373,
     "completed_jobs": 4796,
@@ -133,42 +133,42 @@
       ]
     },
     "180d": {
-      "jobs": 4674,
-      "completed_jobs": 4279,
+      "jobs": 4377,
+      "completed_jobs": 3982,
       "failed_jobs": 395,
-      "cpu_hours_allocated": 8759.602222,
-      "measured_cpu_hours": 3888.001111,
-      "avg_cpu_efficiency": 0.754627,
-      "jobs_with_measured_cpu": 4426,
-      "requested_mem_gb_hours": 88424.738919,
-      "measured_mem_gb_max_sum": 4390.931467,
-      "avg_memory_efficiency": 0.08977,
-      "jobs_with_measured_memory": 4427,
-      "estimated_cost_dkk": 1466.687887,
-      "underutilized_cost_dkk": 1372.427624,
+      "cpu_hours_allocated": 7759.572222,
+      "measured_cpu_hours": 3636.852778,
+      "avg_cpu_efficiency": 0.802562,
+      "jobs_with_measured_cpu": 4131,
+      "requested_mem_gb_hours": 71148.958919,
+      "measured_mem_gb_max_sum": 4359.16884,
+      "avg_memory_efficiency": 0.096113,
+      "jobs_with_measured_memory": 4130,
+      "estimated_cost_dkk": 1185.956462,
+      "underutilized_cost_dkk": 1093.221764,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 569.374144,
-      "mem_cost_dkk": 1436.902007,
+      "cpu_cost_dkk": 504.372194,
+      "mem_cost_dkk": 1156.170582,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 1436.902007,
-      "cost_bearer_efficiency": 0.08977,
-      "cost_bearer_waste_dkk": 1372.427624,
-      "leaf_index": 49,
+      "cost_bearer_cost_dkk": 1156.170582,
+      "cost_bearer_efficiency": 0.096113,
+      "cost_bearer_waste_dkk": 1093.221764,
+      "leaf_index": 52,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.7546,
+          "value": 0.8026,
           "weight": 0.6,
-          "contribution": 0.4528
+          "contribution": 0.4815
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0898,
+          "value": 0.0961,
           "weight": 0.4,
-          "contribution": 0.0359
+          "contribution": 0.0384
         }
       ]
     }
@@ -1188,8 +1188,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.08977,
-        "jobs_with_measured_memory": 4427
+        "avg_memory_efficiency": 0.096113,
+        "jobs_with_measured_memory": 4130
       }
     }
   ],
@@ -1388,41 +1388,41 @@
   "leaf": {
     "version": "2.0",
     "window_days": 180,
-    "leaf_index": 49,
+    "leaf_index": 52,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.7546,
+        "value": 0.8026,
         "weight": 0.6,
-        "contribution": 0.4528
+        "contribution": 0.4815
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0898,
+        "value": 0.0961,
         "weight": 0.4,
-        "contribution": 0.0359
+        "contribution": 0.0384
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 4427,
-      "jobs_excluded": 247,
-      "jobs_measured_pct": 94.72,
-      "cpu_hours_measured_pct": 44.39,
-      "memory_measured_pct": 4.97
+      "jobs_measured": 4131,
+      "jobs_excluded": 246,
+      "jobs_measured_pct": 94.38,
+      "cpu_hours_measured_pct": 46.87,
+      "memory_measured_pct": 6.13
     },
-    "percentile": 94.3
+    "percentile": 95.0
   },
   "public_user_id": "usr_315eeee8e9f8",
   "display_pseudonym": "Copper Talon",
   "personal_route_token": "u_71d7d9c7826e3940c1b4119e4c264d9d",
   "username": "mdg396",
   "percentile_position": {
-    "overall": 71.8,
+    "overall": 72.1,
     "cpu": 96.7,
-    "memory": 75.0,
+    "memory": 75.8,
     "savings": 43.8
   },
   "peer_comparisons": [
