@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-11-15T00:37:26Z",
+  "generated_at": "2026-11-16T01:37:18Z",
   "all_time_summary": {
     "jobs": 53775,
     "completed_jobs": 28224,
@@ -118,42 +118,42 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 55,
-      "completed_jobs": 45,
+      "jobs": 49,
+      "completed_jobs": 39,
       "failed_jobs": 10,
-      "cpu_hours_allocated": 14.5425,
-      "measured_cpu_hours": 3.882778,
-      "avg_cpu_efficiency": 0.155761,
-      "jobs_with_measured_cpu": 53,
-      "requested_mem_gb_hours": 79.232222,
-      "measured_mem_gb_max_sum": 85.788281,
-      "avg_memory_efficiency": 0.081859,
-      "jobs_with_measured_memory": 54,
-      "estimated_cost_dkk": 1.372294,
-      "underutilized_cost_dkk": 1.257776,
+      "cpu_hours_allocated": 12.378611,
+      "measured_cpu_hours": 3.640278,
+      "avg_cpu_efficiency": 0.161626,
+      "jobs_with_measured_cpu": 47,
+      "requested_mem_gb_hours": 74.904444,
+      "measured_mem_gb_max_sum": 78.988075,
+      "avg_memory_efficiency": 0.068412,
+      "jobs_with_measured_memory": 48,
+      "estimated_cost_dkk": 1.231642,
+      "underutilized_cost_dkk": 1.132885,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 0.945263,
-      "mem_cost_dkk": 1.287524,
+      "cpu_cost_dkk": 0.80461,
+      "mem_cost_dkk": 1.217197,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 1.287524,
-      "cost_bearer_efficiency": 0.081859,
-      "cost_bearer_waste_dkk": 1.257776,
-      "leaf_index": 13,
+      "cost_bearer_cost_dkk": 1.217197,
+      "cost_bearer_efficiency": 0.068412,
+      "cost_bearer_waste_dkk": 1.132885,
+      "leaf_index": 12,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.1558,
+          "value": 0.1616,
           "weight": 0.6,
-          "contribution": 0.0935
+          "contribution": 0.097
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0819,
+          "value": 0.0684,
           "weight": 0.4,
-          "contribution": 0.0327
+          "contribution": 0.0274
         }
       ]
     }
@@ -1173,8 +1173,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.155761,
-        "jobs_with_measured_cpu": 53
+        "avg_cpu_efficiency": 0.161626,
+        "jobs_with_measured_cpu": 47
       }
     },
     {
@@ -1184,8 +1184,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.081859,
-        "jobs_with_measured_memory": 54
+        "avg_memory_efficiency": 0.068412,
+        "jobs_with_measured_memory": 48
       }
     }
   ],
@@ -1384,32 +1384,32 @@
   "leaf": {
     "version": "2.0",
     "window_days": 180,
-    "leaf_index": 13,
+    "leaf_index": 12,
     "leaf_index_components": [
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.1558,
+        "value": 0.1616,
         "weight": 0.6,
-        "contribution": 0.0935
+        "contribution": 0.097
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0819,
+        "value": 0.0684,
         "weight": 0.4,
-        "contribution": 0.0327
+        "contribution": 0.0274
       }
     ],
     "confidence": "medium",
     "measurement_coverage": {
-      "jobs_measured": 54,
+      "jobs_measured": 48,
       "jobs_excluded": 1,
-      "jobs_measured_pct": 98.18,
-      "cpu_hours_measured_pct": 26.7,
+      "jobs_measured_pct": 97.96,
+      "cpu_hours_measured_pct": 29.41,
       "memory_measured_pct": 100.0
     },
-    "percentile": 45.4
+    "percentile": 44.0
   },
   "public_user_id": "usr_ef629af0dfbb",
   "display_pseudonym": "Lunar Nova",
