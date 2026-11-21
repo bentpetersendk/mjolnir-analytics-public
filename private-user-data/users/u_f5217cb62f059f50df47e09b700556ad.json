@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-11-20T00:40:53Z",
+  "generated_at": "2026-11-21T00:22:54Z",
   "all_time_summary": {
     "jobs": 5115993,
     "completed_jobs": 5102742,
@@ -163,42 +163,42 @@
       ]
     },
     "180d": {
-      "jobs": 35,
+      "jobs": 34,
       "completed_jobs": 10,
-      "failed_jobs": 25,
-      "cpu_hours_allocated": 8617.7375,
+      "failed_jobs": 24,
+      "cpu_hours_allocated": 5737.695833,
       "measured_cpu_hours": 1810.623056,
-      "avg_cpu_efficiency": 0.139776,
-      "jobs_with_measured_cpu": 33,
-      "requested_mem_gb_hours": 86904.967448,
-      "measured_mem_gb_max_sum": 86.468315,
-      "avg_memory_efficiency": 0.012003,
-      "jobs_with_measured_memory": 33,
-      "estimated_cost_dkk": 1417.083204,
-      "underutilized_cost_dkk": 1350.139587,
+      "avg_cpu_efficiency": 0.144144,
+      "jobs_with_measured_cpu": 32,
+      "requested_mem_gb_hours": 58104.550781,
+      "measured_mem_gb_max_sum": 76.188175,
+      "avg_memory_efficiency": 0.011307,
+      "jobs_with_measured_memory": 32,
+      "estimated_cost_dkk": 949.076433,
+      "underutilized_cost_dkk": 898.170067,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 560.152938,
-      "mem_cost_dkk": 1412.205721,
+      "cpu_cost_dkk": 372.950229,
+      "mem_cost_dkk": 944.19895,
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 1412.205721,
-      "cost_bearer_efficiency": 0.012003,
-      "cost_bearer_waste_dkk": 1350.139587,
+      "cost_bearer_cost_dkk": 944.19895,
+      "cost_bearer_efficiency": 0.011307,
+      "cost_bearer_waste_dkk": 898.170067,
       "leaf_index": 9,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.1398,
+          "value": 0.1441,
           "weight": 0.6,
-          "contribution": 0.0839
+          "contribution": 0.0865
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.012,
+          "value": 0.0113,
           "weight": 0.4,
-          "contribution": 0.0048
+          "contribution": 0.0045
         }
       ]
     }
@@ -6783,8 +6783,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.139776,
-        "jobs_with_measured_cpu": 33
+        "avg_cpu_efficiency": 0.144144,
+        "jobs_with_measured_cpu": 32
       }
     },
     {
@@ -6794,8 +6794,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.012003,
-        "jobs_with_measured_memory": 33
+        "avg_memory_efficiency": 0.011307,
+        "jobs_with_measured_memory": 32
       }
     }
   ],
@@ -6999,25 +6999,25 @@
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.1398,
+        "value": 0.1441,
         "weight": 0.6,
-        "contribution": 0.0839
+        "contribution": 0.0865
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.012,
+        "value": 0.0113,
         "weight": 0.4,
-        "contribution": 0.0048
+        "contribution": 0.0045
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 33,
+      "jobs_measured": 32,
       "jobs_excluded": 2,
-      "jobs_measured_pct": 94.29,
-      "cpu_hours_measured_pct": 21.01,
-      "memory_measured_pct": 0.1
+      "jobs_measured_pct": 94.12,
+      "cpu_hours_measured_pct": 31.56,
+      "memory_measured_pct": 0.13
     },
     "percentile": 29.1
   },
@@ -7026,8 +7026,8 @@
   "personal_route_token": "u_f5217cb62f059f50df47e09b700556ad",
   "username": "hsf378",
   "percentile_position": {
-    "overall": 23.1,
-    "cpu": 18.0,
+    "overall": 22.9,
+    "cpu": 17.2,
     "memory": 4.2,
     "savings": 47.2
   },
