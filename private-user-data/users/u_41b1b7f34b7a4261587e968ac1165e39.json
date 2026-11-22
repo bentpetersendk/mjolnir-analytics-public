@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-11-21T00:23:02Z",
+  "generated_at": "2026-11-22T00:22:27Z",
   "all_time_summary": {
     "jobs": 5271,
     "completed_jobs": 2004,
@@ -118,17 +118,17 @@
       "leaf_index_components": []
     },
     "180d": {
-      "jobs": 32,
+      "jobs": 25,
       "completed_jobs": 22,
-      "failed_jobs": 10,
+      "failed_jobs": 3,
       "cpu_hours_allocated": 81.223333,
       "measured_cpu_hours": 4.272778,
       "avg_cpu_efficiency": 0.206776,
       "jobs_with_measured_cpu": 25,
       "requested_mem_gb_hours": 603.193333,
-      "measured_mem_gb_max_sum": 0.19489,
-      "avg_memory_efficiency": 0.000657,
-      "jobs_with_measured_memory": 31,
+      "measured_mem_gb_max_sum": 0.189507,
+      "avg_memory_efficiency": 0.000813,
+      "jobs_with_measured_memory": 25,
       "estimated_cost_dkk": 10.054272,
       "underutilized_cost_dkk": 9.935028,
       "gpu_hours": 0.0,
@@ -137,7 +137,7 @@
       "gpu_cost_dkk": 0.0,
       "cost_bearer": "memory",
       "cost_bearer_cost_dkk": 9.801892,
-      "cost_bearer_efficiency": 0.000657,
+      "cost_bearer_efficiency": 0.000813,
       "cost_bearer_waste_dkk": 9.935028,
       "leaf_index": 12,
       "leaf_index_components": [
@@ -151,7 +151,7 @@
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0007,
+          "value": 0.0008,
           "weight": 0.4,
           "contribution": 0.0003
         }
@@ -2129,8 +2129,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.000657,
-        "jobs_with_measured_memory": 31
+        "avg_memory_efficiency": 0.000813,
+        "jobs_with_measured_memory": 25
       }
     }
   ],
@@ -2341,20 +2341,20 @@
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0007,
+        "value": 0.0008,
         "weight": 0.4,
         "contribution": 0.0003
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 31,
-      "jobs_excluded": 1,
-      "jobs_measured_pct": 96.88,
+      "jobs_measured": 25,
+      "jobs_excluded": 0,
+      "jobs_measured_pct": 100.0,
       "cpu_hours_measured_pct": 5.26,
       "memory_measured_pct": 0.03
     },
-    "percentile": 43.3
+    "percentile": 42.6
   },
   "public_user_id": "usr_032d2870fb28",
   "display_pseudonym": "Granite Beacon",
