@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-11-22T00:22:22Z",
+  "generated_at": "2026-11-23T04:54:54Z",
   "all_time_summary": {
     "jobs": 2246,
     "completed_jobs": 1833,
@@ -133,42 +133,42 @@
       ]
     },
     "180d": {
-      "jobs": 660,
-      "completed_jobs": 399,
+      "jobs": 658,
+      "completed_jobs": 397,
       "failed_jobs": 261,
-      "cpu_hours_allocated": 2964.010833,
-      "measured_cpu_hours": 728.113333,
-      "avg_cpu_efficiency": 0.214596,
-      "jobs_with_measured_cpu": 627,
-      "requested_mem_gb_hours": 107209.086667,
-      "measured_mem_gb_max_sum": 1734.540765,
-      "avg_memory_efficiency": 0.029844,
-      "jobs_with_measured_memory": 655,
-      "estimated_cost_dkk": 2638.450714,
-      "underutilized_cost_dkk": 1242.001213,
-      "gpu_hours": 68.946389,
-      "cpu_cost_dkk": 192.660704,
-      "mem_cost_dkk": 1742.147658,
-      "gpu_cost_dkk": 896.303056,
+      "cpu_hours_allocated": 2263.650833,
+      "measured_cpu_hours": 695.399167,
+      "avg_cpu_efficiency": 0.214746,
+      "jobs_with_measured_cpu": 625,
+      "requested_mem_gb_hours": 101666.722222,
+      "measured_mem_gb_max_sum": 1693.869878,
+      "avg_memory_efficiency": 0.029448,
+      "jobs_with_measured_memory": 653,
+      "estimated_cost_dkk": 1991.637014,
+      "underutilized_cost_dkk": 1180.521223,
+      "gpu_hours": 26.119444,
+      "cpu_cost_dkk": 147.137304,
+      "mem_cost_dkk": 1652.084236,
+      "gpu_cost_dkk": 339.552778,
       "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 1742.147658,
-      "cost_bearer_efficiency": 0.029844,
-      "cost_bearer_waste_dkk": 1242.001213,
+      "cost_bearer_cost_dkk": 1652.084236,
+      "cost_bearer_efficiency": 0.029448,
+      "cost_bearer_waste_dkk": 1180.521223,
       "leaf_index": 14,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.2146,
+          "value": 0.2147,
           "weight": 0.6,
           "contribution": 0.1288
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.0298,
+          "value": 0.0294,
           "weight": 0.4,
-          "contribution": 0.0119
+          "contribution": 0.0118
         }
       ]
     }
@@ -1608,8 +1608,8 @@
       "suggestion": "Review CPU requests for recent jobs and reduce cores where wall time is not improving.",
       "confidence": "medium",
       "evidence": {
-        "avg_cpu_efficiency": 0.214596,
-        "jobs_with_measured_cpu": 627
+        "avg_cpu_efficiency": 0.214746,
+        "jobs_with_measured_cpu": 625
       }
     },
     {
@@ -1619,8 +1619,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.029844,
-        "jobs_with_measured_memory": 655
+        "avg_memory_efficiency": 0.029448,
+        "jobs_with_measured_memory": 653
       }
     }
   ],
@@ -1824,37 +1824,37 @@
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.2146,
+        "value": 0.2147,
         "weight": 0.6,
         "contribution": 0.1288
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.0298,
+        "value": 0.0294,
         "weight": 0.4,
-        "contribution": 0.0119
+        "contribution": 0.0118
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 655,
+      "jobs_measured": 653,
       "jobs_excluded": 5,
       "jobs_measured_pct": 99.24,
-      "cpu_hours_measured_pct": 24.57,
-      "memory_measured_pct": 1.62
+      "cpu_hours_measured_pct": 30.72,
+      "memory_measured_pct": 1.67
     },
-    "percentile": 47.5
+    "percentile": 48.2
   },
   "public_user_id": "usr_d40078dff98f",
   "display_pseudonym": "Copper Juniper",
   "personal_route_token": "u_ae5a0f6d74557b07ee752c8a37d85ad9",
   "username": "jwx891",
   "percentile_position": {
-    "overall": 60.8,
-    "cpu": 67.2,
+    "overall": 61.4,
+    "cpu": 68.0,
     "memory": 42.9,
-    "savings": 72.4
+    "savings": 73.2
   },
   "peer_comparisons": [
     {

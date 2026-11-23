@@ -1,6 +1,6 @@
 {
   "schema_version": "analytics-v1",
-  "generated_at": "2026-11-22T00:22:18Z",
+  "generated_at": "2026-11-23T04:54:49Z",
   "all_time_summary": {
     "jobs": 8232,
     "completed_jobs": 2831,
@@ -148,42 +148,42 @@
       ]
     },
     "180d": {
-      "jobs": 1202,
-      "completed_jobs": 713,
-      "failed_jobs": 489,
-      "cpu_hours_allocated": 23727.777222,
-      "measured_cpu_hours": 9069.710556,
-      "avg_cpu_efficiency": 0.417756,
-      "jobs_with_measured_cpu": 1083,
-      "requested_mem_gb_hours": 94997.045556,
-      "measured_mem_gb_max_sum": 4135.840648,
-      "avg_memory_efficiency": 0.125167,
-      "jobs_with_measured_memory": 1198,
-      "estimated_cost_dkk": 1560.871397,
-      "underutilized_cost_dkk": 970.643732,
+      "jobs": 1198,
+      "completed_jobs": 712,
+      "failed_jobs": 486,
+      "cpu_hours_allocated": 23544.3825,
+      "measured_cpu_hours": 9067.381667,
+      "avg_cpu_efficiency": 0.419273,
+      "jobs_with_measured_cpu": 1079,
+      "requested_mem_gb_hours": 93498.487778,
+      "measured_mem_gb_max_sum": 4123.802739,
+      "avg_memory_efficiency": 0.125119,
+      "jobs_with_measured_memory": 1194,
+      "estimated_cost_dkk": 1536.090075,
+      "underutilized_cost_dkk": 946.628004,
       "gpu_hours": 0.0,
-      "cpu_cost_dkk": 1542.305519,
-      "mem_cost_dkk": 1543.70199,
+      "cpu_cost_dkk": 1530.384862,
+      "mem_cost_dkk": 1519.350426,
       "gpu_cost_dkk": 0.0,
-      "cost_bearer": "memory",
-      "cost_bearer_cost_dkk": 1543.70199,
-      "cost_bearer_efficiency": 0.125167,
-      "cost_bearer_waste_dkk": 970.643732,
+      "cost_bearer": "cpu",
+      "cost_bearer_cost_dkk": 1530.384862,
+      "cost_bearer_efficiency": 0.419273,
+      "cost_bearer_waste_dkk": 946.628004,
       "leaf_index": 30,
       "leaf_index_components": [
         {
           "id": "cpu",
           "label": "CPU efficiency",
-          "value": 0.4178,
+          "value": 0.4193,
           "weight": 0.6,
-          "contribution": 0.2507
+          "contribution": 0.2516
         },
         {
           "id": "memory",
           "label": "Memory efficiency",
-          "value": 0.1252,
+          "value": 0.1251,
           "weight": 0.4,
-          "contribution": 0.0501
+          "contribution": 0.05
         }
       ]
     }
@@ -1953,8 +1953,8 @@
       "suggestion": "Use observed MaxRSS as a guide for smaller future memory requests, leaving a safety margin.",
       "confidence": "medium",
       "evidence": {
-        "avg_memory_efficiency": 0.125167,
-        "jobs_with_measured_memory": 1198
+        "avg_memory_efficiency": 0.125119,
+        "jobs_with_measured_memory": 1194
       }
     }
   ],
@@ -2158,25 +2158,25 @@
       {
         "id": "cpu",
         "label": "CPU efficiency",
-        "value": 0.4178,
+        "value": 0.4193,
         "weight": 0.6,
-        "contribution": 0.2507
+        "contribution": 0.2516
       },
       {
         "id": "memory",
         "label": "Memory efficiency",
-        "value": 0.1252,
+        "value": 0.1251,
         "weight": 0.4,
-        "contribution": 0.0501
+        "contribution": 0.05
       }
     ],
     "confidence": "low",
     "measurement_coverage": {
-      "jobs_measured": 1198,
+      "jobs_measured": 1194,
       "jobs_excluded": 4,
       "jobs_measured_pct": 99.67,
-      "cpu_hours_measured_pct": 38.22,
-      "memory_measured_pct": 4.35
+      "cpu_hours_measured_pct": 38.51,
+      "memory_measured_pct": 4.41
     },
     "percentile": 75.9
   },
@@ -2193,10 +2193,10 @@
   "peer_comparisons": [
     {
       "display_pseudonym": "Azure Nova",
-      "avg_cpu_efficiency": 0.11788771680819989,
-      "avg_memory_efficiency": 0.045136851474318666,
-      "underutilized_cost_dkk": 1175.2231720410005,
-      "percentile_position": 73.2
+      "avg_cpu_efficiency": 0.11537957187271958,
+      "avg_memory_efficiency": 0.04494531127135392,
+      "underutilized_cost_dkk": 1075.42303936344,
+      "percentile_position": 72.4
     },
     {
       "display_pseudonym": "Azure Raven",
